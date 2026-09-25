@@ -54,6 +54,15 @@ dropdown on click. It only appears when there are two or more layouts. `install.
 while Shift is already held, so it is removed from `kb_options` and two Hyprland release binds are used instead.) Selecting from the dropdown switches every
 keyboard on the seat (needed when keyd/fcitx5 sit between the keys and Hyprland).
 
+## Shortcut conflicts
+
+`scripts/keybind-audit.sh` (read-only, works on any Omarchy desktop) reports: the same chord bound twice in Hyprland; global
+binds without Super that steal chords from every app; Ghostty built-ins that shadow keys TUIs expect (Ctrl+Enter is
+fullscreen, Ctrl+Shift+Enter zooms a split, Ctrl+Tab switches tabs); and Orbital's own additions. `install.sh --full` frees
+**Ctrl+Enter** in Ghostty (`--fix-terminal-shortcuts` does only that), because it made Claude Code and other TUIs jump to
+fullscreen. Orbital's other bindings are opt-out: `--no-launcher-key` (SUPER+S opens the launcher and replaces Omarchy's own
+SUPER+S) and `--no-alt-shift` (Alt+Shift layout switching; it also fires after editor chords such as Alt+Shift+Down).
+
 ## Avatar
 
 The dock and the account card show `~/.config/omarchy/avatar.png` (the same file the lock-screen plugins read). Without it they

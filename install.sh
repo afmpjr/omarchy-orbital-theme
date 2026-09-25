@@ -7,7 +7,7 @@
 #
 #   --full  also reproduces the author's desktop: Orbital floating bar (bottom, half-size gap),
 #           dock left / workspaces center / divider + clock right, Super+S launcher binding,
-#           8/12 window gaps, text size 10, keyboard layout widget + Alt+Shift and default dock pins. Your shell.json is backed up first.
+#           frees Ctrl+Enter in Ghostty (--fix-terminal-shortcuts does only that), 8/12 window gaps, text size 10, keyboard layout widget + Alt+Shift and default dock pins. Your shell.json is backed up first.
 #
 # Idempotent. Never edits shell.json by hand (uses `omarchy plugin enable`),
 # backs up anything it replaces OUTSIDE the plugins folder (the shell scans it).
@@ -29,11 +29,12 @@ LIBS=(orbital.ui)
 WIDGETS=("orbital.dock:left" "orbital.workspaces:center" "orbital.keyboard:right" "orbital.clock:right")
 EXTRA_WIDGETS=(orbital.divider)
 
-DRY=0 RESTART=1 BAR=0 UNINSTALL=0 FULL=0 KBLAYOUTS=
+DRY=0 RESTART=1 BAR=0 UNINSTALL=0 FULL=0 KBLAYOUTS= LAUNCHER_KEY=1 ALT_SHIFT=1 TERM_FIX=0
 while (( $# )); do
   a=$1; shift
   case $a in
     --dry-run) DRY=1 ;; --no-restart) RESTART=0 ;; --bar-widgets) BAR=1 ;; --full) FULL=1; BAR=1 ;;
+    --no-launcher-key) LAUNCHER_KEY=0 ;; --no-alt-shift) ALT_SHIFT=0 ;; --fix-terminal-shortcuts) TERM_FIX=1 ;;
     --keyboard-layouts) KBLAYOUTS="${1:?--keyboard-layouts needs a list, e.g. us,br}"; shift ;; --uninstall) UNINSTALL=1 ;;
     -h|--help) sed -n 2,14p "$0"; exit 0 ;;
     *) echo "unknown option: $a" >&2; exit 2 ;;
@@ -51,6 +52,7 @@ uninstall() {
     have_omarchy && run omarchy plugin disable "$id" 2>/dev/null || true
     run rm -rf "$PLUGINS/$id"
   done
+  [[ -f $CFG/ghostty/config ]] && run sed -i '/^# orbital-shortcuts/,/^# orbital-shortcuts end/d' "$CFG/ghostty/config"
   run rm -f "$HYPR/orbital.lua" "$HYPR/orbital-gaps.lua" "$HYPR/orbital-bindings.lua" "$HYPR/orbital-keyboard.lua" "$DROPIN/orbital.conf"
   [[ -f $HYPR/hyprland.lua ]] && run sed -i '/-- orbital$/d' "$HYPR/hyprland.lua"
   say "shell.json is not reverted automatically; restore a backup: $CFG/omarchy/shell.json.bak-orbital-*"
@@ -111,6 +113,20 @@ full_shell_json() {
 
 # Alt+Shift switches layouts (xkb grp:alt_shift_toggle). Uses the layouts you already have in
 # ~/.config/hypr/input.lua, or --keyboard-layouts us,br. Written to its own file, loaded last.
+# Ghostty binds Ctrl+Enter to fullscreen (and Ctrl+Shift+Enter, Ctrl+Tab to split-zoom/tabs), so apps in
+# the terminal (Claude Code, editors, TUIs) never receive them. Free Ctrl+Enter, the one people hit by accident.
+terminal_shortcuts() {
+  local cfg="$CFG/ghostty/config" mark="# orbital-shortcuts"
+  [[ -f $cfg ]] || return 0
+  grep -qF "$mark" "$cfg" && return 0
+  grep -qE '^[[:space:]]*keybind[[:space:]]*=[[:space:]]*ctrl\+enter=' "$cfg" && return 0
+  say "Ghostty: freeing Ctrl+Enter for applications (was: toggle fullscreen)"
+  if (( ! DRY )); then
+    printf '\n%s (added by the Orbital installer; remove this block to get Ctrl+Enter fullscreen back)\nkeybind = ctrl+enter=unbind\n%s end\n' "$mark" "$mark" >> "$cfg"
+    omarchy restart terminal >/dev/null 2>&1 || true
+  fi
+}
+
 keyboard_setup() {
   local input="$HYPR/input.lua" layouts="$KBLAYOUTS" opts="compose:caps,shift:both_capslock_cancel"
   if [[ -f $input ]]; then
@@ -133,10 +149,13 @@ keyboard_setup() {
     cat > "$HYPR/orbital-keyboard.lua" <<LUA
 -- Orbital keyboard: layouts + Alt+Shift switching (loaded last). Edit or delete freely.
 hl.config({ input = { kb_layout = "$layouts", kb_options = "$opts" } })
+LUA
+    if (( ALT_SHIFT )); then cat >> "$HYPR/orbital-keyboard.lua" <<'LUA'
 local next_layout = hl.dsp.exec_cmd("hyprctl switchxkblayout all next")
 hl.bind("ALT + SHIFT + Shift_L", next_layout, { release = true })
 hl.bind("ALT + SHIFT + Alt_L", next_layout, { release = true })
 LUA
+    fi
     grep -qF 'hypr.orbital-keyboard' "$HYPR/hyprland.lua" || printf 'require("hypr.orbital-keyboard") -- orbital\n' >> "$HYPR/hyprland.lua"
   fi
 }
@@ -146,10 +165,10 @@ full_setup() {
   # Text size the layout was tuned at (shell, GTK and terminals), like the author's machine.
   run omarchy display text size 10 || echo "    (could not set the text size)"
   # Hyprland: bindings + gaps (gaps go BEFORE Omarchy's toggles so the gaps toggle still wins).
-  run cp "$REPO/hypr/orbital-bindings.lua" "$HYPR/orbital-bindings.lua"
+  if (( LAUNCHER_KEY )); then run cp "$REPO/hypr/orbital-bindings.lua" "$HYPR/orbital-bindings.lua"; else echo "    Launcher key: skipped (--no-launcher-key); bind it yourself: omarchy-shell shell toggle orbital.launcher"; fi
   run cp "$REPO/hypr/orbital-gaps.lua" "$HYPR/orbital-gaps.lua"
   if [[ -f $HYPR/hyprland.lua ]] && (( ! DRY )); then
-    grep -qF 'hypr.orbital-bindings' "$HYPR/hyprland.lua" || printf 'require("hypr.orbital-bindings") -- orbital\n' >> "$HYPR/hyprland.lua"
+    if (( LAUNCHER_KEY )); then grep -qF 'hypr.orbital-bindings' "$HYPR/hyprland.lua" || printf 'require("hypr.orbital-bindings") -- orbital\n' >> "$HYPR/hyprland.lua"; fi
     if ! grep -qF 'hypr.orbital-gaps' "$HYPR/hyprland.lua"; then
       if grep -q 'require("default.hypr.toggles")' "$HYPR/hyprland.lua"; then
         sed -i 's|^require("default.hypr.toggles")|require("hypr.orbital-gaps") -- orbital\n&|' "$HYPR/hyprland.lua"
@@ -157,6 +176,7 @@ full_setup() {
     fi
   fi
   keyboard_setup
+  terminal_shortcuts
   # Dock pins: only if the user has none yet; from what is actually installed.
   local pins="$HOME/.local/state/omarchy/orbital-dock.json"
   if [[ ! -f $pins ]] && (( ! DRY )); then
@@ -258,7 +278,7 @@ else
   echo "    Bar widgets not touched. To use them: ./install.sh --bar-widgets  (dock left, workspaces center, clock right)"
 fi
 
-if (( FULL )); then full_setup; fi
+if (( FULL )); then full_setup; elif (( TERM_FIX )); then terminal_shortcuts; fi
 if (( ! DRY )); then hyprctl reload >/dev/null 2>&1 || true; fi
 
 if (( RESTART )) && (( ! DRY )); then say "Restarting the shell"; omarchy restart shell || true; fi

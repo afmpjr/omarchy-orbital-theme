@@ -32,7 +32,10 @@ printf 'require("default.hypr.toggles")\n' >> "$HOME/.config/hypr/hyprland.lua"
 # Omarchy's stock input.lua: kb_layout/kb_options only in comments (a grep with no match must not abort the installer)
 printf -- '-- hl.config({ input = { kb_layout = "us" } })\nhl.config({ input = { repeat_rate = 40 } })\n' > "$HOME/.config/hypr/input.lua"
 touch "$HOME/.local/share/applications/com.mitchellh.ghostty.desktop"
+mkdir -p "$HOME/.config/ghostty"; printf 'font-size = 9\n' > "$HOME/.config/ghostty/config"
 "$REPO/install.sh" --full --no-restart >/dev/null
+GC="$HOME/.config/ghostty/config"
+[[ $(grep -c 'ctrl+enter=unbind' "$GC") == 1 ]] || bad "ghostty ctrl+enter not freed"; ok "Ghostty: Ctrl+Enter freed"
 SJ="$HOME/.config/omarchy/shell.json"
 [[ $(jq -r .bar.id "$SJ") == orbital.floating-bar && $(jq -r .bar.floatGapScale "$SJ") == 0.5 && $(jq -r .bar.cornerRadius "$SJ") == 10 ]] || bad "bar config"
 [[ $(jq -c '[.bar.layout.left[].id, .bar.layout.center[].id]' "$SJ") == '["orbital.dock","orbital.workspaces"]' ]] || bad "layout left/center"
@@ -49,6 +52,7 @@ grep -q "orbital-bindings" "$HOME/.config/hypr/hyprland.lua" || bad "bindings ho
 jq -e '.pinned | map(.entry) | index("com.mitchellh.ghostty")' "$HOME/.local/state/omarchy/orbital-dock.json" >/dev/null || bad "dock pins"; ok "default dock pins from installed apps"
 "$REPO/install.sh" --full --no-restart >/dev/null
 [[ $(jq -c '.bar.layout.right | map(.id) | map(select(. == "orbital.clock")) | length' "$SJ") == 1 ]] || bad "full not idempotent"; ok "full is idempotent"
+[[ $(grep -c 'ctrl+enter=unbind' "$GC") == 1 ]] || bad "ghostty block duplicated"; ok "Ghostty fix idempotent"
 [[ $(jq -r '.bar.layout.right[-4].id' "$SJ") == orbital.keyboard ]] || bad "keyboard widget not in layout"; ok "keyboard widget placed before divider + clock + bell"
 [[ ! -f $HOME/.config/hypr/orbital-keyboard.lua ]] || bad "keyboard file written with a single layout"; ok "single layout: no keyboard config forced"
 "$REPO/install.sh" --full --no-restart --keyboard-layouts br,us >/dev/null
@@ -81,6 +85,7 @@ rm -rf "$HOME/.local/state/omarchy/orbital-accent-base"
 out="$(python3 "$ACC" red 2>&1 || true)"
 [[ $out == *"pristine theme copy missing"* ]] && ok "missing baseline fails loudly" || bad "silent failure"
 "$REPO/install.sh" --uninstall >/dev/null
+! grep -q 'orbital-shortcuts' "$GC" || bad "ghostty block not removed"; ok "uninstall removes the Ghostty block"
 [[ ! -d $HOME/.config/omarchy/plugins/orbital.dock && ! -f $HOME/.config/hypr/orbital.lua ]] || bad "uninstall"
 ! grep -q 'hypr.orbital' "$HOME/.config/hypr/hyprland.lua" || bad "hook not removed"; ok "uninstall clean"
 echo "ALL PASSED"
