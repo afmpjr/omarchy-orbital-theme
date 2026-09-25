@@ -11,17 +11,17 @@ white, gray and black, or any hex).
 | Part | What it does | Installed by |
 |------|--------------|--------------|
 | Theme (repo root) | `colors.toml`, `shell.toml` (menu / popups / notifications glass tokens), terminals, GTK, btop, ... | `omarchy theme install` |
-| `plugins/orbital.launcher` | App drawer: search, categories, Recommended, per-app context menu (pin, move to category, uninstall) | `install.sh` |
-| `plugins/orbital.dock` | Dock (bar widget): pinned + running apps, context menu | `install.sh --bar-widgets` |
-| `plugins/orbital.clock`, `orbital.workspaces`, `orbital.divider` | Calendar popup with real reminders and weather, numbered workspace chips, hairline divider (bar widgets) | `install.sh --bar-widgets` |
-| `plugins/orbital.account` | Profile card, links, power actions | `install.sh` |
-| `plugins/orbital.appearance` | Color picker window (+ `orbital-accent.py`) | `install.sh` |
-| `plugins/orbital.worldclock` | World clock, alarms, timer | `install.sh` |
-| `plugins/orbital.crash` | "Process crashed" toast -> themed modal -> *Diagnose with AI* | `install.sh` |
-| `plugins/orbital.keyboard` | Tray widget: country flag of the active keyboard layout; click for a dropdown to switch. Alt+Shift also cycles | `install.sh --bar-widgets` |
-| `plugins/orbital.floating-bar` | The bar: Omarchy's bar floating off the edge, rounded corners. Fork of `charlieras262/floating-bar` | `install.sh` (default bar) |
-| `plugins/orbital.bar` | Alternative bar with dock, workspace pills and system controls built in | `install.sh` (pick with `omarchy plugin enable orbital.bar`) |
-| `plugins/orbital.ui` | Shared UI contract (tokens + dialog); library, not a plugin | `install.sh` |
+| [`orbital.launcher`](plugins/orbital.launcher/) | App drawer: search, categories, Recommended, per-app context menu (pin, move to category, uninstall) | `install.sh` |
+| [`orbital.dock`](plugins/orbital.dock/) | Dock (bar widget): pinned + running apps, context menu | `install.sh --bar-widgets` |
+| [`orbital.clock`](plugins/orbital.clock/), [`orbital.workspaces`](plugins/orbital.workspaces/), [`orbital.divider`](plugins/orbital.divider/) | Calendar popup with real reminders and weather, numbered workspace chips, hairline divider (bar widgets) | `install.sh --bar-widgets` |
+| [`orbital.account`](plugins/orbital.account/) | Profile card, links, power actions | `install.sh` |
+| [`orbital.appearance`](plugins/orbital.appearance/) | Color picker window (+ `orbital-accent.py`) | `install.sh` |
+| [`orbital.worldclock`](plugins/orbital.worldclock/) | World clock, alarms, timer | `install.sh` |
+| [`orbital.crash`](plugins/orbital.crash/) | "Process crashed" toast -> themed modal -> *Diagnose with AI* | `install.sh` |
+| [`orbital.keyboard`](plugins/orbital.keyboard/) | Tray widget: country flag of the active keyboard layout; click for a dropdown to switch. Alt+Shift also cycles | `install.sh --bar-widgets` |
+| [`orbital.floating-bar`](plugins/orbital.floating-bar/) | The bar: Omarchy's bar floating off the edge, rounded corners. Fork of `charlieras262/floating-bar` | `install.sh` (default bar) |
+| [`orbital.bar`](plugins/orbital.bar/) | Alternative bar with dock, workspace pills and system controls built in | `install.sh` (pick with `omarchy plugin enable orbital.bar`) |
+| [`orbital.ui`](plugins/orbital.ui/) | Shared UI contract (tokens + dialog); library, not a plugin | `install.sh` |
 | `hypr/orbital.lua` | Blur for the popups, rounded windows, glass terminals, eased horizontal workspace slide | `install.sh` |
 
 Each plugin has its own README with options and attribution. Two bars ship on purpose: only the one named in
