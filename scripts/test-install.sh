@@ -55,7 +55,8 @@ done; ok "plugins installed"
 grep -q 'require("hypr.orbital")' "$HOME/.config/hypr/hyprland.lua" && [[ -f $HOME/.config/hypr/orbital.lua ]] || bad "hyprland hook"; ok "hyprland hook"
 "$REPO/install.sh" --no-restart >/dev/null
 [[ $(grep -c 'require("hypr.orbital")' "$HOME/.config/hypr/hyprland.lua") == 1 ]] || bad "hook not idempotent"; ok "idempotent hook"
-grep -q "plugin enable orbital.dock --section left" "$HOME/omarchy-calls.log" || bad "dock not placed"; ok "bar widgets placed via CLI"
+[[ $(jq -r '.bar.layout.right[-1].id' "$HOME/.config/omarchy/shell.json") == orbital.clock ]] || bad "--full layout was disturbed by widget placement"
+! grep -q "plugin enable orbital.clock --section" "$HOME/omarchy-calls.log" || bad "--full must not re-place widgets"; ok "--full keeps its layout (no widget re-placement)"
 [[ -f $HOME/.local/state/omarchy/orbital-accent-base/colors.toml ]] || bad "baseline"
 grep -q '^accent = "#39A9FF"' "$HOME/.local/state/omarchy/orbital-accent-base/colors.toml" || bad "baseline not blue"; ok "pristine blue baseline"
 

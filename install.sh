@@ -222,7 +222,19 @@ enable_verified() { # `plugin enable` talks to the running shell; confirm it stu
 }
 for id in "${OVERLAYS[@]}"; do if (( DRY )); then echo "    [dry-run] enable $id"; else enable_verified "$id" || true; fi; done
 if (( BAR )); then
-  for w in "${WIDGETS[@]}"; do run omarchy plugin enable "${w%%:*}" --section "${w##*:}" || echo "    (could not place ${w%%:*})"; done
+  if (( FULL )); then
+    echo "    Bar layout already written by --full."
+  else
+    for w in "${WIDGETS[@]}"; do run omarchy plugin enable "${w%%:*}" --section "${w##*:}" || echo "    (could not place ${w%%:*})"; done
+    # `enable --section` inserts at the START of a section; right-hand widgets belong at the end
+    # (keyboard, then clock), so move them there.
+    if (( ! DRY )); then
+      for id in orbital.keyboard orbital.clock; do
+        n="$(jq '.bar.layout.right | length' "$SJ" 2>/dev/null || echo 0)"
+        (( n > 0 )) && omarchy bar move "$id" --section right --index $((n - 1)) >/dev/null 2>&1 || true
+      done
+    fi
+  fi
 else
   echo "    Bar widgets not touched. To use them: ./install.sh --bar-widgets  (dock left, workspaces center, clock right)"
 fi
