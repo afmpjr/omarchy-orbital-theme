@@ -10,7 +10,7 @@ var pt = {
   "Custom": "Personalizada", "Enter to apply": "Enter para aplicar", "Themes and wallpapers ›": "Temas e papéis de parede ›",
   "Blue": "Azul", "Indigo": "Índigo", "Purple": "Roxo", "Lilac": "Lilás", "Magenta": "Magenta", "Pink": "Rosa",
   "Rose": "Rosé", "Red": "Vermelho", "Orange": "Laranja", "Amber": "Âmbar", "Lime": "Limão", "Green": "Verde",
-  "Mint": "Menta", "Teal": "Azul-petróleo", "Cyan": "Ciano", "White": "Branco", "Gray": "Cinza", "Black": "Preto",
+  "Mint": "Menta", "Teal": "Turquesa", "Cyan": "Ciano", "White": "Branco", "Gray": "Cinza", "Black": "Preto",
   // Clock / calendar
   "Back to today": "Voltar para hoje", "Previous month": "Mês anterior", "Next month": "Próximo mês", "Today": "Hoje",
   "BORN": "NASCEU", "LIVE TO": "VIVER ATÉ", "LIFE": "VIDA", "year": "ano", "in ": "em ",

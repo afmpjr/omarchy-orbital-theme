@@ -395,7 +395,7 @@ checks() {
   for d in "$REPO"/plugins/*/; do
     id="$(basename "$d")"
     if [[ $id == orbital.ui ]]; then
-      [[ -f $d/OrbitalTokens.qml ]] || problem "the package is incomplete: plugins/$id/OrbitalTokens.qml is missing"
+      [[ -f $d/OrbitalTokens.qml && -f $d/OrbitalI18n.qml && -f $d/I18n.js ]] || problem "the package is incomplete: plugins/$id/OrbitalTokens.qml, OrbitalI18n.qml or I18n.js is missing"
     elif [[ ! -f $d/manifest.json ]]; then
       problem "the package is incomplete: plugins/$id/manifest.json is missing"
     fi

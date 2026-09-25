@@ -5,11 +5,18 @@ unreleased, so the entries describe the current state rather than a sequence of 
 
 ## Unreleased
 
+### Languages
+
+- The interface is available in English and Brazilian Portuguese (system locale, or `ORBITAL_LANG=pt|en`); day and month
+  names in the calendar follow it. `scripts/test-i18n.sh` keeps the dictionary and the plugins in sync.
+
 ### Installer: adopts what you already have
 
 - The installer no longer adds a second copy of something your Hyprland config already does: glass rules, the launcher
   key, gaps and the touchpad gesture are left alone (dotfiles symlinks are followed and never replaced), and an
   `orbital-keyboard.lua` you wrote yourself is kept. `--keep-bar` keeps the bar you use now.
+- `--refresh-theme` overwrites the theme copy (after a backup); `--theme-dir DIR` (or the prompt, in a terminal) keeps it
+  elsewhere and links `themes/orbital` to it.
 - Run from a clone in any folder, the installer copies the theme files that are missing into
   `~/.config/omarchy/themes/orbital` (never overwriting the ones already there).
 - `--full` enables the 4-finger horizontal touchpad swipe for workspaces (`--no-gestures` skips it).
