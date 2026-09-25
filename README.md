@@ -48,10 +48,21 @@ and tells you what failed**; your shell is only restarted when everything is in 
 something (a missing `curl` for the weather, a notification bell that could not be fetched) is reported as a warning
 instead, and never blocks the install.
 
-`--bar-widgets` is the flag that puts the widgets in your bar. It keeps the widgets you already had and **appends**
-Orbital's at the end of each section — the dock on the left, the keyboard flag, the hairline divider and the
-clock/calendar on the right — and switches the bar itself to Orbital's floating one (rounded corners, a gap off the
-edge). It does **not** move your bar or change its position.
+`--bar-widgets` is the flag that puts the widgets in your bar. It **appends** Orbital's to the sections your bar already
+uses — the dock on the left, the workspaces in the middle, the keyboard flag, the hairline divider and the clock/calendar
+on the right — and switches the bar itself to Orbital's floating one (rounded corners, a gap off the edge). It does
+**not** move your bar or change its position.
+
+One thing to know: Omarchy allows a single workspaces widget and a single clock, so Orbital's two **take the place of**
+`omarchy.workspaces` and `omarchy.clock` — that is Omarchy switching roles over, not the installer deleting anything. Every
+other stock widget (menu, indicators, tray, weather, system-update, network, audio, bluetooth, power, agents, monitor,
+keyboard layout) stays exactly where it was. To hand a role back to the stock widget, enable it again and Orbital's steps
+aside:
+
+```bash
+omarchy plugin enable omarchy.workspaces --section left    # back to the stock workspaces
+omarchy plugin enable omarchy.clock --section center        # back to the stock clock
+```
 
 `./install.sh --full` reproduces the author's whole desktop instead (bar at the bottom, widget layout, **Super**+**S**
 launcher, gaps, text size 10, Alt+Shift layout switching, dock pins); it backs up `shell.json` first.
