@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "id": "orbital.bar",
+  "name": "Orbital Bar",
+  "description": "Floating glass bar with the dock, workspace pills and system controls built in. Alternative to orbital.floating-bar: only the bar named in shell.json is loaded.",
+  "version": "1.0.0",
+  "kinds": [
+    "bar"
+  ],
+  "entryPoints": {
+    "bar": "Bar.qml"
+  },
+  "author": "afmpjr",
+  "license": "MIT"
+}

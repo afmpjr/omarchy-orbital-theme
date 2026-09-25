@@ -1,0 +1,10 @@
+AvatarWidget AvatarWidget.qml
+DockSection DockSection.qml
+DockItem DockItem.qml
+DockModel DockModel.js
+WorkspacePills WorkspacePills.qml
+WorkspacePill WorkspacePill.qml
+WorkspaceModel WorkspaceModel.js
+SystemControls SystemControls.qml
+SystemControlButton SystemControlButton.qml
+Clock Clock.qml

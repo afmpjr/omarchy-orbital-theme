@@ -1,13 +1,16 @@
 #!/usr/bin/env bash
 # Orbital installer: theme companions that `omarchy theme install` cannot ship.
 #
-#   omarchy theme install https://github.com/<you>/omarchy-orbital-theme   # the theme itself
+#   omarchy theme install https://github.com/afmpjr/omarchy-orbital-theme   # the theme itself
 #   ./install.sh [--full] [--keyboard-layouts us,br] [--bar-widgets] [--no-restart] [--dry-run]      # plugins + Hyprland glass
 #   ./install.sh --uninstall
 #
 #   --full  also reproduces the author's desktop: Orbital floating bar (bottom, half-size gap),
 #           dock left / workspaces center / divider + clock right, Super+S launcher binding,
 #           frees Ctrl+Enter in Ghostty (--fix-terminal-shortcuts does only that), 8/12 window gaps, text size 10, keyboard layout widget + Alt+Shift and default dock pins. Your shell.json is backed up first.
+#
+# Both bar plugins are copied (orbital.floating-bar, the default, and orbital.bar, the self-contained
+# alternative), but only the one named in shell.json's .bar.id is ever loaded.
 #
 # Idempotent. Never edits shell.json by hand (uses `omarchy plugin enable`),
 # backs up anything it replaces OUTSIDE the plugins folder (the shell scans it).
@@ -36,7 +39,7 @@ while (( $# )); do
     --dry-run) DRY=1 ;; --no-restart) RESTART=0 ;; --bar-widgets) BAR=1 ;; --full) FULL=1; BAR=1 ;;
     --no-launcher-key) LAUNCHER_KEY=0 ;; --no-alt-shift) ALT_SHIFT=0 ;; --fix-terminal-shortcuts) TERM_FIX=1 ;;
     --keyboard-layouts) KBLAYOUTS="${1:?--keyboard-layouts needs a list, e.g. us,br}"; shift ;; --uninstall) UNINSTALL=1 ;;
-    -h|--help) sed -n 2,14p "$0"; exit 0 ;;
+    -h|--help) sed -n 2,17p "$0"; exit 0 ;;
     *) echo "unknown option: $a" >&2; exit 2 ;;
   esac
 done
@@ -48,7 +51,7 @@ have_omarchy() { command -v omarchy >/dev/null 2>&1; }
 
 uninstall() {
   say "Removing Orbital plugins, Hyprland hook and crash drop-in"
-  for id in "${OVERLAYS[@]}" "${LIBS[@]}" orbital.floating-bar "${EXTRA_WIDGETS[@]}" "${WIDGETS[@]%%:*}"; do
+  for id in "${OVERLAYS[@]}" "${LIBS[@]}" orbital.floating-bar orbital.bar "${EXTRA_WIDGETS[@]}" "${WIDGETS[@]%%:*}"; do
     have_omarchy && run omarchy plugin disable "$id" 2>/dev/null || true
     run rm -rf "$PLUGINS/$id"
   done

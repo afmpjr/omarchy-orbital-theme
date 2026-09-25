@@ -68,9 +68,9 @@ grep -q 'kb_layout = "br,us"' "$KB" && grep -q 'Shift_L", next_layout, { release
 [[ $(grep -c 'hypr.orbital-keyboard' "$HOME/.config/hypr/hyprland.lua") == 1 ]] || bad "keyboard hook twice"
 "$REPO/install.sh" --full --no-restart --keyboard-layouts br,us >/dev/null
 [[ $(grep -c 'hypr.orbital-keyboard' "$HOME/.config/hypr/hyprland.lua") == 1 ]] || bad "keyboard hook not idempotent"; ok "keyboard hook idempotent"
-for id in orbital.launcher orbital.dock orbital.account orbital.appearance orbital.worldclock orbital.crash orbital.ui orbital.clock orbital.workspaces orbital.divider; do
+for id in orbital.launcher orbital.dock orbital.account orbital.appearance orbital.worldclock orbital.crash orbital.ui orbital.clock orbital.workspaces orbital.divider orbital.floating-bar orbital.bar; do
   [[ -d $HOME/.config/omarchy/plugins/$id ]] || bad "plugin $id missing"
-done; ok "plugins installed"
+done; ok "plugins installed (both bars present, only .bar.id is ever loaded)"
 grep -q 'require("hypr.orbital")' "$HOME/.config/hypr/hyprland.lua" && [[ -f $HOME/.config/hypr/orbital.lua ]] || bad "hyprland hook"; ok "hyprland hook"
 "$REPO/install.sh" --no-restart >/dev/null
 [[ $(grep -c 'require("hypr.orbital")' "$HOME/.config/hypr/hyprland.lua") == 1 ]] || bad "hook not idempotent"; ok "idempotent hook"
@@ -92,6 +92,6 @@ out="$(python3 "$ACC" red 2>&1 || true)"
 [[ $out == *"pristine theme copy missing"* ]] && ok "missing baseline fails loudly" || bad "silent failure"
 "$REPO/install.sh" --uninstall >/dev/null
 ! grep -q 'orbital-shortcuts' "$GC" || bad "ghostty block not removed"; ok "uninstall removes the Ghostty block"
-[[ ! -d $HOME/.config/omarchy/plugins/orbital.dock && ! -f $HOME/.config/hypr/orbital.lua ]] || bad "uninstall"
+[[ ! -d $HOME/.config/omarchy/plugins/orbital.dock && ! -d $HOME/.config/omarchy/plugins/orbital.bar && ! -d $HOME/.config/omarchy/plugins/orbital.floating-bar && ! -f $HOME/.config/hypr/orbital.lua ]] || bad "uninstall"
 ! grep -q 'hypr.orbital' "$HOME/.config/hypr/hyprland.lua" || bad "hook not removed"; ok "uninstall clean"
 echo "ALL PASSED"
