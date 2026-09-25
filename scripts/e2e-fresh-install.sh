@@ -45,6 +45,7 @@ readme_says "omarchy theme set orbital"
 "$TB" ssh "$ENVSET; omarchy theme set orbital" 2>&1 | tail -2
 sleep 8
 
+# shellcheck disable=SC2088
 GT='~/.config/omarchy/themes/orbital'   # single quotes: the tilde must be expanded by the guest, not here
 # The clone has to be the published repo, whole and clean.
 "$TB" ssh "$ENVSET; cd $GT && git rev-parse --short HEAD && git status --porcelain" > /tmp/e2e-fresh-git 2>&1
@@ -57,8 +58,8 @@ for f in CREDITS.md LICENSE README.md install.sh .omarchy-theme.yml; do
 done
 "$TB" ssh "$ENVSET; test -x $GT/install.sh" || bad "install.sh lost its exec bit in the clone"
 N="$("$TB" ssh "$ENVSET; ls -1 $GT/backgrounds | wc -l")"
-[[ $N == 6 ]] || bad "expected 6 wallpapers in the published repo, found $N"
-ok "published repo is complete (docs, license, executable installer, $N wallpapers)"
+[[ $N == 1 ]] || bad "expected 1 wallpaper in the published repo, found $N"
+ok "published repo is complete (docs, license, executable installer, $N wallpaper)"
 
 # Theme applied.
 THEME="$("$TB" ssh "$ENVSET; cat ~/.local/state/omarchy/current/theme.name")"
@@ -130,7 +131,7 @@ ok "a failed re-install rolls back to the installed state instead of breaking it
 # Screenshot: best effort. The guest keeps its native 1280x800 (this Hyprland's `hyprctl dispatch`
 # is the Lua form, so the classic `workspace 9` is a syntax error there and resizing is not worth
 # fighting for a test artifact); a missing launcher in the picture must not fail the run.
-for i in 1 2 3 4; do
+for _ in 1 2 3 4; do
   "$TB" ssh "$ENVSET; hyprctl layers" 2>/dev/null | grep -q orbital-launcher && break
   "$TB" ssh "$ENVSET; omarchy-shell shell toggle orbital.launcher '{}'" >/dev/null 2>&1 || true
   sleep 3

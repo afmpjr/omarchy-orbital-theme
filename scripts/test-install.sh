@@ -237,6 +237,11 @@ cmp -s "$D/hyprland.lua" "$HOME/hl.orig" || [[ $(grep -c 'hypr.orbital-gaps' "$D
 [[ $(grep -c 'orbital-gaps' "$D/hyprland.lua") -le 1 ]] || bad "gaps required twice"
 [[ $(jq -r .bar.id "$HOME/.config/omarchy/shell.json") == someone.floating-bar ]] || bad "--keep-bar changed the bar"
 [[ $(jq -c '[.bar.layout[][]?.id] | group_by(.) | map(select(length > 1)) | length' "$HOME/.config/omarchy/shell.json") == 0 ]] || bad "a widget is placed twice"
+"$REPO/install.sh" --uninstall --no-restart >/dev/null 2>&1 || bad "uninstall on an existing setup failed"
+[[ -L $H/orbital-keyboard.lua ]] && cmp -s "$D/orbital-keyboard.lua" "$HOME/kb.orig" || bad "uninstall removed the user's own keyboard file"
+grep -qF 'hypr.orbital-keyboard' "$D/hyprland.lua" || bad "uninstall removed the user's own keyboard require"
+[[ -L $H/hyprland.lua ]] || bad "uninstall replaced the hyprland.lua symlink"
+! grep -q -- '-- orbital$' "$D/hyprland.lua" || bad "uninstall left the installer's require lines"
 export HOME="$SAVED_HOME"
 ok "existing setup adopted: nothing duplicated, symlinks and your own files untouched"
 
