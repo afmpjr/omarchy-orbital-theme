@@ -19,5 +19,13 @@ sleep 10
 "$TB" ssh "$ENVSET; hyprctl eval 'hl.monitor({ output = \"\", mode = \"1366x768@60\", position = \"auto\", scale = 1 })' >/dev/null; hyprctl dispatch 'hl.dsp.focus({ workspace = \"9\" })' >/dev/null; for i in 1 2 3 4; do hyprctl layers | grep -q orbital-launcher && break; omarchy-shell shell toggle orbital.launcher '{}'; sleep 3; done"
 sleep 4; "$TB" shot "$OUT"
 "$TB" ssh "$ENVSET; hyprctl configerrors | head -3; omarchy plugin list | grep orbital"
-n="$("$TB" ssh "$ENVSET; omarchy plugin list | grep -c 'orbital.*disabled'" || true)"
-[[ $n == 0 ]] || { echo "FAIL: $n orbital plugin(s) disabled"; exit 1; }; echo "all orbital plugins enabled"
+LIST="$("$TB" ssh "$ENVSET; omarchy plugin list")"
+BAR="$("$TB" ssh "$ENVSET; jq -r .bar.id ~/.config/omarchy/shell.json")"
+[[ $BAR == orbital.floating-bar ]] || { echo "FAIL: --full should select orbital.floating-bar, got '$BAR'"; exit 1; }
+DISABLED="$(grep -c 'orbital.*disabled' <<<"$LIST" || true)"
+BAR_ON="$(grep -c 'orbital\.floating-bar.*enabled' <<<"$LIST" || true)"
+OTHER_OFF="$(grep -c '^orbital\.bar .*disabled' <<<"$LIST" || true)"
+[[ $BAR_ON == 1 ]] || { echo "FAIL: --full should leave orbital.floating-bar enabled"; exit 1; }
+[[ $OTHER_OFF == 1 ]] || { echo "FAIL: the unused bar alternative should be the only disabled one"; exit 1; }
+[[ $DISABLED == 1 ]] || { echo "FAIL: $DISABLED orbital plugin(s) disabled, expected only the inactive bar"; exit 1; }
+echo "all orbital plugins enabled except the inactive bar alternative (bar.id=$BAR)"
