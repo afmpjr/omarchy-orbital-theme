@@ -49,8 +49,9 @@ CLI: `python3 ~/.config/omarchy/plugins/orbital.appearance/orbital-accent.py <pr
 
 The `orbital.keyboard` tray widget shows the flag of the active layout (text label for layouts without a flag) and opens a
 dropdown on click. It only appears when there are two or more layouts. `install.sh --full` reads your layouts from
-`~/.config/hypr/input.lua` (or use `--keyboard-layouts br,us`) and adds `grp:alt_shift_toggle` to `kb_options`, so **Alt+Shift**
-switches, in a small `~/.config/hypr/orbital-keyboard.lua` you can edit or delete. Selecting from the dropdown switches every
+`~/.config/hypr/input.lua` (or use `--keyboard-layouts br,us`) and makes **Alt+Shift** switch, in either order, through a small
+`~/.config/hypr/orbital-keyboard.lua` you can edit or delete. (xkb's own `grp:alt_shift_toggle` only fires when Alt goes down
+while Shift is already held, so it is removed from `kb_options` and two Hyprland release binds are used instead.) Selecting from the dropdown switches every
 keyboard on the seat (needed when keyd/fcitx5 sit between the keys and Hyprland).
 
 ## Avatar

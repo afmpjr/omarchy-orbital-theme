@@ -42,7 +42,8 @@ jq -e '.pinned | map(.entry) | index("com.mitchellh.ghostty")' "$HOME/.local/sta
 [[ ! -f $HOME/.config/hypr/orbital-keyboard.lua ]] || bad "keyboard file written with a single layout"; ok "single layout: no keyboard config forced"
 "$REPO/install.sh" --full --no-restart --keyboard-layouts br,us >/dev/null
 KB="$HOME/.config/hypr/orbital-keyboard.lua"
-grep -q 'kb_layout = "br,us"' "$KB" && grep -q 'grp:alt_shift_toggle' "$KB" || bad "keyboard config"; ok "Alt+Shift toggle configured for br,us"
+grep -q 'kb_layout = "br,us"' "$KB" && grep -q 'Shift_L", next_layout, { release = true }' "$KB" && grep -q 'Alt_L", next_layout' "$KB" || bad "keyboard config"
+! grep -q 'grp:' "$KB" || bad "grp: option must not be set (it would double-toggle)"; ok "Alt+Shift release binds configured for br,us (no grp: option)"
 [[ $(grep -c 'hypr.orbital-keyboard' "$HOME/.config/hypr/hyprland.lua") == 1 ]] || bad "keyboard hook twice"
 "$REPO/install.sh" --full --no-restart --keyboard-layouts br,us >/dev/null
 [[ $(grep -c 'hypr.orbital-keyboard' "$HOME/.config/hypr/hyprland.lua") == 1 ]] || bad "keyboard hook not idempotent"; ok "keyboard hook idempotent"

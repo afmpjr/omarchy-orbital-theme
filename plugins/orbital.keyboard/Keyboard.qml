@@ -37,7 +37,17 @@ BarWidget {
   property int menuFocus: 0
   readonly property var layouts: KeyboardLayoutModel.layoutList(keyboardInfo, layoutDescriptions, layoutBriefs)
   readonly property int activeIndex: keyboardInfo && keyboardInfo.active_layout_index ? keyboardInfo.active_layout_index : 0
-  readonly property bool altShiftToggle: keyboardInfo && String(keyboardInfo.options || "").indexOf("grp:alt_shift_toggle") !== -1
+  // Alt+Shift works either through xkb's option or through install.sh's release binds
+  // (~/.config/hypr/orbital-keyboard.lua); show the hint when one of them is in place.
+  readonly property bool altShiftToggle: orbitalKeyboardFile.loaded
+    || (keyboardInfo && String(keyboardInfo.options || "").indexOf("grp:alt_shift_toggle") !== -1)
+
+  FileView {
+    id: orbitalKeyboardFile
+    path: Quickshell.env("HOME") + "/.config/hypr/orbital-keyboard.lua"
+    printErrors: false
+    watchChanges: false
+  }
   readonly property string layoutLabel: KeyboardLayoutModel.shortLabel(layoutFull, layoutBriefs)
 
   // A query already in flight was started before this event, so it may read the

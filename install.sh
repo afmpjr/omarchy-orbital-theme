@@ -109,12 +109,21 @@ keyboard_setup() {
     echo "    Keyboard: only one layout configured; pass --keyboard-layouts us,br to enable switching (the tray widget stays hidden until then)."
     return 0
   fi
+  # xkb's own grp:alt_shift_toggle only fires when Alt goes down while Shift is already held, so the
+  # usual Alt-then-Shift does nothing. Drop any grp: option and use two release binds instead: they
+  # fire once per Alt+Shift chord in either order (mods at release time are ALT+SHIFT), and never on
+  # Alt or Shift alone.
   opts="$(echo "$opts" | tr ',' '\n' | grep -v '^grp:' | paste -sd, -)"
-  opts="${opts:+$opts,}grp:alt_shift_toggle"
-  say "Keyboard layouts: $layouts (Alt+Shift switches)"
+  say "Keyboard layouts: $layouts (Alt+Shift switches, either order)"
   run mkdir -p "$HYPR"
   if (( ! DRY )); then
-    printf -- '-- Orbital keyboard: layouts + Alt+Shift toggle (loaded last). Edit or delete freely.\nhl.config({ input = { kb_layout = "%s", kb_options = "%s" } })\n' "$layouts" "$opts" > "$HYPR/orbital-keyboard.lua"
+    cat > "$HYPR/orbital-keyboard.lua" <<LUA
+-- Orbital keyboard: layouts + Alt+Shift switching (loaded last). Edit or delete freely.
+hl.config({ input = { kb_layout = "$layouts", kb_options = "$opts" } })
+local next_layout = hl.dsp.exec_cmd("hyprctl switchxkblayout all next")
+hl.bind("ALT + SHIFT + Shift_L", next_layout, { release = true })
+hl.bind("ALT + SHIFT + Alt_L", next_layout, { release = true })
+LUA
     grep -qF 'hypr.orbital-keyboard' "$HYPR/hyprland.lua" || printf 'require("hypr.orbital-keyboard") -- orbital\n' >> "$HYPR/hyprland.lua"
   fi
 }
