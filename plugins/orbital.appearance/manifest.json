@@ -5,8 +5,11 @@
   "version": "1.0.0",
   "author": "afmpjr",
   "description": "Appearance window: pick the theme's accent/glass color (presets or custom hex).",
-  "kinds": ["overlay"],
+  "kinds": [
+    "overlay"
+  ],
   "entryPoints": {
     "overlay": "Appearance.qml"
-  }
+  },
+  "license": "MIT"
 }

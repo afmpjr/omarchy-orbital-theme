@@ -3,7 +3,7 @@
   "id": "orbital.clock",
   "name": "Orbital Clock",
   "version": "1.0.0",
-  "author": "Omarchy",
+  "author": "afmpjr",
   "description": "Date/time label with a calendar popup",
   "kinds": [
     "bar-widget"
@@ -19,5 +19,6 @@
   },
   "omarchy": {
     "clonedFrom": "omarchy.clock"
-  }
+  },
+  "license": "MIT"
 }

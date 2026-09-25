@@ -16,5 +16,6 @@
     "description": "Thin hairline between widget groups",
     "category": "Layout",
     "allowMultiple": true
-  }
+  },
+  "license": "MIT"
 }

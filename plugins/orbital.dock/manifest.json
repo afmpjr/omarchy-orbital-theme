@@ -16,5 +16,6 @@
     "description": "Pinned apps: click to launch or focus, dot while running",
     "category": "Launchers",
     "allowMultiple": false
-  }
+  },
+  "license": "MIT"
 }

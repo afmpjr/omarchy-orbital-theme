@@ -5,8 +5,11 @@
   "version": "1.0.0",
   "author": "afmpjr",
   "description": "Mockup-style account/profile panel: avatar, real name/email, quick links to real settings, and power actions.",
-  "kinds": ["overlay"],
+  "kinds": [
+    "overlay"
+  ],
   "entryPoints": {
     "overlay": "Account.qml"
-  }
+  },
+  "license": "MIT"
 }
