@@ -181,7 +181,7 @@ full_setup() {
   local pins="$HOME/.local/state/omarchy/orbital-dock.json"
   if [[ ! -f $pins ]] && (( ! DRY )); then
     local b t f entries=()
-    b="$(xdg-settings get default-web-browser 2>/dev/null | sed 's/\.desktop$//')"
+    b="$(xdg-settings get default-web-browser 2>/dev/null | sed 's/\.desktop$//' || true)"
     t="$(desktop_id com.mitchellh.ghostty Alacritty kitty foot)"
     f="$(desktop_id org.gnome.Nautilus org.kde.dolphin thunar)"
     for e in "$b" "$t" "$f"; do [[ -n $e ]] && entries+=("$e"); done

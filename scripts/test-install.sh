@@ -19,8 +19,14 @@ case "$1 $2" in
 esac
 exit 0
 STUB
+# Everything that could touch the REAL session is stubbed: this test must never restart, kill or
+# reload anything on the machine that runs it (an earlier version killed the user's shell).
+for c in omarchy-shell quickshell hyprctl systemctl xdg-settings; do
+  printf '#!/usr/bin/env bash\nexit 1\n' > "$T/bin/$c"
+done
 printf '#!/usr/bin/env bash\nexit 0\n' > "$T/bin/omarchy-shell"
-chmod +x "$T/bin/omarchy" "$T/bin/omarchy-shell"; export PATH="$T/bin:$PATH"
+chmod +x "$T/bin/"*; export PATH="$T/bin:$PATH"
+for c in quickshell hyprctl systemctl; do [[ $(command -v $c) == "$T/bin/$c" ]] || { echo "sandbox failed to stub $c"; exit 1; }; done
 ok() { echo "ok   - $1"; }; bad() { echo "FAIL - $1"; exit 1; }
 
 # Theme as `omarchy theme install` would leave it (clone in themes/orbital).
