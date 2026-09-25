@@ -10,6 +10,8 @@ unreleased, so the entries describe the current state rather than a sequence of 
 - The installer no longer adds a second copy of something your Hyprland config already does: glass rules, the launcher
   key, gaps and the touchpad gesture are left alone (dotfiles symlinks are followed and never replaced), and an
   `orbital-keyboard.lua` you wrote yourself is kept. `--keep-bar` keeps the bar you use now.
+- Run from a clone in any folder, the installer copies the theme files that are missing into
+  `~/.config/omarchy/themes/orbital` (never overwriting the ones already there).
 - `--full` enables the 4-finger horizontal touchpad swipe for workspaces (`--no-gestures` skips it).
 - `--uninstall` removes the `require` lines before the files (no transient Hyprland config error), and never removes
   symlinks or files that are not the installer's own.

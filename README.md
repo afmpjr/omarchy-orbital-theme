@@ -27,6 +27,10 @@ white, gray and black, or any hex).
 Each plugin has its own README with options and attribution. Two bars ship on purpose: only the one named in
 `shell.json`'s `.bar.id` is ever loaded, so the other is just an option in the bar menu.
 
+**Cloned somewhere else?** `install.sh` works from any folder: it copies the theme files that are not yet in
+`~/.config/omarchy/themes/orbital` (terminal configs, Lua and wallpaper included) and never overwrites one that is already
+there, since the accent picker rewrites them. Then `omarchy theme set orbital`.
+
 Why two steps? `omarchy theme install` only stages theme files (and drops `*.lua`, terminal configs and `vscode.json` from git
 themes), and plugins are added with `omarchy plugin add`, one repository each. `install.sh` bridges the gap.
 
