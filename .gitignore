@@ -2,3 +2,5 @@ __pycache__/
 *.pyc
 *.pre-*
 test-output/
+AI_HANDOFF.md
+AI_HANDOFF_ARCHIVE.md
