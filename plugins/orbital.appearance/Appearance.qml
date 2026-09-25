@@ -10,10 +10,12 @@ import Quickshell.Wayland
 import QtQuick
 import qs.Commons
 import qs.Ui
+import "../orbital.ui" as OrbitalUi
 
 Item {
   id: root
 
+  function tr(s) { return OrbitalUi.OrbitalI18n.t(s) }
   property var shell: null
   property var manifest: null
 
@@ -31,15 +33,15 @@ Item {
   property string fontFamily: Style.font.family
 
   readonly property var swatches: [
-    { name: "blue", label: "Blue", color: "#39A9FF" }, { name: "indigo", label: "Indigo", color: "#3939FF" },
-    { name: "purple", label: "Purple", color: "#9539FF" }, { name: "lilac", label: "Lilac", color: "#CE39FF" },
-    { name: "magenta", label: "Magenta", color: "#FF39EF" }, { name: "pink", label: "Pink", color: "#FF39AC" },
-    { name: "rose", label: "Rose", color: "#FF395A" }, { name: "red", label: "Red", color: "#FF3939" },
-    { name: "orange", label: "Orange", color: "#FF8C39" }, { name: "amber", label: "Amber", color: "#FFC439" },
-    { name: "lime", label: "Lime", color: "#ACFF39" }, { name: "green", label: "Green", color: "#39FF8C" },
-    { name: "mint", label: "Mint", color: "#39FFBD" }, { name: "teal", label: "Teal", color: "#39FFEE" },
-    { name: "cyan", label: "Cyan", color: "#39DEFF" }, { name: "white", label: "White", color: "#FFFFFF" },
-    { name: "gray", label: "Gray", color: "#9E9E9E" }, { name: "black", label: "Black", color: "#0A0A0A" }
+    { name: "blue", label: tr("Blue"), color: "#39A9FF" }, { name: "indigo", label: tr("Indigo"), color: "#3939FF" },
+    { name: "purple", label: tr("Purple"), color: "#9539FF" }, { name: "lilac", label: tr("Lilac"), color: "#CE39FF" },
+    { name: "magenta", label: tr("Magenta"), color: "#FF39EF" }, { name: "pink", label: tr("Pink"), color: "#FF39AC" },
+    { name: "rose", label: tr("Rose"), color: "#FF395A" }, { name: "red", label: tr("Red"), color: "#FF3939" },
+    { name: "orange", label: tr("Orange"), color: "#FF8C39" }, { name: "amber", label: tr("Amber"), color: "#FFC439" },
+    { name: "lime", label: tr("Lime"), color: "#ACFF39" }, { name: "green", label: tr("Green"), color: "#39FF8C" },
+    { name: "mint", label: tr("Mint"), color: "#39FFBD" }, { name: "teal", label: tr("Teal"), color: "#39FFEE" },
+    { name: "cyan", label: tr("Cyan"), color: "#39DEFF" }, { name: "white", label: tr("White"), color: "#FFFFFF" },
+    { name: "gray", label: tr("Gray"), color: "#9E9E9E" }, { name: "black", label: tr("Black"), color: "#0A0A0A" }
   ]
 
   function open(payloadJson) {
@@ -113,14 +115,14 @@ Item {
             width: parent.width - closeText.width
             spacing: Style.space(2)
             Text {
-              text: "Appearance"
+              text: tr("Appearance")
               color: root.foreground
               font.family: root.fontFamily
               font.pixelSize: Style.font.body
               font.bold: true
             }
             Text {
-              text: root.busy ? "Applying…" : "Theme color — accent and glass tint"
+              text: root.busy ? tr("Applying…") : tr("Theme color — accent and glass tint")
               color: root.foreground
               opacity: 0.6
               font.family: root.fontFamily
@@ -197,7 +199,7 @@ Item {
           spacing: Style.space(8)
           Text {
             anchors.verticalCenter: parent.verticalCenter
-            text: "Custom"
+            text: tr("Custom")
             color: root.foreground
             opacity: 0.7
             font.family: root.fontFamily
@@ -226,7 +228,7 @@ Item {
           }
           Text {
             anchors.verticalCenter: parent.verticalCenter
-            text: "Enter to apply"
+            text: tr("Enter to apply")
             color: root.foreground
             opacity: 0.4
             font.family: root.fontFamily
@@ -236,7 +238,7 @@ Item {
 
         // Full theme switcher (wallpapers/other themes) stays one click away.
         Text {
-          text: "Themes and wallpapers ›"
+          text: tr("Themes and wallpapers ›")
           color: Color.accent
           font.family: root.fontFamily
           font.pixelSize: Style.font.bodySmall

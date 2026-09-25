@@ -6,9 +6,11 @@ import qs.Ui
 import qs.Commons
 import Quickshell.Wayland
 import "KeyboardModel.js" as KeyboardLayoutModel
+import "../orbital.ui" as OrbitalUi
 
 BarWidget {
   id: root
+  function tr(s) { return OrbitalUi.OrbitalI18n.t(s) }
   moduleName: "orbital.keyboard"
 
 
@@ -391,7 +393,7 @@ BarWidget {
           width: menuColumn.width
           topPadding: Style.space(6)
           horizontalAlignment: Text.AlignHCenter
-          text: "Alt + Shift to switch"
+          text: tr("Alt + Shift to switch")
           color: root.bar ? root.bar.foreground : Color.foreground
           opacity: 0.45
           font.family: Style.font.family

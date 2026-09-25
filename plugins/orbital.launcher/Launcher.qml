@@ -45,10 +45,12 @@ import QtQuick
 import qs.Commons
 import qs.Ui
 import "AppSearch.js" as AppSearch
+import "../orbital.ui" as OrbitalUi
 
 Item {
   id: root
 
+  function tr(s) { return OrbitalUi.OrbitalI18n.t(s) }
   property string omarchyPath: ""
   property var shell: null
   property var manifest: null
@@ -63,12 +65,12 @@ Item {
   property bool deleteConfirmOpen: false
 
   readonly property var categoryDefs: [
-    { id: "all", label: "All Apps", match: [] },
-    { id: "productivity", label: "Productivity", match: ["Office", "Network"] },
-    { id: "development", label: "Development", match: ["Development"] },
-    { id: "media", label: "Media", match: ["AudioVideo", "Graphics", "Video"] },
-    { id: "utilities", label: "Utilities", match: ["Utility", "System", "Settings"] },
-    { id: "games", label: "Games", match: ["Game"] }
+    { id: "all", label: tr("All Apps"), match: [] },
+    { id: "productivity", label: tr("Productivity"), match: ["Office", "Network"] },
+    { id: "development", label: tr("Development"), match: ["Development"] },
+    { id: "media", label: tr("Media"), match: ["AudioVideo", "Graphics", "Video"] },
+    { id: "utilities", label: tr("Utilities"), match: ["Utility", "System", "Settings"] },
+    { id: "games", label: tr("Games"), match: ["Game"] }
   ]
   property string activeCategory: "all"
 
@@ -276,9 +278,9 @@ Item {
     var ids = Object.keys(root.usage)
     var byRecent = ids.slice().sort(function(a, b) { return root.usage[b].last - root.usage[a].last })
     var byCount = ids.slice().sort(function(a, b) { return root.usage[b].count - root.usage[a].count })
-    for (var i = 0; i < byRecent.length && i < 2; i++) push(byRecent[i], "Recently used")
-    for (var j = 0; j < byCount.length && out.length < 4; j++) if (root.usage[byCount[j]].count >= 2) push(byCount[j], "Frequently used")
-    for (var m = 0; m < root.recentlyAdded.length; m++) push(root.recentlyAdded[m], "Recently added")
+    for (var i = 0; i < byRecent.length && i < 2; i++) push(byRecent[i], tr("Recently used"))
+    for (var j = 0; j < byCount.length && out.length < 4; j++) if (root.usage[byCount[j]].count >= 2) push(byCount[j], tr("Frequently used"))
+    for (var m = 0; m < root.recentlyAdded.length; m++) push(root.recentlyAdded[m], tr("Recently added"))
     for (var n = 0; n < out.length; n++) recModel.append(out[n])
   }
 
@@ -330,15 +332,15 @@ Item {
 
   function openAppMenu(appId, label, item, mouse) {
     var entry = root.entryById(appId)
-    var items = [{ kind: "open", label: "Open" }]
+    var items = [{ kind: "open", label: tr("Open") }]
     var acts = (entry && entry.actions) || []
     for (var i = 0; i < acts.length; i++) {
       if (acts[i] && acts[i].name) items.push({ kind: "action", label: String(acts[i].name), action: acts[i] })
     }
-    items.push({ kind: "pin", label: root.isPinned(appId) ? "Remove from Dock" : "Pin to Dock" })
-    items.push({ kind: "movecat", label: "Move to category \u203A" })
-    items.push({ kind: "more", label: "More options \u203A" })
-    items.push({ kind: "uninstall", label: "Uninstall\u2026", danger: true })
+    items.push({ kind: "pin", label: root.isPinned(appId) ? tr("Remove from Dock") : tr("Pin to Dock") })
+    items.push({ kind: "movecat", label: tr("Move to category \u203A") })
+    items.push({ kind: "more", label: tr("More options \u203A") })
+    items.push({ kind: "uninstall", label: tr("Uninstall\u2026"), danger: true })
     var pos = item.mapToItem(cardContent, mouse.x, mouse.y)
     root.appMenuItems = items
     root.appMenu = { appId: appId, label: label, x: pos.x, y: pos.y }
@@ -378,10 +380,10 @@ Item {
     if (it.kind === "more") {
       root.appMenuRootItems = root.appMenuItems
       root.appMenuItems = [
-        { kind: "back", label: "\u2039 Back" },
-        { kind: "showfile", label: "Show in file manager" },
-        { kind: "copycmd", label: "Copy launch command" },
-        { kind: "copyid", label: "Copy app ID" }
+        { kind: "back", label: tr("\u2039 Back") },
+        { kind: "showfile", label: tr("Show in file manager") },
+        { kind: "copycmd", label: tr("Copy launch command") },
+        { kind: "copyid", label: tr("Copy app ID") }
       ]
       return
     }
@@ -390,12 +392,12 @@ Item {
       var entry = root.entryById(m.appId)
       var ov = root.categoryOverrides[m.appId]
       var cur = ov !== undefined ? ov : root.autoCategoryOf(entry)
-      var list = [{ kind: "back", label: "\u2039 Back" }]
+      var list = [{ kind: "back", label: tr("\u2039 Back") }]
       for (var i = 1; i < root.categoryDefs.length; i++) {
         var d = root.categoryDefs[i]
         list.push({ kind: "setcat", catId: d.id, label: d.label, checked: cur === d.id })
       }
-      list.push({ kind: "setcat", catId: "", label: "Automatic", checked: ov === undefined })
+      list.push({ kind: "setcat", catId: "", label: tr("Automatic"), checked: ov === undefined })
       root.appMenuItems = list
       return
     }
@@ -762,7 +764,7 @@ Item {
             anchors.right: shortcutBadge.left
             anchors.rightMargin: Style.space(10)
             anchors.verticalCenter: parent.verticalCenter
-            text: root.filterText.length > 0 ? root.filterText : "Search for apps…"
+            text: root.filterText.length > 0 ? root.filterText : tr("Search for apps…")
             textFormat: Text.PlainText
             color: root.foreground
             opacity: root.filterText.length > 0 ? 1 : 0.5
@@ -951,7 +953,7 @@ Item {
             visible: displayModel.count === 0
 
             Text {
-              text: root.filterText.length > 0 ? ("No matches for “" + root.filterText + "”") : "No apps in this category"
+              text: root.filterText.length > 0 ? (tr("No matches for “") + root.filterText + "”") : tr("No apps in this category")
               textFormat: Text.PlainText
               color: root.foreground
               opacity: 0.7
@@ -981,7 +983,7 @@ Item {
             id: recTitle
             anchors.top: parent.top
             anchors.topMargin: Style.space(10)
-            text: "Recommended"
+            text: tr("Recommended")
             textFormat: Text.PlainText
             color: root.foreground
             font.family: root.fontFamily
@@ -992,7 +994,7 @@ Item {
           Text {
             anchors.right: parent.right
             anchors.verticalCenter: recTitle.verticalCenter
-            text: (root.recExpanded ? "Show Less" : "Show More") + " \u203A"
+            text: (root.recExpanded ? tr("Show Less") : tr("Show More")) + " \u203A"
             textFormat: Text.PlainText
             color: Color.accent
             font.family: root.fontFamily
@@ -1233,7 +1235,7 @@ Item {
 
             Text {
               width: parent.width
-              text: "Uninstall " + ((root.deleteTarget && root.deleteTarget.label) || "") + "?"
+              text: tr("Uninstall ") + ((root.deleteTarget && root.deleteTarget.label) || "") + "?"
               textFormat: Text.PlainText
               wrapMode: Text.WordWrap
               color: root.foreground
@@ -1244,7 +1246,7 @@ Item {
 
             Text {
               width: parent.width
-              text: "This removes the package and its launcher entry from your system."
+              text: tr("This removes the package and its launcher entry from your system.")
               textFormat: Text.PlainText
               wrapMode: Text.WordWrap
               color: root.foreground
@@ -1269,7 +1271,7 @@ Item {
 
                 Text {
                   anchors.centerIn: parent
-                  text: "Cancel"
+                  text: tr("Cancel")
                   textFormat: Text.PlainText
                   color: root.foreground
                   font.family: root.fontFamily
@@ -1295,7 +1297,7 @@ Item {
 
                 Text {
                   anchors.centerIn: parent
-                  text: "Uninstall"
+                  text: tr("Uninstall")
                   textFormat: Text.PlainText
                   color: "#ff8f8f"
                   font.family: root.fontFamily

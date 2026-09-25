@@ -38,10 +38,12 @@ import Quickshell.Wayland
 import QtQuick
 import qs.Commons
 import qs.Ui
+import "../orbital.ui" as OrbitalUi
 
 Item {
   id: root
 
+  function tr(s) { return OrbitalUi.OrbitalI18n.t(s) }
   property var shell: null
   property var manifest: null
   property bool opened: false
@@ -274,10 +276,10 @@ Item {
   })
 
   readonly property var focusQuotes: [
-    "A focused mind builds extraordinary things.",
-    "Small steps, done consistently, add up.",
-    "One task at a time.",
-    "Deep work beats busy work."
+    tr("A focused mind builds extraordinary things."),
+    tr("Small steps, done consistently, add up."),
+    tr("One task at a time."),
+    tr("Deep work beats busy work.")
   ]
   readonly property string focusQuote: focusQuotes[new Date().getDate() % focusQuotes.length]
 
@@ -476,10 +478,10 @@ Item {
             }
           }
 
-          TabButton { tabId: "clock"; label: "Clock"; iconName: "clock-symbolic" }
-          TabButton { tabId: "alarms"; label: "Alarms"; iconName: "alarm-symbolic" }
-          TabButton { tabId: "timer"; label: "Timer"; iconName: "timer-alt-symbolic" }
-          TabButton { tabId: "focus"; label: "Focus"; iconName: "focus-windows-symbolic" }
+          TabButton { tabId: "clock"; label: tr("Clock"); iconName: "clock-symbolic" }
+          TabButton { tabId: "alarms"; label: tr("Alarms"); iconName: "alarm-symbolic" }
+          TabButton { tabId: "timer"; label: tr("Timer"); iconName: "timer-alt-symbolic" }
+          TabButton { tabId: "focus"; label: tr("Focus"); iconName: "focus-windows-symbolic" }
         }
 
         Rectangle {
@@ -574,7 +576,7 @@ Item {
 
                   Text {
                     anchors.verticalCenter: parent.verticalCenter
-                    text: cityRow.modelData.local ? "Local" : root.gmtLabelFor(cityRow.modelData.tz)
+                    text: cityRow.modelData.local ? tr("Local") : root.gmtLabelFor(cityRow.modelData.tz)
                     textFormat: Text.PlainText
                     color: cityRow.modelData.local ? Color.accent : root.foreground
                     opacity: cityRow.modelData.local ? 1 : 0.5
@@ -629,7 +631,7 @@ Item {
               }
               Text {
                 anchors.verticalCenter: parent.verticalCenter
-                text: "Add city"
+                text: tr("Add city")
                 textFormat: Text.PlainText
                 color: root.foreground
                 opacity: 0.7
@@ -680,7 +682,7 @@ Item {
                   Text {
                     anchors.fill: parent
                     visible: citySearchInput.text.length === 0
-                    text: "Search cities…"
+                    text: tr("Search cities…")
                     textFormat: Text.PlainText
                     color: root.foreground
                     opacity: 0.4
@@ -717,7 +719,7 @@ Item {
             Text {
               width: parent.width
               visible: root.cityQuery.trim().length > 0 && root.citySearchResults.length === 0
-              text: "No matches"
+              text: tr("No matches")
               textFormat: Text.PlainText
               color: root.foreground
               opacity: 0.5
@@ -784,7 +786,7 @@ Item {
           }
 
           Text {
-            text: "Focus"
+            text: tr("Focus")
             textFormat: Text.PlainText
             color: root.foreground
             opacity: 0.75
@@ -803,7 +805,7 @@ Item {
 
           Text {
             visible: root.alarms.length === 0
-            text: "No reminders set"
+            text: tr("No reminders set")
             textFormat: Text.PlainText
             color: root.foreground
             opacity: 0.5
@@ -852,7 +854,7 @@ Item {
             topPadding: Style.space(8)
 
             Text {
-              text: "New reminder"
+              text: tr("New reminder")
               textFormat: Text.PlainText
               color: root.foreground
               opacity: 0.6
@@ -888,7 +890,7 @@ Item {
                   Text {
                     anchors.fill: parent
                     visible: minutesInput.text.length === 0
-                    text: "Min"
+                    text: tr("Min")
                     textFormat: Text.PlainText
                     color: root.foreground
                     opacity: 0.4
@@ -922,7 +924,7 @@ Item {
                   Text {
                     anchors.fill: parent
                     visible: messageInput.text.length === 0
-                    text: "What for? (optional)"
+                    text: tr("What for? (optional)")
                     textFormat: Text.PlainText
                     color: root.foreground
                     opacity: 0.4
@@ -1027,7 +1029,7 @@ Item {
               visible: root.countdownTotal > 0
               Text {
                 anchors.centerIn: parent
-                text: root.countdownRunning ? "Pause" : "Start"
+                text: root.countdownRunning ? tr("Pause") : tr("Start")
                 textFormat: Text.PlainText
                 color: Color.background
                 font.family: root.fontFamily
@@ -1044,7 +1046,7 @@ Item {
               visible: root.countdownTotal > 0
               Text {
                 anchors.centerIn: parent
-                text: "Reset"
+                text: tr("Reset")
                 textFormat: Text.PlainText
                 color: root.foreground
                 font.family: root.fontFamily
@@ -1058,10 +1060,10 @@ Item {
         CountdownUi {
           visible: root.activeTab === "timer"
           presets: [
-            { label: "5 min", seconds: 5 * 60 },
-            { label: "10 min", seconds: 10 * 60 },
-            { label: "20 min", seconds: 20 * 60 },
-            { label: "30 min", seconds: 30 * 60 }
+            { label: tr("5 min"), seconds: 5 * 60 },
+            { label: tr("10 min"), seconds: 10 * 60 },
+            { label: tr("20 min"), seconds: 20 * 60 },
+            { label: tr("30 min"), seconds: 30 * 60 }
           ]
         }
 
@@ -1094,9 +1096,9 @@ Item {
 
       Repeater {
         model: [
-          { label: "Pomodoro", seconds: root.focusPresets.pomodoro },
-          { label: "Short Break", seconds: root.focusPresets.short },
-          { label: "Long Break", seconds: root.focusPresets.long }
+          { label: tr("Pomodoro"), seconds: root.focusPresets.pomodoro },
+          { label: tr("Short Break"), seconds: root.focusPresets.short },
+          { label: tr("Long Break"), seconds: root.focusPresets.long }
         ]
         delegate: Rectangle {
           id: focusPreset

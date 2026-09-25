@@ -36,10 +36,12 @@ import Quickshell.Wayland
 import QtQuick
 import qs.Commons
 import qs.Ui
+import "../orbital.ui" as OrbitalUi
 
 Item {
   id: root
 
+  function tr(s) { return OrbitalUi.OrbitalI18n.t(s) }
   property var shell: null
   property var manifest: null
 
@@ -333,13 +335,13 @@ Item {
         }
 
         LinkRow {
-          label: "Appearance"
+          label: tr("Appearance")
           iconName: "preferences-desktop-theme"
           onActivated: { root.close(); Util.execDetached("omarchy-shell shell toggle orbital.appearance '{}'") }
         }
 
         LinkRow {
-          label: "Keyboard Shortcuts"
+          label: tr("Keyboard Shortcuts")
           iconName: "preferences-desktop-keyboard-shortcuts"
           onActivated: root.run("omarchy-menu-keybindings")
         }
@@ -365,19 +367,19 @@ Item {
           width: parent.width
 
           LinkRow {
-            label: "Lock"; iconName: "system-lock-screen"; showChevron: false
+            label: tr("Lock"); iconName: "system-lock-screen"; showChevron: false
             onActivated: root.run("omarchy system lock")
           }
           LinkRow {
-            label: "Sleep"; iconName: "preferences-system-power"; showChevron: false
+            label: tr("Sleep"); iconName: "preferences-system-power"; showChevron: false
             onActivated: root.run("systemctl suspend")
           }
           LinkRow {
-            label: "Restart"; iconName: "system-reboot"; showChevron: false
+            label: tr("Restart"); iconName: "system-reboot"; showChevron: false
             onActivated: root.run("omarchy system reboot")
           }
           LinkRow {
-            label: "Shut Down"; iconName: "system-shutdown"; showChevron: false
+            label: tr("Shut Down"); iconName: "system-shutdown"; showChevron: false
             onActivated: root.run("omarchy system shutdown")
           }
         }

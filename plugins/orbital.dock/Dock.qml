@@ -45,9 +45,11 @@ import Quickshell.Io
 import Quickshell.Wayland
 import qs.Commons
 import qs.Ui
+import "../orbital.ui" as OrbitalUi
 
 BarWidget {
   id: root
+  function tr(s) { return OrbitalUi.OrbitalI18n.t(s) }
   moduleName: "orbital.dock"
 
   // --------------------------------------------------------- app identity
@@ -690,7 +692,7 @@ BarWidget {
         anchors.top: parent.top
 
         MenuRow {
-          label: "Open"
+          label: tr("Open")
           visible: root.menuHasEntry
           height: visible ? implicitHeight : 0
           onActivated: {
@@ -700,7 +702,7 @@ BarWidget {
         }
 
         MenuRow {
-          label: root.menuIsPinned ? "Remove from Dock" : "Pin to Dock"
+          label: root.menuIsPinned ? tr("Remove from Dock") : tr("Pin to Dock")
           onActivated: {
             root.togglePin(root.menuKey)
             root.closeMenu()

@@ -1,2 +1,3 @@
 OrbitalTokens 1.0 OrbitalTokens.qml
 OrbitalDialog 1.0 OrbitalDialog.qml
+singleton OrbitalI18n 1.0 OrbitalI18n.qml

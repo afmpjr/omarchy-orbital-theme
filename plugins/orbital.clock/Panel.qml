@@ -4,6 +4,7 @@ import Quickshell.Io
 import qs.Commons
 import qs.Ui
 import "Model.js" as Model
+import "../orbital.ui" as OrbitalUi
 
 // The clock's calendar popup: a month grid with ISO week numbers, built to
 // sit beside the weather panel — same hero-over-detail composition, same
@@ -17,6 +18,7 @@ import "Model.js" as Model
 // anchor against.
 Panel {
   id: root
+  function tr(s) { return OrbitalUi.OrbitalI18n.t(s) }
   moduleName: "omarchy.clock"
   ipcTarget: "omarchy.clock"
   manageIpc: false
@@ -65,10 +67,11 @@ Panel {
   // convention. Clicking the grid's "W" heading writes the choice back to
   // shell.json.
   readonly property int weekStart: Model.normalizedWeekStart(setting("weekStartDay", null), Qt.locale().firstDayOfWeek)
-  // The interface is English throughout, so day names are not taken from the
-  // system locale. Where the week starts still is: that is a regional
-  // convention rather than a translation, and it stays overridable above.
-  readonly property var labelLocale: Qt.locale("en_US")
+  // Day and month names follow the interface language (English, or Portuguese when the system
+  // locale is pt*; see orbital.ui/OrbitalI18n.qml). Where the week starts comes from the system
+  // locale instead: that is a regional convention rather than a translation, and it stays
+  // overridable above.
+  readonly property var labelLocale: Qt.locale(OrbitalUi.OrbitalI18n.pt ? "pt_BR" : "en_US")
   readonly property string nextWeekStartLabel: labelLocale.dayName(Model.toggledWeekStart(weekStart), Locale.LongFormat)
   readonly property var weekdays: Model.weekdayOrder(weekStart)
   readonly property var weeks: Model.monthGrid(viewYear, viewMonth, weekStart, todayKey)
@@ -374,7 +377,7 @@ Panel {
             Text {
               id: headerDateText
               textFormat: Text.PlainText
-              text: Qt.formatDate(root.today, "dddd, MMM d, yyyy")
+              text: labelLocale.toString(root.today, OrbitalUi.OrbitalI18n.pt ? "dddd, d 'de' MMM 'de' yyyy" : "dddd, MMM d, yyyy")
               color: heroMouse.containsMouse
                 ? Style.hoverStateColor(root.contentForeground, Color.accent)
                 : root.contentForeground
@@ -393,7 +396,7 @@ Panel {
 
               PanelToolTip {
                 visible: heroMouse.containsMouse
-                text: "Back to today"
+                text: tr("Back to today")
                 fontFamily: root.contentFontFamily
               }
             }
@@ -418,7 +421,7 @@ Panel {
               textFormat: Text.PlainText
               anchors.left: parent.left
               anchors.verticalCenter: parent.verticalCenter
-              text: Qt.formatDate(root.viewDate, "MMMM yyyy")
+              text: labelLocale.toString(root.viewDate, "MMMM yyyy")
               color: Qt.darker(root.contentForeground, 1.3)
               font.family: root.contentFontFamily
               font.pixelSize: Style.font.body
@@ -433,7 +436,7 @@ Panel {
               PanelActionButton {
                 id: prevMonthButton
                 iconText: "󰅁"
-                tooltipText: "Previous month"
+                tooltipText: tr("Previous month")
                 foreground: root.contentForeground
                 fontFamily: root.contentFontFamily
                 onClicked: root.moveMonth(-1)
@@ -441,7 +444,7 @@ Panel {
 
               PanelActionButton {
                 iconText: "󰅂"
-                tooltipText: "Next month"
+                tooltipText: tr("Next month")
                 foreground: root.contentForeground
                 fontFamily: root.contentFontFamily
                 onClicked: root.moveMonth(1)
@@ -480,7 +483,7 @@ Panel {
 
                 Text {
                   anchors.verticalCenter: parent.verticalCenter
-                  text: "BORN"
+                  text: tr("BORN")
                   color: Qt.darker(root.contentForeground, 1.5)
                   font.family: root.contentFontFamily
                   font.pixelSize: Style.font.bodySmall
@@ -491,7 +494,7 @@ Panel {
                   id: bornField
                   width: Style.space(70)
                   anchors.verticalCenter: parent.verticalCenter
-                  placeholderText: "year"
+                  placeholderText: tr("year")
                   foreground: root.contentForeground
                   font.family: root.contentFontFamily
                   inputMethodHints: Qt.ImhDigitsOnly
@@ -503,7 +506,7 @@ Panel {
                   anchors.verticalCenter: parent.verticalCenter
                   anchors.verticalCenterOffset: 0
                   leftPadding: Style.space(6)
-                  text: "LIVE TO"
+                  text: tr("LIVE TO")
                   color: Qt.darker(root.contentForeground, 1.5)
                   font.family: root.contentFontFamily
                   font.pixelSize: Style.font.bodySmall
@@ -590,7 +593,7 @@ Panel {
                 id: lifeLabel
                 anchors.left: parent.left
                 anchors.verticalCenter: parent.verticalCenter
-                text: "LIFE"
+                text: tr("LIFE")
                 color: Qt.darker(root.contentForeground, 1.5)
                 font.family: root.contentFontFamily
                 font.pixelSize: Style.font.bodySmall
@@ -765,7 +768,7 @@ Panel {
             }
 
             Text {
-              text: "Today"
+              text: tr("Today")
               textFormat: Text.PlainText
               color: root.contentForeground
               font.family: root.contentFontFamily
@@ -826,7 +829,7 @@ Panel {
 
                   Text {
                     width: parent.width
-                    text: remaining.length > 0 ? "in " + remaining : ""
+                    text: remaining.length > 0 ? tr("in ") + remaining : ""
                     textFormat: Text.PlainText
                     elide: Text.ElideRight
                     color: root.contentForeground
