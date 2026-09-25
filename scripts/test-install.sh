@@ -6,7 +6,7 @@
 set -euo pipefail
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 T="$(mktemp -d)"; trap 'rm -rf "$T"' EXIT
-export HOME="$T/home"; mkdir -p "$HOME/.config/hypr" "$T/bin" "$HOME/.config/omarchy/themes"
+export ORBITAL_INSTALL_NO_WAIT=1 HOME="$T/home"; mkdir -p "$HOME/.config/hypr" "$T/bin" "$HOME/.config/omarchy/themes"
 printf 'require("default.hypr.omarchy")\n' > "$HOME/.config/hypr/hyprland.lua"
 cat > "$T/bin/omarchy" <<'STUB'
 #!/usr/bin/env bash

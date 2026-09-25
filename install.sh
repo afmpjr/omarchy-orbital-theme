@@ -39,6 +39,7 @@ for a in "$@"; do
 done
 
 say() { echo "==> $*"; }
+nap() { [[ ${ORBITAL_INSTALL_NO_WAIT:-} == 1 ]] || sleep "$1"; }  # tests skip the waits
 run() { if (( DRY )); then echo "    [dry-run] $*"; else "$@"; fi; }
 have_omarchy() { command -v omarchy >/dev/null 2>&1; }
 
@@ -63,8 +64,8 @@ desktop_id() { # first installed .desktop among candidates
   done
 }
 
-full_setup() {
-  say "Full desktop: floating bar, layout, bindings, gaps, dock pins"
+full_shell_json() {
+  say "Full desktop: bar and layout in shell.json"
   local sj="$CFG/omarchy/shell.json"
   run mkdir -p "$CFG/omarchy"
   if [[ ! -f $sj ]]; then run cp "${OMARCHY_PATH:-/usr/share/omarchy}/config/omarchy/shell.json" "$sj"; fi
@@ -91,6 +92,10 @@ full_setup() {
       }
     ' "$sj" > "$tmp" && cat "$tmp" > "$sj" && rm -f "$tmp"
   fi
+}
+
+full_setup() {
+  say "Full desktop: bindings, gaps, text size, dock pins"
   # Text size the layout was tuned at (shell, GTK and terminals), like the author's machine.
   run omarchy display text size 10 || echo "    (could not set the text size)"
   # Hyprland: bindings + gaps (gaps go BEFORE Omarchy's toggles so the gaps toggle still wins).
@@ -168,8 +173,19 @@ if [[ ! -f $SJ ]]; then
   say "Creating $SJ from Omarchy's defaults"
   run mkdir -p "$CFG/omarchy"; run cp "$OMARCHY_PATH/config/omarchy/shell.json" "$SJ"; run chmod 644 "$SJ"
 fi
+if (( FULL )); then full_shell_json; nap 3; fi
+if (( ! DRY )); then omarchy-shell shell rescanPlugins >/dev/null 2>&1 || true; nap 2; fi
 say "Enabling plugins"
-for id in "${OVERLAYS[@]}"; do run omarchy plugin enable "$id" || echo "    (could not enable $id)"; done
+enable_verified() { # `plugin enable` talks to the running shell; confirm it stuck, retry if not
+  local id="$1" n
+  for n in 1 2 3 4 5; do
+    omarchy plugin enable "$id" >/dev/null 2>&1 || true
+    omarchy plugin list 2>/dev/null | grep -E "^$id +enabled" >/dev/null && { echo "    enabled $id"; return 0; }
+    nap 2
+  done
+  echo "    (could not enable $id)"; return 1
+}
+for id in "${OVERLAYS[@]}"; do if (( DRY )); then echo "    [dry-run] enable $id"; else enable_verified "$id" || true; fi; done
 if (( BAR )); then
   for w in "${WIDGETS[@]}"; do run omarchy plugin enable "${w%%:*}" --section "${w##*:}" || echo "    (could not place ${w%%:*})"; done
 else
