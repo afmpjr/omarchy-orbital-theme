@@ -23,6 +23,14 @@ case "$1 $2" in
     case "$3" in   # picking a bar is what the real CLI records in shell.json
       omarchy.bar|orbital.bar|orbital.floating-bar) jq --arg id "$3" '.bar.id = $id' "$SJ" > "$HOME/.sj.new" && mv "$HOME/.sj.new" "$SJ" ;;
     esac ;;
+  "bar move")   # move a widget to an index of a section, like the real CLI
+    jq --arg id "$3" --arg sec "$5" --argjson idx "${7:-0}" '
+        .bar.layout[$sec] as $s | ($s | map(.id) | index($id)) as $at
+        | if $at == null then . else
+            ($s[$at]) as $o | ($s | del(.[$at])) as $rest
+            | .bar.layout[$sec] = (if $idx >= ($rest | length) then $rest + [$o]
+                                   else $rest[0:$idx] + [$o] + $rest[$idx:] end)
+          end' "$HOME/.config/omarchy/shell.json" > "$HOME/.sj.new" && mv "$HOME/.sj.new" "$HOME/.config/omarchy/shell.json" ;;
   "plugin add") mkdir -p "$HOME/.config/omarchy/plugins/jankeesvw.notification-center"; echo jankeesvw.notification-center >> "$HOME/enabled.txt" ;;
   # A bar widget counts as enabled when it is in the bar layout: that is how the real shell decides.
   "plugin list")

@@ -506,6 +506,33 @@ enable_verified() { # `plugin enable` talks to the running shell; confirm it stu
   return 1
 }
 
+# `omarchy plugin enable --section` reports "omarchy-shell is not responding" under a burst of calls
+# even when the change lands, so the exit code is not the truth: read the layout back instead.
+place_verified() { # <id> <section>: confirm the widget is really in the bar layout
+  local id="$1" sec="$2" n
+  for n in 1 2 3 4 5; do
+    trip widgets && { problem "could not place $id in the bar (simulated failure)"; return 1; }
+    omarchy plugin enable "$id" --section "$sec" >/dev/null 2>&1 || true
+    if in_bar "$id"; then echo "    placed $id in $sec"; return 0; fi
+    nap 2
+  done
+  problem "could not place $id in the $sec section of the bar"
+  return 1
+}
+in_bar() { jq -e --arg id "$1" '[.bar.layout[]?[]?.id] | index($id)' "$SJ" >/dev/null 2>&1; }
+move_verified() { # <id> <section> <index>: same shell-busy flakiness, so confirm the position
+  local id="$1" sec="$2" idx="$3" n at
+  for n in 1 2 3 4 5; do
+    trip widgets && { problem "could not move $id to the end of the bar (simulated failure)"; return 1; }
+    omarchy bar move "$id" --section "$sec" --index "$idx" >/dev/null 2>&1 || true
+    at="$(jq -r --arg sec "$sec" --argjson i "$idx" '.bar.layout[$sec][$i].id // empty' "$SJ" 2>/dev/null || true)"
+    [[ $at == "$id" ]] && return 0
+    nap 2
+  done
+  problem "$id could not be moved to the end of the $sec section of the bar"
+  return 1
+}
+
 apply_enable() {
   local id w
   say "Enabling plugins"
@@ -538,24 +565,17 @@ apply_enable() {
     for w in "${WIDGETS[@]}" "${EXTRA_WIDGETS[@]}"; do echo "    [dry-run] place ${w%%:*} in the bar (${w##*:})"; done
     return 0
   fi
-  for w in "${WIDGETS[@]}"; do
-    trip widgets && { problem "could not place ${w%%:*} in the bar (simulated failure)"; return 1; }
-    if ! omarchy plugin enable "${w%%:*}" --section "${w##*:}" >/dev/null 2>&1; then
-      problem "could not place ${w%%:*} in the bar"; return 1
-    fi
-  done
-  for id in "${EXTRA_WIDGETS[@]}"; do
-    trip widgets && { problem "could not place $id in the bar (simulated failure)"; return 1; }
-    omarchy plugin enable "$id" --section right >/dev/null 2>&1 || { problem "could not place $id in the bar"; return 1; }
-  done
+  for w in "${WIDGETS[@]}"; do place_verified "${w%%:*}" "${w##*:}" || return 1; done
+  for id in "${EXTRA_WIDGETS[@]}"; do place_verified "$id" right || return 1; done
   # `enable --section` inserts at the START of a section; right-hand widgets belong at the end
   # (keyboard, divider, clock), so move them there.
-  for id in orbital.keyboard orbital.divider orbital.clock; do
-    local n; n="$(jq '.bar.layout.right | length' "$SJ" 2>/dev/null || echo 0)"
-    if (( n > 0 )); then
-      omarchy bar move "$id" --section right --index $((n - 1)) >/dev/null 2>&1 || true
-    fi
-  done
+  local n; n="$(jq '.bar.layout.right | length' "$SJ" 2>/dev/null || echo 0)"
+  if (( n > 0 )); then
+    # keyboard, divider, clock, each to the last slot: the previous one ends up just before it.
+    for id in orbital.keyboard orbital.divider orbital.clock; do
+      move_verified "$id" right $((n - 1)) || return 1
+    done
+  fi
 }
 
 apply_extras() {
@@ -598,6 +618,11 @@ verify_all() {
     for w in orbital.keyboard orbital.divider orbital.clock; do
       grep -qw "$w" <<<"$right" || problem "$w is not in the right section of the bar (right: ${right:-empty})"
     done
+    # keyboard, then the hairline, then the clock: the order is the whole point of the divider
+    local order; order="$(jq -r '[.bar.layout.right[]?.id] | join(" ")' "$SJ" 2>/dev/null || true)"
+    [[ $(awk '{for (i=1;i<=NF;i++) {if ($i=="orbital.keyboard") k=i; if ($i=="orbital.divider") d=i; if ($i=="orbital.clock") c=i}}
+                       END {print (k && d && c && k<d && d<c) ? "yes" : "no"}' <<<"$order") == yes ]] \
+      || problem "the right side of the bar is out of order (want keyboard, divider, clock: ${order:-empty})"
     grep -qw orbital.workspaces <<<"$(jq -r '[.bar.layout[]?[]?.id] | join(" ")' "$SJ" 2>/dev/null || true)" \
       || problem "orbital.workspaces is not in the bar layout"
   fi
