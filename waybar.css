@@ -1,0 +1,37 @@
+/* Orbital — Waybar compat (§14 floating taskbar spec) */
+@define-color background rgba(7, 15, 28, 0.72);
+@define-color foreground #F4F8FF;
+@define-color accent #39A9FF;
+
+* {
+  font-family: "JetBrainsMono Nerd Font", "Inter", sans-serif;
+  font-size: 13px;
+}
+
+window#waybar {
+  background: @background;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 16px;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.35);
+}
+
+#workspaces button {
+  background: transparent;
+  color: #91A4BB;
+  border-radius: 10px;
+  padding: 4px 10px;
+  margin: 4px 2px;
+}
+#workspaces button.active {
+  background: rgba(57,169,255,0.18);
+  color: #F4F8FF;
+  box-shadow: 0 0 0 1px rgba(57,169,255,0.35);
+}
+#workspaces button:hover {
+  background: rgba(255,255,255,0.06);
+}
+
+#clock, #network, #pulseaudio, #battery, #custom-notification {
+  color: #F4F8FF;
+  padding: 0 8px;
+}

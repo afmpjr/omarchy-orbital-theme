@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "id": "orbital.appearance",
+  "name": "Orbital Appearance",
+  "version": "1.0.0",
+  "author": "afmpjr",
+  "description": "Appearance window: pick the theme's accent/glass color (presets or custom hex).",
+  "kinds": ["overlay"],
+  "entryPoints": {
+    "overlay": "Appearance.qml"
+  }
+}

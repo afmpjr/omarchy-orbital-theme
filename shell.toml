@@ -1,0 +1,86 @@
+# Orbital — Quickshell / Quattro (§14, §27, §28)
+# Taskbar: floating glass, bottom 12px, blur 24px, dark translucent
+# Launcher: Level 2 — slightly darker, more opaque
+
+[bar]
+background = "#0A1422"
+background-alpha = 0.72
+text = "#F4F8FF"
+active = "#39A9FF"
+# Floating panel — spec §4, §5
+scale-with-font = true
+size-horizontal = 38
+size-vertical = 38
+# Blur via shell (Quattro usa backdrop-filter internamente)
+# border: rgba(255,255,255,0.08) shadow 0 12px 40px rgba(0,0,0,0.35)
+
+[hyprland]
+active-border = "rgb(57,169,255) rgb(91,192,255) rgb(168,187,212) 45deg"
+active-border-foreground = "rgb(57,169,255) rgb(91,192,255) rgb(168,187,212) 45deg"
+
+[launcher]
+background = "#0A1422"
+background-alpha = 0.84
+text = "#F4F8FF"
+border = "rgba(255,255,255,0.08)"
+rounding = 20
+blur = 24
+width = 640
+height = 560
+
+[controls]
+# Level 3 — interactive opaque
+normal-color = "#91A4BB"
+normal-fill-alpha = 0.06
+normal-border = "rgba(255,255,255,0.08)"
+normal-border-width = 1
+normal-border-alpha = 1.0
+
+hover-cursor-color = "#F4F8FF"
+hover-cursor-fill-alpha = 0.08
+hover-cursor-border = "#39A9FF"
+hover-cursor-border-width = 1
+hover-cursor-border-alpha = 0.25
+
+focus-color = "#F4F8FF"
+focus-fill-alpha = 0.10
+focus-border = "rgb(57,169,255) rgb(91,192,255) 45deg"
+focus-border-width = 1
+focus-border-alpha = 0.85
+
+selected-color = "#F4F8FF"
+selected-fill-alpha = 0.14
+selected-border = "#39A9FF"
+selected-border-width = 1
+selected-border-alpha = 0.9
+
+# --- Shared popup card contract -------------------------------------------
+# Every Orbital popup (launcher, world clock, account, calendar, dock menu)
+# reads these through Color.menu / Color.popups / Border.surfaceSpec, so the
+# card look lives HERE, once, instead of per plugin. Radius comes from
+# Style.cornerRadius (mirrors Hyprland decoration:rounding). A plugin that
+# is missing or disabled cannot break another: each one only reads tokens.
+[menu]
+background = "#0A1422"
+background-alpha = 0.72
+text = "#F4F8FF"
+border = "rgba(255,255,255,0.16)"
+border-width = 1
+
+[popups]
+background = "#0A1422"
+background-alpha = 0.72
+text = "#F4F8FF"
+border = "rgba(255,255,255,0.16)"
+border-width = 1
+
+# Notification toasts read this section (NotificationCard). Same glass card as
+# the popups above, so toasts, launcher and modals share one look; the crash
+# glyph/countdown tint comes from Color.urgent / accent.
+[notifications]
+background = "#0A1422"
+background-alpha = 0.72
+text = "#F4F8FF"
+border = "rgba(255,255,255,0.16)"
+border-width = 1
+countdown = "accent"

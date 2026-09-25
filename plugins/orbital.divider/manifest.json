@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "id": "orbital.divider",
+  "name": "Orbital Divider",
+  "version": "1.0.0",
+  "author": "afmpjr",
+  "description": "A thin hairline separating two groups of bar widgets.",
+  "kinds": [
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "barWidget": "Divider.qml"
+  },
+  "barWidget": {
+    "displayName": "Orbital Divider",
+    "description": "Thin hairline between widget groups",
+    "category": "Layout",
+    "allowMultiple": true
+  }
+}

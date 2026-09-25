@@ -1,0 +1,61 @@
+/* Orbital — Walker (§15-§21) — launcher glass */
+@define-color background rgba(10, 20, 34, 0.84);
+@define-color foreground #F4F8FF;
+@define-color accent #39A9FF;
+
+/* Window = launcher panel */
+window {
+  background: @background;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 20px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.40);
+}
+
+/* Search entry — §16 */
+#search {
+  background: rgba(16, 30, 48, 1);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 12px;
+  color: #F4F8FF;
+  padding: 10px 14px;
+}
+#search placeholder {
+  color: #60758C;
+}
+#search:focus {
+  border: 1px solid #39A9FF;
+  box-shadow: 0 0 0 2px rgba(57,169,255,0.15);
+}
+
+/* Categories — §17 */
+#categories button {
+  background: transparent;
+  color: #91A4BB;
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 12px;
+}
+#categories button:selected, #categories button.active {
+  background: #39A9FF;
+  color: #050B14;
+}
+
+/* App grid — §18-§19 */
+#app-grid button {
+  background: transparent;
+  border-radius: 14px;
+  padding: 10px;
+  transition: all 160ms ease-out;
+}
+#app-grid button:hover {
+  background: rgba(255,255,255,0.06);
+  box-shadow: 0 0 0 1px rgba(57,169,255,0.12);
+}
+#app-grid button:focus {
+  background: rgba(57,169,255,0.14);
+  border: 1px solid #39A9FF;
+}
+#app-grid button label {
+  color: #F4F8FF;
+  font-size: 12px;
+}

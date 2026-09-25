@@ -1,0 +1,39 @@
+[window]
+opacity = 0.72
+padding = { x = 10, y = 10 }
+dynamic_padding = true
+
+[colors]
+transparent_background_colors = true
+
+[colors.primary]
+background = "#050B14"
+foreground = "#F4F8FF"
+
+[colors.normal]
+black   = "#050B14"
+red     = "#E86A6A"
+green   = "#7BC29A"
+yellow  = "#D9B66A"
+blue    = "#39A9FF"
+magenta = "#8A7BC2"
+cyan    = "#5BC0FF"
+white   = "#F4F8FF"
+
+[colors.bright]
+black   = "#60758C"
+red     = "#FF8A8A"
+green   = "#9AD9B8"
+yellow  = "#FFD67A"
+blue    = "#6EC1FF"
+magenta = "#B9A6FF"
+cyan    = "#A8BBD4"
+white   = "#FFFFFF"
+
+[colors.cursor]
+cursor = "#39A9FF"
+text   = "#050B14"
+
+[colors.selection]
+background = "#1769AA"
+text = "#F4F8FF"

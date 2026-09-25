@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "id": "orbital.launcher",
+  "name": "Orbital Launcher",
+  "version": "1.0.0",
+  "author": "afmpjr",
+  "description": "Mockup-style app drawer: live search, category pills, real installed apps, keyboard navigation.",
+  "kinds": ["overlay", "menu"],
+  "entryPoints": {
+    "overlay": "Launcher.qml",
+    "menu": "Launcher.qml"
+  }
+}

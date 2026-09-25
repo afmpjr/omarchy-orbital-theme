@@ -1,0 +1,159 @@
+#!/bin/bash
+
+# Orbital crash watcher: same trigger as omarchy-crash-watch (systemd-coredump
+# journal entries), but announces with the orbital.crash themed modal instead
+# of an instant AI diagnosis: the toast says "View details" and clicking it opens
+# the orbital.crash modal (via orbital-crash-show), where the AI diagnosis is one
+# of the buttons.
+#
+# Runs in place of omarchy-crash-watch through the user-unit drop-in
+# ~/.config/systemd/user/omarchy-crash-watch.service.d/orbital.conf, so the
+# stock unit's toggle (omarchy-toggle-crash-capture) keeps working.
+#
+# Language follows the system locale (LC_ALL > LC_MESSAGES > LANG, then
+# /etc/locale.conf): Portuguese for pt*, English otherwise.
+
+set -uo pipefail
+
+# See systemd.journal-fields(7).
+readonly COREDUMP_MESSAGE_ID=fc2e22bc6ee647b6b90729ab34a250b1
+readonly SHOW=${BASH_SOURCE%/*}/orbital-crash-show
+readonly CRASH_GLYPH=$'\U000f16a1'
+
+readonly dedupe_seconds=${OMARCHY_CRASH_DEDUPE_SECONDS:-60}
+readonly ignore_pattern=${OMARCHY_CRASH_IGNORE:-}
+
+declare -A last_notified
+
+locale_name() {
+  local l=${LC_ALL:-${LC_MESSAGES:-${LANG:-}}}
+  if [[ -z $l && -r /etc/locale.conf ]]; then
+    l=$(sed -n 's/^LANG=//p' /etc/locale.conf | tr -d '"' | head -1)
+  fi
+  printf '%s' "${l,,}"
+}
+
+if [[ $(locale_name) == pt* ]]; then
+  T_TITLE="Processo travou"
+  T_DISMISS="Dispensar"
+  T_DIAGNOSE="Diagnosticar com IA"
+  T_VIEW="Ver detalhes"
+  T_PROCESS="Processo"
+  T_BINARY="Binário"
+  T_SIGNAL="Sinal"
+  T_TIME="Horário"
+  T_WHERE="Falha em"
+  T_COUNT="Ocorrências"
+  T_COUNT_FMT="%s core dump(s) registrados"
+  declare -A SIG=(
+    [SEGV]="Falha de segmentação" [ABRT]="Abortado" [BUS]="Erro de barramento"
+    [FPE]="Erro aritmético" [ILL]="Instrução ilegal" [TRAP]="Trap de depuração"
+    [SYS]="Chamada de sistema inválida" [KILL]="Encerrado à força" [XCPU]="Limite de CPU excedido"
+  )
+else
+  T_TITLE="Process crashed"
+  T_DISMISS="Dismiss"
+  T_DIAGNOSE="Diagnose with AI"
+  T_VIEW="View details"
+  T_PROCESS="Process"
+  T_BINARY="Binary"
+  T_SIGNAL="Signal"
+  T_TIME="Time"
+  T_WHERE="Crashed in"
+  T_COUNT="Occurrences"
+  T_COUNT_FMT="%s core dump(s) recorded"
+  declare -A SIG=(
+    [SEGV]="Segmentation fault" [ABRT]="Aborted" [BUS]="Bus error"
+    [FPE]="Arithmetic error" [ILL]="Illegal instruction" [TRAP]="Debug trap"
+    [SYS]="Bad system call" [KILL]="Killed" [XCPU]="CPU limit exceeded"
+  )
+fi
+
+# Fields ride in a JSON built by jq --arg, so a hostile process name can never
+# break out of the payload or reach a shell.
+build_payload() {
+  local name=$1 pid=$2 exe=$3 signal=$4 ts=$5 frame=$6 count=$7
+  local sig_label=${SIG[${signal#SIG}]:-} when="" count_text=""
+  [[ $ts =~ ^[0-9]+$ ]] && when=$(date -d "@$((ts / 1000000))" '+%x %X')
+  [[ $count =~ ^[0-9]+$ && $count -gt 1 ]] && printf -v count_text "$T_COUNT_FMT" "$count"
+  [[ -n $sig_label ]] && sig_label="$sig_label (SIG${signal#SIG})" || sig_label=$signal
+
+  jq -cn \
+    --arg pid "$pid" --arg comm "$name" --arg exe "$exe" --arg signal "$signal" \
+    --arg title "$T_TITLE" --arg dismiss "$T_DISMISS" --arg diagnose "$T_DIAGNOSE" \
+    --arg l_process "$T_PROCESS" --arg l_binary "$T_BINARY" --arg l_signal "$T_SIGNAL" \
+    --arg l_time "$T_TIME" --arg l_where "$T_WHERE" --arg l_count "$T_COUNT" \
+    --arg sig_label "$sig_label" --arg when "$when" --arg frame "$frame" --arg count_text "$count_text" \
+    '{pid: $pid, comm: $comm, exe: $exe, signal: $signal,
+      title: $title, dismiss: $dismiss, diagnose: $diagnose,
+      rows: ([
+        {label: $l_process, value: "\($comm) (PID \($pid))"},
+        {label: $l_binary,  value: $exe},
+        {label: $l_signal,  value: $sig_label, crash: true},
+        {label: $l_time,    value: $when},
+        {label: $l_where,   value: $frame},
+        {label: $l_count,   value: $count_text}
+      ] | map(select(.value != "" and .value != "-")))}'
+}
+
+announce() {
+  local name=$1 pid=$2 exe=$3 signal=$4 ts=$5 frame=$6 count=$7 payload
+
+  omarchy-notification-wait || return 1
+
+  payload=$(build_payload "$name" "$pid" "$exe" "$signal" "$ts" "$frame" "$count") || payload=""
+
+  # Toast first, modal on click: a background crash never steals keyboard focus.
+  # --exec consumes the rest of the line and keeps the payload as one argv word,
+  # so a hostile process name cannot be reparsed as a command. If there is no
+  # payload the click falls back to the stock AI diagnosis.
+  if [[ -n $payload ]]; then
+    omarchy-notification-send \
+      --urgency critical \
+      --glyph "$CRASH_GLYPH" \
+      "$T_TITLE: $name" \
+      "$T_VIEW" \
+      --exec "$SHOW" "$payload"
+  else
+    omarchy-notification-send \
+      --urgency critical \
+      --glyph "$CRASH_GLYPH" \
+      "$T_TITLE: $name" \
+      "$T_VIEW" \
+      --exec omarchy-agent-crash "$pid" "$name" "$exe" "$signal"
+  fi
+}
+
+journalctl -f -n 0 -o json --all "MESSAGE_ID=$COREDUMP_MESSAGE_ID" 2>/dev/null |
+  while IFS= read -r entry; do
+    IFS=$'\t' read -r uid comm pid exe signal ts frame < <(
+      jq -r '[(._UID // "-"),
+              (.COREDUMP_COMM // "-"),
+              (.COREDUMP_PID // "-"),
+              (.COREDUMP_EXE // "-"),
+              (.COREDUMP_SIGNAL_NAME // "-"),
+              (.__REALTIME_TIMESTAMP // "-"),
+              ((if (.MESSAGE | type) == "string" then .MESSAGE else "" end)
+                | split("\n") | map(select(test("^\\s*#0 "))) | .[0] // "-"
+                | sub("^\\s*#0\\s+0x[0-9a-f]+\\s+"; "") | gsub("\\t"; " "))] | @tsv' <<<"$entry" 2>/dev/null
+    )
+
+    [[ $pid =~ ^[0-9]+$ ]] || continue
+    [[ -n $(omarchy-default-agent) ]] || continue
+    [[ $uid =~ ^[0-9]+$ ]] || continue
+    ((uid == UID)) || continue
+
+    name=$comm
+    [[ $exe == /* ]] && name=${exe##*/}
+
+    [[ -n $ignore_pattern && $name =~ $ignore_pattern ]] && continue
+    [[ $name == omarchy-crash-* || $name == omarchy-agent-* || $name == orbital-crash-* ]] && continue
+
+    now=$EPOCHSECONDS
+    (((now - ${last_notified[$name]:-0}) < dedupe_seconds)) && continue
+
+    count=""
+    [[ $exe == /* ]] && count=$(coredumpctl list --no-pager --no-legend "$exe" 2>/dev/null | wc -l)
+
+    announce "$name" "$pid" "$exe" "$signal" "$ts" "$frame" "$count" && last_notified[$name]=$now
+  done

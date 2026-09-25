@@ -1,0 +1,74 @@
+# Orbital — Modern Sci-Fi OS (§26 palette)
+# Baseado em: Space exploration + Planet Earth + Premium futuristic desktop
+# Wallpaper dominante: astronaut lower-left, Earth horizon, atmospheric blue glow
+
+mode = "dark"
+accent = "#39A9FF"
+active_border_color = "#39A9FF"
+active_tab_background = "#39A9FF"
+hyprland_active_border = "rgb(57,169,255) rgb(91,192,255) rgb(168,187,212) 45deg"
+hyprland_inactive_border = "rgba(255,255,255,0.08)"
+
+background = "#050B14"
+dark_background = "#03080F"
+darker_background = "#02060C"
+lighter_background = "#101E30"
+
+foreground = "#F4F8FF"
+dark_foreground = "#91A4BB"
+light_foreground = "#F4F8FF"
+bright_foreground = "#FFFFFF"
+
+cursor = "#F4F8FF"
+selection_foreground = "#F4F8FF"
+selection_background = "#1769AA"
+
+# ANSI normal 0-7
+color0 = "#050B14"
+color1 = "#E86A6A"
+color2 = "#7BC29A"
+color3 = "#D9B66A"
+color4 = "#39A9FF"
+color5 = "#8A7BC2"
+color6 = "#5BC0FF"
+color7 = "#F4F8FF"
+
+# ANSI bright 8-15
+color8 = "#60758C"
+color9 = "#FF8A8A"
+color10 = "#9AD9B8"
+color11 = "#FFD67A"
+color12 = "#6EC1FF"
+color13 = "#B9A6FF"
+color14 = "#A8BBD4"
+color15 = "#FFFFFF"
+
+# Extra terminal tones
+color16 = "#927D64"
+color17 = "#1769AA"
+
+# Quattro semantic (§26)
+bg = "#050B14"
+lighter_bg = "#101E30"
+selection = "#1769AA"
+muted = "#60758C"
+dark_fg = "#91A4BB"
+fg = "#F4F8FF"
+light_fg = "#F4F8FF"
+bright_fg = "#FFFFFF"
+red = "#E86A6A"
+green = "#7BC29A"
+yellow = "#D9B66A"
+blue = "#39A9FF"
+magenta = "#8A7BC2"
+cyan = "#5BC0FF"
+orange = "#E8A06A"
+brown = "#927D64"
+dark_bg = "#03080F"
+darker_bg = "#02060C"
+bright_red = "#FF8A8A"
+bright_green = "#9AD9B8"
+bright_yellow = "#FFD67A"
+bright_blue = "#6EC1FF"
+bright_magenta = "#B9A6FF"
+bright_cyan = "#A8BBD4"

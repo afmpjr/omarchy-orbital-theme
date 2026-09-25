@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "id": "orbital.dock",
+  "name": "Orbital Dock",
+  "version": "1.0.0",
+  "author": "afmpjr",
+  "description": "Pinned-app row for the Orbital bar's left slot — icon, click to launch or focus, a dot while running.",
+  "kinds": [
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "barWidget": "Dock.qml"
+  },
+  "barWidget": {
+    "displayName": "Orbital Dock",
+    "description": "Pinned apps: click to launch or focus, dot while running",
+    "category": "Launchers",
+    "allowMultiple": false
+  }
+}

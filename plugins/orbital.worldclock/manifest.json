@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "id": "orbital.worldclock",
+  "name": "Orbital World Clock",
+  "version": "1.0.0",
+  "author": "afmpjr",
+  "description": "Mockup-style clock panel: world clock (real timezones), alarms (real omarchy reminders), a countdown timer, and a Pomodoro focus mode.",
+  "kinds": ["overlay"],
+  "entryPoints": {
+    "overlay": "WorldClock.qml"
+  }
+}

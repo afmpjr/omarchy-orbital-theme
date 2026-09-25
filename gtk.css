@@ -1,0 +1,39 @@
+/* Orbital — GTK4/Adwaita (§1, §26, §28) */
+@define-color background #050B14;
+@define-color foreground #F4F8FF;
+@define-color black #050B14;
+@define-color red #E86A6A;
+@define-color green #7BC29A;
+@define-color yellow #D9B66A;
+@define-color blue #39A9FF;
+@define-color magenta #8A7BC2;
+@define-color cyan #5BC0FF;
+@define-color white #F4F8FF;
+@define-color bright_black #60758C;
+@define-color bright_red #FF8A8A;
+@define-color bright_green #9AD9B8;
+@define-color bright_yellow #FFD67A;
+@define-color bright_blue #6EC1FF;
+@define-color bright_magenta #B9A6FF;
+@define-color bright_cyan #A8BBD4;
+@define-color bright_white #FFFFFF;
+
+@define-color accent_bg_color #39A9FF;
+@define-color accent_fg_color #050B14;
+@define-color accent_color #39A9FF;
+
+@define-color window_bg_color #050B14;
+@define-color window_fg_color #F4F8FF;
+@define-color view_bg_color #0A1422;
+@define-color view_fg_color #F4F8FF;
+@define-color sidebar_bg_color #050B14;
+@define-color sidebar_fg_color #F4F8FF;
+@define-color sidebar_backdrop_color #050B14;
+@define-color sidebar_shade_color #02060C;
+
+@define-color headerbar_bg_color rgba(10,20,34,0.72);
+@define-color headerbar_fg_color #F4F8FF;
+@define-color headerbar_backdrop_color #050B14;
+@define-color headerbar_shade_color #02060C;
+@define-color card_bg_color rgba(255,255,255,0.08);
+@define-color card_fg_color #F4F8FF;
