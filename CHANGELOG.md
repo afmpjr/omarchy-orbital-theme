@@ -10,8 +10,8 @@ unreleased, so the entries describe the current state rather than a sequence of 
 - Dock tooltips show just the app name (no "right-click for options").
 - A window on a special workspace (the scratchpad terminal) is not listed in the dock while that workspace is hidden;
   it appears while it is up, and pinning it keeps it always.
-- The layout menu names each layout by its 2-3 letter country code plus the variant, e.g. `BR · ABNT2`, `US · Intl`
-  (`scripts/test-keyboard-model.sh`).
+- The layout menu shows the language with a 2-3 letter country on the left (`Portuguese (BR)`) and the variant on the right
+  (`ABNT2`); every layout has a variant label (defaults: `ABNT2` for br, `QWERTY` for us, `Standard` otherwise)
 - The time in the bar is 2px larger.
 
 ### Languages

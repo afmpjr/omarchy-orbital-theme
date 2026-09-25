@@ -264,7 +264,7 @@ BarWidget {
     fixedWidth: flagImage.status === Image.Ready ? Style.space(34) : -1
     fontSize: Style.font.caption
     horizontalMargin: 6
-    tooltipText: root.layouts.length > root.activeIndex ? root.layouts[root.activeIndex].description : root.layoutFull
+    tooltipText: root.layouts.length > root.activeIndex ? root.layouts[root.activeIndex].description + "  \u00b7  " + root.layouts[root.activeIndex].variantLabel : root.layoutFull
     onPressed: function() { root.toggleMenu() }
 
     Image {
@@ -367,8 +367,19 @@ BarWidget {
               }
             }
             Text {
-              anchors.left: flagSlot.right
+              id: variantText
               anchors.right: parent.right
+              anchors.rightMargin: Style.space(8)
+              anchors.verticalCenter: parent.verticalCenter
+              text: modelData.variantLabel
+              color: row.current ? Color.accent : (root.bar ? root.bar.foreground : Color.foreground)
+              opacity: row.current ? 1 : 0.6
+              font.family: Style.font.family
+              font.pixelSize: Style.font.body
+            }
+            Text {
+              anchors.left: flagSlot.right
+              anchors.right: variantText.left
               anchors.rightMargin: Style.space(8)
               anchors.verticalCenter: parent.verticalCenter
               text: modelData.description

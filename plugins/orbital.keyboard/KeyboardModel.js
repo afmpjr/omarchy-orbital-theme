@@ -129,30 +129,31 @@ function layoutDescriptions(text) {
   return out
 }
 
-// The variant xkb uses when kb_variant leaves it empty, where that is worth spelling out:
-// Brazil's default layout is ABNT2.
-var defaultDetail = { br: "ABNT2" }
+// What the layout is called when kb_variant leaves it empty (xkb's default variant). Every layout
+// gets a variant label; the ones not listed here read "Standard".
+var defaultVariant = { br: "ABNT2", us: "QWERTY" }
 
-// "abnt2" -> "ABNT2", "intl" -> "Intl", "no_dead_keys" -> "No dead keys".
-function variantDetail(code, variant) {
+// "abnt2" -> "ABNT2", "intl" -> "Intl", "nodeadkeys" -> "No dead keys"; empty -> the default's name.
+function variantLabel(code, variant) {
   var v = String(variant || "").trim()
-  if (v === "") return defaultDetail[code] || ""
+  if (v === "") return defaultVariant[String(code || "").toLowerCase()] || "Standard"
   if (/^abnt/i.test(v)) return v.toUpperCase()
   v = v.replace(/nodeadkeys/i, "no dead keys").replace(/[_-]+/g, " ")
   return v.charAt(0).toUpperCase() + v.slice(1)
 }
 
-// "br" + "abnt2" -> "BR \u00b7 ABNT2"; the country is the 2-3 letter xkb layout code, never a long name.
-function standardName(code, variant) {
+// "Portuguese (BR)": the language from xkb's own description ("Portuguese (Brazil)") and the 2-3 letter
+// layout code as the country, so every entry reads the same way.
+function languageName(code, description) {
   var c = String(code || "").toUpperCase().substring(0, 3)
-  var d = variantDetail(String(code || "").toLowerCase(), variant)
-  return d ? c + " \u00b7 " + d : c
+  var lang = String(description || "").split(" (")[0].trim()
+  return lang && lang.toLowerCase() !== String(code || "").toLowerCase() ? lang + " (" + c + ")" : c
 }
 
 // The layouts Hyprland is configured with, in switching order:
-// [{ index, code, label, description, fullDescription }]. Codes come from kb_layout ("br,us");
-// a variant ("intl") pairs with the same position in kb_variant. `description` is the short
-// standard name shown in the menu ("BR \u00b7 ABNT2"); `fullDescription` is xkb's own text.
+// [{ index, code, label, description, variantLabel, fullDescription }]. Codes come from kb_layout
+// ("br,us"); a variant ("intl") pairs with the same position in kb_variant. The menu shows
+// `description` ("Portuguese (BR)") on the left and `variantLabel` ("ABNT2") on the right.
 function layoutList(keyboard, descriptions, briefs) {
   if (!keyboard || !keyboard.layout) return []
   var codes = String(keyboard.layout).split(",")
@@ -161,7 +162,11 @@ function layoutList(keyboard, descriptions, briefs) {
     code = code.trim()
     var variant = (variants[i] || "").trim()
     var full = (descriptions || {})[code + "|" + variant] || (descriptions || {})[code + "|"] || code
-    return { index: i, code: code, label: shortLabel(full, briefs), description: standardName(code, variant), fullDescription: full }
+    return {
+      index: i, code: code, label: shortLabel(full, briefs),
+      description: languageName(code, (descriptions || {})[code + "|"] || full),
+      variantLabel: variantLabel(code, variant), fullDescription: full
+    }
   })
 }
 
@@ -169,7 +174,8 @@ if (typeof module !== "undefined") {
   module.exports = {
     layoutDescriptions: layoutDescriptions,
     layoutList: layoutList,
-    standardName: standardName,
+    languageName: languageName,
+    variantLabel: variantLabel,
     eventKeyboardName: eventKeyboardName,
     isTypedKeyboard: isTypedKeyboard,
     layoutBriefs: layoutBriefs,
