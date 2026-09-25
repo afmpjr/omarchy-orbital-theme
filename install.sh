@@ -89,7 +89,7 @@ full_setup() {
                 + [{id: "orbital.divider"},
                    {id: "orbital.clock", format: "HH:mm", formatAlt: "d MMMM '"'"'W'"'"'ww yyyy", verticalFormat: "HH\n—\nmm"}] )
       }
-    ' "$sj" > "$tmp" && mv "$tmp" "$sj"
+    ' "$sj" > "$tmp" && cat "$tmp" > "$sj" && rm -f "$tmp"
   fi
   # Text size the layout was tuned at (shell, GTK and terminals), like the author's machine.
   run omarchy display text size 10 || echo "    (could not set the text size)"
@@ -161,7 +161,13 @@ run mkdir -p "$DROPIN"
 run cp "$REPO/systemd/orbital.conf" "$DROPIN/orbital.conf"
 if (( ! DRY )); then systemctl --user daemon-reload 2>/dev/null || true; systemctl --user try-restart omarchy-crash-watch 2>/dev/null || true; fi
 
-# 6. Enable plugins through Omarchy's own CLI.
+# 6. Enable plugins through Omarchy's own CLI. A fresh Omarchy has no ~/.config/omarchy/shell.json
+#    and `plugin enable` then silently records nothing, so create it from the defaults first.
+SJ="$CFG/omarchy/shell.json"
+if [[ ! -f $SJ ]]; then
+  say "Creating $SJ from Omarchy's defaults"
+  run mkdir -p "$CFG/omarchy"; run cp "$OMARCHY_PATH/config/omarchy/shell.json" "$SJ"; run chmod 644 "$SJ"
+fi
 say "Enabling plugins"
 for id in "${OVERLAYS[@]}"; do run omarchy plugin enable "$id" || echo "    (could not enable $id)"; done
 if (( BAR )); then

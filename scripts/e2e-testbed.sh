@@ -16,4 +16,6 @@ ENVSET='export OMARCHY_PATH=/usr/share/omarchy XDG_RUNTIME_DIR=/run/user/1000 HY
 sleep 10
 "$TB" ssh "$ENVSET; hyprctl eval 'hl.monitor({ output = \"\", mode = \"1366x768@60\", position = \"auto\", scale = 1 })' >/dev/null; hyprctl dispatch 'hl.dsp.focus({ workspace = \"9\" })' >/dev/null; for i in 1 2 3 4; do hyprctl layers | grep -q orbital-launcher && break; omarchy-shell shell toggle orbital.launcher '{}'; sleep 3; done"
 sleep 4; "$TB" shot "$OUT"
-"$TB" ssh "$ENVSET; hyprctl configerrors | head -3; omarchy plugin list | grep -c 'orbital.*enabled'"
+"$TB" ssh "$ENVSET; hyprctl configerrors | head -3; omarchy plugin list | grep orbital"
+n="$("$TB" ssh "$ENVSET; omarchy plugin list | grep -c 'orbital.*disabled'" || true)"
+[[ $n == 0 ]] || { echo "FAIL: $n orbital plugin(s) disabled"; exit 1; }; echo "all orbital plugins enabled"
