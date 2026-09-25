@@ -38,8 +38,8 @@ readme_says "omarchy theme install $URL"
 "$TB" ssh "$ENVSET; omarchy theme install $URL" 2>&1 | tail -2
 readme_says "./install.sh --bar-widgets"
 "$TB" ssh "$ENVSET; cd ~/.config/omarchy/themes/orbital && ./install.sh --bar-widgets" 2>&1 | tail -12
-readme_says "omarchy theme set Orbital"
-"$TB" ssh "$ENVSET; omarchy theme set Orbital" 2>&1 | tail -2
+readme_says "omarchy theme set orbital"
+"$TB" ssh "$ENVSET; omarchy theme set orbital" 2>&1 | tail -2
 sleep 8
 
 GT='~/.config/omarchy/themes/orbital'   # single quotes: the tilde must be expanded by the guest, not here
@@ -76,8 +76,20 @@ for id in orbital.launcher orbital.account orbital.appearance orbital.worldclock
 done
 grep -qE '^orbital\.bar +disabled' <<<"$LIST" || bad "the unused bar alternative should stay disabled"
 ok "every promised plugin enabled; only the unused bar alternative disabled"
+# The README promises a bar with widgets in it: check the state the user will actually see, not
+# just that the plugin folders exist.
 BAR="$("$TB" ssh "$ENVSET; jq -r .bar.id ~/.config/omarchy/shell.json")"
-echo "info - bar.id after the README path: $BAR"
+[[ $BAR == orbital.floating-bar ]] || bad "the theme bar is not the one in use (bar.id=$BAR)"
+# No double quotes inside the ssh string: they would close it. One id per line, joined here.
+LEFT="$("$TB" ssh "$ENVSET; jq -r '.bar.layout.left[].id' ~/.config/omarchy/shell.json" | tr '\n' ' ')"
+RIGHT="$("$TB" ssh "$ENVSET; jq -r '.bar.layout.right[].id' ~/.config/omarchy/shell.json" | tr '\n' ' ')"
+grep -qw orbital.dock <<<"$LEFT" || bad "the dock is not on the left of the bar (left: $LEFT)"
+for w in orbital.keyboard orbital.divider orbital.clock; do
+  grep -qw "$w" <<<"$RIGHT" || bad "$w is not on the right of the bar (right: $RIGHT)"
+done
+ok "bar.id=$BAR, dock on the left, keyboard/divider/clock on the right"
+BARGEOM="$("$TB" ssh "$ENVSET; hyprctl layers | grep -m1 'namespace: omarchy-bar'" | tr -d '\r')"
+echo "info - bar layer: $(grep -oE 'xywh: [0-9 ]+' <<<"$BARGEOM" || echo unknown) (floating = a gap off the edge)"
 
 # Hyprland part: hook present, no dangling require, no config error.
 "$TB" ssh "$ENVSET; grep -q 'require(\"hypr.orbital\")' ~/.config/hypr/hyprland.lua && test -f ~/.config/hypr/orbital.lua" \
@@ -100,6 +112,17 @@ for d in $("$TB" ssh "$ENVSET; ls -d ~/.config/omarchy/plugins/orbital.*/" | tr 
 done
 [[ -z $INVALID ]] || bad "this Omarchy rejects:$INVALID"
 ok "every installed manifest passes 'omarchy plugin validate'"
+
+# All or nothing, on the real system: a failure in the middle has to put back exactly what was
+# there. Here there IS a working install, so the rollback must restore it, not delete it.
+SJ_BEFORE="$("$TB" ssh "$ENVSET; md5sum < ~/.config/omarchy/shell.json" | cut -d' ' -f1)"
+ROLL="$("$TB" ssh "$ENVSET; cd $GT && ORBITAL_FAIL_AT=widgets ./install.sh --bar-widgets --no-restart" 2>&1)" && bad "the installer said it succeeded even though a step was forced to fail" || true
+grep -qi 'nothing was applied' <<<"$ROLL" || bad "a failed install did not say that nothing was applied"
+SJ_AFTER="$("$TB" ssh "$ENVSET; md5sum < ~/.config/omarchy/shell.json" | cut -d' ' -f1)"
+[[ $SJ_BEFORE == "$SJ_AFTER" ]] || bad "a failed re-install changed shell.json ($SJ_BEFORE -> $SJ_AFTER)"
+"$TB" ssh "$ENVSET; omarchy plugin list" | grep -qE '^orbital[.]dock +enabled' || bad "a failed re-install left the plugins disabled"
+"$TB" ssh "$ENVSET; grep -c 'hypr.orbital' ~/.config/hypr/hyprland.lua" >/dev/null || bad "a failed re-install broke the Hyprland hook"
+ok "a failed re-install rolls back to the installed state instead of breaking it"
 
 # Screenshot: best effort. The guest keeps its native 1280x800 (this Hyprland's `hyprctl dispatch`
 # is the Lua form, so the classic `workspace 9` is a syntax error there and resizing is not worth

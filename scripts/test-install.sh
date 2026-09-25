@@ -24,7 +24,11 @@ case "$1 $2" in
       omarchy.bar|orbital.bar|orbital.floating-bar) jq --arg id "$3" '.bar.id = $id' "$SJ" > "$HOME/.sj.new" && mv "$HOME/.sj.new" "$SJ" ;;
     esac ;;
   "plugin add") mkdir -p "$HOME/.config/omarchy/plugins/jankeesvw.notification-center"; echo jankeesvw.notification-center >> "$HOME/enabled.txt" ;;
-  "plugin list") [[ -f $HOME/enabled.txt ]] && sort -u "$HOME/enabled.txt" | awk '{printf "%-32s enabled   stub\n", $1}' ;;
+  # A bar widget counts as enabled when it is in the bar layout: that is how the real shell decides.
+  "plugin list")
+    { cat "$HOME/enabled.txt" 2>/dev/null
+      jq -r '.bar.layout[]?[]?.id, .bar.id // empty' "$HOME/.config/omarchy/shell.json" 2>/dev/null; } \
+      | sort -u | grep . | awk '{printf "%-32s enabled   stub\n", $1}' || true ;;
 esac
 exit 0
 STUB
@@ -136,5 +140,67 @@ out="$(python3 "$ACC" red 2>&1 || true)"
 "$REPO/install.sh" --uninstall >/dev/null
 ! grep -q 'orbital-shortcuts' "$GC" || bad "ghostty block not removed"; ok "uninstall removes the Ghostty block"
 [[ ! -d $HOME/.config/omarchy/plugins/orbital.dock && ! -d $HOME/.config/omarchy/plugins/orbital.bar && ! -d $HOME/.config/omarchy/plugins/orbital.floating-bar && ! -f $HOME/.config/hypr/orbital.lua ]] || bad "uninstall"
-! grep -q 'hypr.orbital' "$HOME/.config/hypr/hyprland.lua" || bad "hook not removed"; ok "uninstall clean"
+! grep -q 'hypr.orbital' "$HOME/.config/hypr/hyprland.lua" || bad "hook not removed"; ok "uninstall clean"# ---- --dry-run must describe the work without doing any of it ---------------------------------
+SAVED_HOME="$HOME"
+export HOME="$T/dry"; rm -rf "$HOME"; mkdir -p "$HOME/.config/omarchy/themes" "$HOME/.config/hypr" "$HOME/.config/omarchy"
+cp -r "$REPO" "$HOME/.config/omarchy/themes/orbital"; rm -rf "$HOME/.config/omarchy/themes/orbital/.git"
+cp /usr/share/omarchy/config/omarchy/shell.json "$HOME/.config/omarchy/shell.json"
+cp "$HOME/.config/omarchy/shell.json" "$T/dry-stock.json"
+printf 'require("default.hypr.omarchy")\n' > "$HOME/.config/hypr/hyprland.lua"
+dry_out="$("$REPO/install.sh" --full --dry-run 2>&1)" || bad "--dry-run exited non-zero"
+grep -q '\[dry-run\]' <<<"$dry_out" || bad "--dry-run printed no [dry-run] lines"
+[[ ! -e $HOME/.config/omarchy/plugins/orbital.dock ]] || bad "--dry-run installed a plugin"
+[[ ! -e $HOME/.config/hypr/orbital.lua ]] || bad "--dry-run wrote the Hyprland part"
+[[ ! -e $HOME/.local/state/omarchy/orbital-accent-base ]] || bad "--dry-run created the accent baseline"
+! grep -q 'hypr.orbital' "$HOME/.config/hypr/hyprland.lua" || bad "--dry-run edited hyprland.lua"
+cmp -s "$HOME/.config/omarchy/shell.json" "$T/dry-stock.json" || bad "--dry-run changed shell.json"
+export HOME="$SAVED_HOME"
+ok "--dry-run describes everything and writes nothing"
+
+# ---- all or nothing: a failed install must leave the system exactly as it was ----------------
+# The installer promises that nothing is applied unless everything worked. Force one step to fail
+# and check the promise: non-zero exit, the reason named, and not one file left behind.
+rollback_case() { # label fail-at-point
+  local label=$1 at=$2 rc=0 out
+  export HOME="$T/rb-$label"; rm -rf "$HOME"; mkdir -p "$HOME/.config/omarchy/themes" "$HOME/.config/hypr" "$HOME/.config/omarchy"
+  cp -r "$REPO" "$HOME/.config/omarchy/themes/orbital"; rm -rf "$HOME/.config/omarchy/themes/orbital/.git"
+  cp /usr/share/omarchy/config/omarchy/shell.json "$HOME/.config/omarchy/shell.json"
+  cp "$HOME/.config/omarchy/shell.json" "$T/rb-$label-stock.json"
+  printf 'require("default.hypr.omarchy")\n' > "$HOME/.config/hypr/hyprland.lua"
+  out="$(ORBITAL_FAIL_AT=$at "$REPO/install.sh" --bar-widgets --no-restart 2>&1)" || rc=$?
+  [[ $rc -ne 0 ]] || bad "$label: the installer exited 0 even though a step failed"
+  grep -qiE 'nothing (was applied|was changed)' <<<"$out" || bad "$label: the failure was not reported as 'nothing applied'"
+  # Nothing at all may survive a failure.
+  [[ -z $(ls -A "$HOME/.config/omarchy/plugins" 2>/dev/null) ]] || bad "$label: plugin folders were left behind"
+  cmp -s "$HOME/.config/omarchy/shell.json" "$T/rb-$label-stock.json" || bad "$label: shell.json was modified"
+  [[ ! -f $HOME/.config/hypr/orbital.lua ]] || bad "$label: the Hyprland part was left behind"
+  ! grep -q 'hypr.orbital' "$HOME/.config/hypr/hyprland.lua" || bad "$label: the hyprland.lua hook was left behind"
+  [[ ! -f $HOME/.config/systemd/user/omarchy-crash-watch.service.d/orbital.conf ]] || bad "$label: the crash drop-in was left behind"
+  [[ ! -d $HOME/.local/state/omarchy/orbital-accent-base ]] || bad "$label: the accent baseline was left behind"
+  [[ ! -f $HOME/.local/state/omarchy/orbital-dock.json ]] || bad "$label: dock pins were left behind"
+  export HOME="$SAVED_HOME"
+}
+rollback_case validate validate
+ok "a manifest this Omarchy rejects: refused before touching anything"
+rollback_case plugins plugins
+ok "a failure while copying the plugins: everything rolled back"
+rollback_case dropin dropin
+ok "a failure after the Hyprland part: everything rolled back"
+rollback_case enable enable
+ok "a plugin that would not enable: everything rolled back, nothing half-enabled"
+rollback_case widgets widgets
+ok "a widget that would not be placed: everything rolled back"
+rollback_case verify verify
+ok "a failed verification: everything rolled back instead of being called done"
+# The report has to name what went wrong, not just that something did.
+export HOME="$T/rb-why"; rm -rf "$HOME"; mkdir -p "$HOME/.config/omarchy/themes" "$HOME/.config/hypr" "$HOME/.config/omarchy"
+cp -r "$REPO" "$HOME/.config/omarchy/themes/orbital"; rm -rf "$HOME/.config/omarchy/themes/orbital/.git"
+cp /usr/share/omarchy/config/omarchy/shell.json "$HOME/.config/omarchy/shell.json"
+printf 'require("default.hypr.omarchy")\n' > "$HOME/.config/hypr/hyprland.lua"
+out="$(ORBITAL_FAIL_AT=enable "$REPO/install.sh" --bar-widgets --no-restart 2>&1 || true)"
+grep -q 'could not be enabled' <<<"$out" || bad "the failure report does not say which plugin failed"
+grep -q 'run ./install.sh again' <<<"$out" || bad "the failure report does not say what to do next"
+export HOME="$SAVED_HOME"
+ok "the failure report names the problem and the next step"
+
 echo "ALL PASSED"

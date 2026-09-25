@@ -18,7 +18,7 @@ white, gray and black, or any hex).
 | [`orbital.appearance`](plugins/orbital.appearance/) | Color picker window (+ `orbital-accent.py`) | `install.sh` |
 | [`orbital.worldclock`](plugins/orbital.worldclock/) | World clock, alarms, timer | `install.sh` |
 | [`orbital.crash`](plugins/orbital.crash/) | "Process crashed" toast -> themed modal -> *Diagnose with AI* | `install.sh` |
-| [`orbital.keyboard`](plugins/orbital.keyboard/) | Tray widget: country flag of the active keyboard layout; click for a dropdown to switch. Alt+Shift also cycles | `install.sh --bar-widgets` |
+| [`orbital.keyboard`](plugins/orbital.keyboard/) | Tray widget: flag of the active layout (only with 2+ layouts); click for a dropdown to switch. Alt+Shift also cycles, with `--full` | `install.sh --bar-widgets` |
 | [`orbital.floating-bar`](plugins/orbital.floating-bar/) | The bar: Omarchy's bar floating off the edge, rounded corners. Fork of `charlieras262/floating-bar` | `install.sh` (default bar) |
 | [`orbital.bar`](plugins/orbital.bar/) | Alternative bar with dock, workspace pills and system controls built in | `install.sh` (pick with `omarchy plugin enable orbital.bar`) |
 | [`orbital.ui`](plugins/orbital.ui/) | Shared UI contract (tokens + dialog); library, not a plugin | `install.sh` |
@@ -33,18 +33,71 @@ themes), and plugins are added with `omarchy plugin add`, one repository each. `
 ## Install
 
 ```bash
-omarchy theme install https://github.com/afmpjr/omarchy-orbital-theme   # theme name becomes "orbital"
+omarchy theme install https://github.com/afmpjr/omarchy-orbital-theme   # the theme lands as "orbital"
 cd ~/.config/omarchy/themes/orbital
-./install.sh --bar-widgets        # plugins, Hyprland part, crash drop-in, baseline for the color picker
-omarchy theme set Orbital
+./install.sh --bar-widgets        # plugins + widgets, Hyprland part, crash dialog, color-picker baseline
+omarchy theme set orbital
 ```
 
-`./install.sh --full` reproduces the author's whole desktop instead (bar position, widget layout, Super+S launcher, gaps,
-text size 10, Alt+Shift layouts, dock pins); it backs up `shell.json` first.
+**All or nothing.** The theme is applied only if the whole install works. Before touching anything the installer checks
+everything it can check (package complete, every manifest accepted by your Omarchy, `shell.json` valid, every directory
+writable, shell answering) and lists *all* the problems it found; then it applies the changes with a snapshot of
+everything it replaces, and finally reads the real state back — every plugin enabled, the bar in use, the widgets in
+place, no `require` without a file. If any of that fails, the install **aborts, rolls back to the state you had before,
+and tells you what failed**; your shell is only restarted when everything is in place. A step that would only degrade
+something (a missing `curl` for the weather, a notification bell that could not be fetched) is reported as a warning
+instead, and never blocks the install.
+
+`--bar-widgets` is the flag that puts the widgets in your bar. It keeps the widgets you already had and **appends**
+Orbital's at the end of each section — the dock on the left, the keyboard flag, the hairline divider and the
+clock/calendar on the right — and switches the bar itself to Orbital's floating one (rounded corners, a gap off the
+edge). It does **not** move your bar or change its position.
+
+`./install.sh --full` reproduces the author's whole desktop instead (bar at the bottom, widget layout, **Super**+**S**
+launcher, gaps, text size 10, Alt+Shift layout switching, dock pins); it backs up `shell.json` first.
 
 `install.sh` never edits `shell.json` by hand (it uses `omarchy plugin enable`), backs up what it replaces outside the plugins
 folder, and is idempotent. `--dry-run` shows what it would do; `--uninstall` removes everything it added.
 Without `--bar-widgets` your bar layout is left alone.
+
+## Check it worked
+
+```bash
+omarchy plugin list | grep orbital   # 12 enabled; the bar you are NOT using shows "disabled"
+hyprctl configerrors                 # must print nothing: one stray line breaks the whole Hyprland config
+hyprctl layers | grep omarchy-bar    # the bar, floating with a gap off the edge of the screen
+jq -r '[.bar.layout.left[].id, .bar.layout.right[].id] | join(" ")' ~/.config/omarchy/shell.json
+```
+
+On screen: the dock on the left of the bar, and on the right the keyboard flag, the hairline divider and the clock
+(click it for calendar, reminders and weather). The avatar in the dock opens the account card, and **Appearance** there
+is the color picker. The app drawer (launcher) and Alt+Shift layout switching are bound **only by `--full`**; in this
+path you can always open the drawer with `omarchy-shell shell toggle orbital.launcher`. If a widget is missing after
+installing or editing a plugin, run `omarchy restart shell` — the QML cache only reloads on restart.
+
+## Update
+
+```bash
+omarchy theme update                                    # re-pulls every user-installed git theme
+cd ~/.config/omarchy/themes/orbital && ./install.sh --bar-widgets
+```
+
+`install.sh` is idempotent: it re-applies what is missing and leaves what you changed alone. Add `--full` if you use it,
+or `--uninstall` first for a clean slate.
+
+## If the install fails
+
+Nothing is applied and the installer exits non-zero. The report names every problem it found, and everything it had
+already changed is put back (plugin folders, `shell.json`, the Hyprland files, the crash drop-in, the dock pins) — so
+fixing the cause and running the same command again is always safe. Failures worth knowing about:
+
+| Message | What it means |
+|---------|---------------|
+| `Cannot install yet. Nothing was changed.` | A pre-flight check failed: nothing was even started. The list under it is everything wrong at once. |
+| `the Omarchy shell is not answering` | `omarchy plugin list` fails, so no plugin could be enabled. Start the shell and retry. |
+| `this Omarchy rejects the manifest of <id>` | Your Omarchy version does not accept that plugin's `manifest.json`. |
+| `... is installed but not enabled after the install` | The verification pass: Omarchy did not keep the change. This is what stops a half-installed theme. |
+| `both bars are enabled at once` | Only the bar in `shell.json`'s `.bar.id` is ever loaded; the installer turns the other one off. |
 
 ## Color picker
 
@@ -68,8 +121,9 @@ keyboard on the seat (needed when keyd/fcitx5 sit between the keys and Hyprland)
 binds without Super that steal chords from every app; Ghostty built-ins that shadow keys TUIs expect (Ctrl+Enter is
 fullscreen, Ctrl+Shift+Enter zooms a split, Ctrl+Tab switches tabs); and Orbital's own additions. `install.sh --full` frees
 **Ctrl+Enter** in Ghostty (`--fix-terminal-shortcuts` does only that), because it made Claude Code and other TUIs jump to
-fullscreen. Orbital's other bindings are opt-out: `--no-launcher-key` (SUPER+S opens the launcher and replaces Omarchy's own
+fullscreen. The two bindings `--full` adds are opt-out: `--no-launcher-key` (SUPER+S opens the launcher and replaces Omarchy's own
 SUPER+S) and `--no-alt-shift` (Alt+Shift layout switching; it also fires after editor chords such as Alt+Shift+Down).
+Without `--full` Orbital binds nothing at all, so your own keys are left as they are.
 
 ## Avatar
 
@@ -116,6 +170,10 @@ load the config at all. `install.sh` drops such a dangling line (and says so) in
 - Layout was tuned at 1366x768 at scale 1 with the system monospace font; other scales are untested.
 - `hypr/orbital.lua` is loaded last from `~/.config/hypr/hyprland.lua`; if you set the same options later they win.
 - The QML cache of `omarchy-shell` means new/edited plugins need `omarchy restart shell`.
+- Omarchy itself refuses terminal/Lua/VS Code files that arrive with a theme installed from a git repo. `kitty.toml`,
+  `alacritty.toml`, `foot.ini`, `ghostty.conf`, `neovim.lua` and `vscode.json` in this repo are therefore **reference
+  copies**: they document the intended look, and the installer applies what it can through `omarchy config`, but they do
+  not reach your dotfiles. Hyprland's `hypr/orbital.lua` is not affected — `install.sh` writes it directly.
 - A plugin whose QML `import` cannot be resolved (an Omarchy or Quickshell build without that module) does not load;
   the rest of the shell is unaffected. `scripts/test-install.sh` checks every manifest with `omarchy plugin validate`
   (the schema is Omarchy's, not the theme's) and `scripts/e2e-testbed.sh` repeats it on a clean Omarchy VM.
@@ -132,6 +190,3 @@ column still needs the author's confirmation**. Third-party notices in [`docs/NO
 commands above from the public URL, then checks the theme, the 13 plugin folders, the enabled plugins, the bar in use,
 the Hyprland hook and `hyprctl configerrors`. It needs a VM you can wipe (`TESTBED=/path/to/omarchy-testbed`).
 
-Note: Omarchy itself refuses terminal/Lua/VS Code files that arrive with a theme installed from a git repo, so
-`kitty.toml`, `alacritty.toml`, `foot.ini`, `ghostty.conf`, `neovim.lua` and `vscode.json` in this repo are reference
-copies only; the installer applies what it can through `omarchy config` and never writes into your dotfiles.
