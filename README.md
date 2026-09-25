@@ -18,6 +18,7 @@ white, gray and black, or any hex).
 | `plugins/orbital.appearance` | Color picker window (+ `orbital-accent.py`) | `install.sh` |
 | `plugins/orbital.worldclock` | World clock, alarms, timer | `install.sh` |
 | `plugins/orbital.crash` | "Process crashed" toast -> themed modal -> *Diagnose with AI* | `install.sh` |
+| `plugins/orbital.keyboard` | Tray widget: country flag of the active keyboard layout; click for a dropdown to switch. Alt+Shift also cycles | `install.sh --bar-widgets` |
 | `plugins/orbital.ui` | Shared UI contract (tokens + dialog); library, not a plugin | `install.sh` |
 | `hypr/orbital.lua` | Blur for the popups, rounded windows, glass terminals, eased horizontal workspace slide | `install.sh` |
 
@@ -43,6 +44,14 @@ Open the account menu (avatar in the dock) -> **Appearance**. Every color rotate
 (accent, navy glass, blue-grey text) to the chosen hue; white/gray/black drop saturation. The wallpaper is never touched.
 It regenerates the theme from a pristine copy in `~/.local/state/omarchy/orbital-accent-base/`, so choices never compound.
 CLI: `python3 ~/.config/omarchy/plugins/orbital.appearance/orbital-accent.py <preset|#rrggbb|list|current>`.
+
+## Keyboard layouts
+
+The `orbital.keyboard` tray widget shows the flag of the active layout (text label for layouts without a flag) and opens a
+dropdown on click. It only appears when there are two or more layouts. `install.sh --full` reads your layouts from
+`~/.config/hypr/input.lua` (or use `--keyboard-layouts br,us`) and adds `grp:alt_shift_toggle` to `kb_options`, so **Alt+Shift**
+switches, in a small `~/.config/hypr/orbital-keyboard.lua` you can edit or delete. Selecting from the dropdown switches every
+keyboard on the seat (needed when keyd/fcitx5 sit between the keys and Hyprland).
 
 ## Avatar
 

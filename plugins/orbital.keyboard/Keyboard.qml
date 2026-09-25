@@ -79,9 +79,12 @@ BarWidget {
   // has been advanced too, a toggle that wraps the keyboard back to the first
   // layout leaves the button reading as the furthest along, and the label
   // follows the button.
+  // Applied to every keyboard on the seat (an explicit index, so they all end up on the same
+  // layout): with keyd or fcitx5 the typed events come from a virtual keyboard, not the one
+  // that was read.
   function setLayout(index) {
-    if (!root.keyboardName || !root.bar) return
-    root.bar.run("hyprctl switchxkblayout " + Util.shellQuote(root.keyboardName) + " " + index)
+    if (!root.bar) return
+    root.bar.run("hyprctl switchxkblayout all " + index)
     root.menuOpen = false
     refreshTimer.restart()
   }
@@ -229,15 +232,34 @@ BarWidget {
   implicitWidth: button.implicitWidth
   implicitHeight: button.implicitHeight
 
+  // The active layout's country flag (flag-icons, MIT; see flags/ and LICENSE-flag-icons).
+  // Layouts without a flag (Arabic, Latin American, ...) fall back to the text label.
+  readonly property string activeCode: root.layouts.length > root.activeIndex ? root.layouts[root.activeIndex].code : ""
+
   WidgetButton {
     id: button
     anchors.fill: parent
     bar: root.bar
     text: root.layoutLabel
+    labelVisible: flagImage.status !== Image.Ready
+    fixedWidth: flagImage.status === Image.Ready ? Style.space(34) : -1
     fontSize: Style.font.caption
     horizontalMargin: 6
     tooltipText: root.layoutFull
     onPressed: function() { root.toggleMenu() }
+
+    Image {
+      id: flagImage
+      anchors.centerIn: parent
+      width: Style.space(20)
+      height: Math.round(width * 3 / 4)
+      sourceSize.width: width * 2
+      sourceSize.height: height * 2
+      fillMode: Image.PreserveAspectFit
+      asynchronous: true
+      source: root.activeCode !== "" ? Qt.resolvedUrl("flags/" + root.activeCode + ".svg") : ""
+      visible: status === Image.Ready
+    }
   }
 
   // Dropdown: same KeyboardPanel the dock menu and the calendar use, so it
@@ -250,7 +272,7 @@ BarWidget {
     open: root.menuOpen
     centerOnBar: false
     focusTarget: menuKeys
-    contentWidth: menu.fittedContentWidth(Style.space(230))
+    contentWidth: menu.fittedContentWidth(Style.space(270))
     contentHeight: menu.fittedContentHeight(menuColumn.implicitHeight)
 
     Item {
@@ -296,19 +318,37 @@ BarWidget {
               font.family: Style.font.family
               font.pixelSize: Style.font.body
             }
-            Text {
-              id: code
+            Item {
+              id: flagSlot
               anchors.left: check.right
               anchors.verticalCenter: parent.verticalCenter
               width: Style.space(34)
-              text: modelData.label
-              color: row.current ? Color.accent : (root.bar ? root.bar.foreground : Color.foreground)
-              font.family: Style.font.family
-              font.pixelSize: Style.font.body
-              font.bold: true
+              height: parent.height
+
+              Image {
+                id: rowFlag
+                anchors.centerIn: parent
+                width: Style.space(22)
+                height: Math.round(width * 3 / 4)
+                sourceSize.width: width * 2
+                sourceSize.height: height * 2
+                fillMode: Image.PreserveAspectFit
+                asynchronous: true
+                source: Qt.resolvedUrl("flags/" + modelData.code + ".svg")
+                visible: status === Image.Ready
+              }
+              Text {
+                anchors.centerIn: parent
+                visible: rowFlag.status !== Image.Ready
+                text: modelData.label
+                color: row.current ? Color.accent : (root.bar ? root.bar.foreground : Color.foreground)
+                font.family: Style.font.family
+                font.pixelSize: Style.font.body
+                font.bold: true
+              }
             }
             Text {
-              anchors.left: code.right
+              anchors.left: flagSlot.right
               anchors.right: parent.right
               anchors.rightMargin: Style.space(8)
               anchors.verticalCenter: parent.verticalCenter
