@@ -66,6 +66,17 @@ desktop_id() { # first installed .desktop among candidates
   done
 }
 
+# Third-party (MIT) notification center: the bell after the clock. Installed with Omarchy's own
+# `plugin add` (not bundled); skipped, and left out of the layout, when it cannot be fetched.
+NOTIF_ID="jankeesvw.notification-center"
+NOTIF_URL="https://github.com/jankeesvw/omarchy-notification-center.git"
+install_notification_center() {
+  [[ -d $PLUGINS/$NOTIF_ID ]] && return 0
+  say "Installing the notification center ($NOTIF_ID)"
+  if (( DRY )); then echo "    [dry-run] omarchy plugin add $NOTIF_URL --enable --yes"; return 0; fi
+  omarchy plugin add "$NOTIF_URL" --enable --yes >/dev/null 2>&1 || echo "    (could not install $NOTIF_ID; the bell is left out)"
+}
+
 full_shell_json() {
   say "Full desktop: bar and layout in shell.json"
   local sj="$CFG/omarchy/shell.json"
@@ -73,8 +84,9 @@ full_shell_json() {
   if [[ ! -f $sj ]]; then run cp "${OMARCHY_PATH:-/usr/share/omarchy}/config/omarchy/shell.json" "$sj"; fi
   run cp "$sj" "$sj.bak-orbital-$STAMP"
   if (( ! DRY )); then
-    local tmp; tmp="$(mktemp)"
-    jq '
+    local tmp bell=false; tmp="$(mktemp)"
+    [[ -d $PLUGINS/$NOTIF_ID ]] && bell=true
+    jq --argjson bell "$bell" --arg bellid "$NOTIF_ID" '
       .bar = (.bar // {}) |
       .bar.id = "orbital.floating-bar" | .bar.position = "bottom" | .bar.transparent = false |
       .bar.cornerRadius = 10 | .bar.floatGapScale = 0.5 | .bar.centerAnchor = "orbital.workspaces" |
@@ -88,9 +100,10 @@ full_shell_json() {
         right:  ( ($right | map(select(.id == "omarchy.tray")))
                 + $ind
                 + ($right | map(select(.id != "omarchy.tray" and .id != "omarchy.indicators"
-                                        and .id != "orbital.divider" and .id != "orbital.keyboard" and .id != "orbital.clock" and .id != "omarchy.clock")))
+                                        and .id != "orbital.divider" and .id != "orbital.keyboard" and .id != "orbital.clock" and .id != "omarchy.clock" and .id != $bellid)))
                 + [{id: "orbital.keyboard"}, {id: "orbital.divider"},
-                   {id: "orbital.clock", format: "HH:mm", formatAlt: "d MMMM '"'"'W'"'"'ww yyyy", verticalFormat: "HH\n—\nmm"}] )
+                   {id: "orbital.clock", format: "HH:mm", formatAlt: "d MMMM '"'"'W'"'"'ww yyyy", verticalFormat: "HH\n—\nmm"}]
+                + (if $bell then [{id: $bellid}] else [] end) )
       }
     ' "$sj" > "$tmp" && cat "$tmp" > "$sj" && rm -f "$tmp"
   fi
@@ -208,7 +221,7 @@ if [[ ! -f $SJ ]]; then
   say "Creating $SJ from Omarchy's defaults"
   run mkdir -p "$CFG/omarchy"; run cp "$OMARCHY_PATH/config/omarchy/shell.json" "$SJ"; run chmod 644 "$SJ"
 fi
-if (( FULL )); then full_shell_json; nap 3; fi
+if (( FULL )); then install_notification_center; full_shell_json; nap 3; fi
 if (( ! DRY )); then omarchy-shell shell rescanPlugins >/dev/null 2>&1 || true; nap 2; fi
 say "Enabling plugins"
 enable_verified() { # `plugin enable` talks to the running shell; confirm it stuck, retry if not

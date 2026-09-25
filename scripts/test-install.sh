@@ -10,9 +10,17 @@ export ORBITAL_INSTALL_NO_WAIT=1 HOME="$T/home"; mkdir -p "$HOME/.config/hypr" "
 printf 'require("default.hypr.omarchy")\n' > "$HOME/.config/hypr/hyprland.lua"
 cat > "$T/bin/omarchy" <<'STUB'
 #!/usr/bin/env bash
+# Minimal stand-in for the omarchy CLI: records calls, remembers enabled plugins, "installs" plugins.
 echo "omarchy $*" >> "$HOME/omarchy-calls.log"
+case "$1 $2" in
+  "plugin enable") echo "$3" >> "$HOME/enabled.txt" ;;
+  "plugin add") mkdir -p "$HOME/.config/omarchy/plugins/jankeesvw.notification-center"; echo jankeesvw.notification-center >> "$HOME/enabled.txt" ;;
+  "plugin list") [[ -f $HOME/enabled.txt ]] && sort -u "$HOME/enabled.txt" | awk '{printf "%-32s enabled   stub\n", $1}' ;;
+esac
+exit 0
 STUB
-chmod +x "$T/bin/omarchy"; export PATH="$T/bin:$PATH"
+printf '#!/usr/bin/env bash\nexit 0\n' > "$T/bin/omarchy-shell"
+chmod +x "$T/bin/omarchy" "$T/bin/omarchy-shell"; export PATH="$T/bin:$PATH"
 ok() { echo "ok   - $1"; }; bad() { echo "FAIL - $1"; exit 1; }
 
 # Theme as `omarchy theme install` would leave it (clone in themes/orbital).
@@ -28,11 +36,12 @@ touch "$HOME/.local/share/applications/com.mitchellh.ghostty.desktop"
 SJ="$HOME/.config/omarchy/shell.json"
 [[ $(jq -r .bar.id "$SJ") == orbital.floating-bar && $(jq -r .bar.floatGapScale "$SJ") == 0.5 && $(jq -r .bar.cornerRadius "$SJ") == 10 ]] || bad "bar config"
 [[ $(jq -c '[.bar.layout.left[].id, .bar.layout.center[].id]' "$SJ") == '["orbital.dock","orbital.workspaces"]' ]] || bad "layout left/center"
-[[ $(jq -r '.bar.layout.right[-1].id' "$SJ") == orbital.clock && $(jq -r '.bar.layout.right[-2].id' "$SJ") == orbital.divider ]] || bad "layout right"
+[[ $(jq -r '.bar.layout.right[-1].id' "$SJ") == jankeesvw.notification-center && $(jq -r '.bar.layout.right[-2].id' "$SJ") == orbital.clock && $(jq -r '.bar.layout.right[-3].id' "$SJ") == orbital.divider ]] || bad "layout right (bell, clock, divider order)"
 jq -e '.bar.layout.right | map(.id) | index("omarchy.tray") == 0 and (index("omarchy.indicators") == 1)' "$SJ" >/dev/null || bad "tray/indicators order"
-[[ $(jq -r '.bar.layout.right[-1].formatAlt' "$SJ") == "d MMMM 'W'ww yyyy" ]] || bad "clock format"
+[[ $(jq -r '.bar.layout.right[-2].formatAlt' "$SJ") == "d MMMM 'W'ww yyyy" ]] || bad "clock format"
 ok "full: bar config + layout"
 [[ $(stat -c %a "$SJ") == 644 ]] || bad "shell.json permissions"; ok "shell.json keeps 644"
+[[ $(jq -c '[.bar.layout.right[].id | select(. == "jankeesvw.notification-center")] | length' "$SJ") == 1 ]] || bad "bell missing/duplicated"; ok "notification center installed and placed last"
 ls "$HOME/.config/omarchy/shell.json.bak-orbital-"* >/dev/null || bad "shell.json backup"; ok "shell.json backed up"
 G="$(grep -n 'hypr.orbital-gaps' "$HOME/.config/hypr/hyprland.lua" | cut -d: -f1)"; TG="$(grep -n 'default.hypr.toggles' "$HOME/.config/hypr/hyprland.lua" | cut -d: -f1)"
 (( G < TG )) || bad "gaps must load before toggles"; ok "gaps load before the gaps toggle"
@@ -40,7 +49,7 @@ grep -q "orbital-bindings" "$HOME/.config/hypr/hyprland.lua" || bad "bindings ho
 jq -e '.pinned | map(.entry) | index("com.mitchellh.ghostty")' "$HOME/.local/state/omarchy/orbital-dock.json" >/dev/null || bad "dock pins"; ok "default dock pins from installed apps"
 "$REPO/install.sh" --full --no-restart >/dev/null
 [[ $(jq -c '.bar.layout.right | map(.id) | map(select(. == "orbital.clock")) | length' "$SJ") == 1 ]] || bad "full not idempotent"; ok "full is idempotent"
-[[ $(jq -r '.bar.layout.right[-3].id' "$SJ") == orbital.keyboard ]] || bad "keyboard widget not in layout"; ok "keyboard widget placed before divider + clock"
+[[ $(jq -r '.bar.layout.right[-4].id' "$SJ") == orbital.keyboard ]] || bad "keyboard widget not in layout"; ok "keyboard widget placed before divider + clock + bell"
 [[ ! -f $HOME/.config/hypr/orbital-keyboard.lua ]] || bad "keyboard file written with a single layout"; ok "single layout: no keyboard config forced"
 "$REPO/install.sh" --full --no-restart --keyboard-layouts br,us >/dev/null
 KB="$HOME/.config/hypr/orbital-keyboard.lua"
@@ -55,7 +64,7 @@ done; ok "plugins installed"
 grep -q 'require("hypr.orbital")' "$HOME/.config/hypr/hyprland.lua" && [[ -f $HOME/.config/hypr/orbital.lua ]] || bad "hyprland hook"; ok "hyprland hook"
 "$REPO/install.sh" --no-restart >/dev/null
 [[ $(grep -c 'require("hypr.orbital")' "$HOME/.config/hypr/hyprland.lua") == 1 ]] || bad "hook not idempotent"; ok "idempotent hook"
-[[ $(jq -r '.bar.layout.right[-1].id' "$HOME/.config/omarchy/shell.json") == orbital.clock ]] || bad "--full layout was disturbed by widget placement"
+[[ $(jq -r '.bar.layout.right[-2].id' "$HOME/.config/omarchy/shell.json") == orbital.clock ]] || bad "--full layout was disturbed by widget placement"
 ! grep -q "plugin enable orbital.clock --section" "$HOME/omarchy-calls.log" || bad "--full must not re-place widgets"; ok "--full keeps its layout (no widget re-placement)"
 [[ -f $HOME/.local/state/omarchy/orbital-accent-base/colors.toml ]] || bad "baseline"
 grep -q '^accent = "#39A9FF"' "$HOME/.local/state/omarchy/orbital-accent-base/colors.toml" || bad "baseline not blue"; ok "pristine blue baseline"
