@@ -7,7 +7,7 @@
 #
 #   --full  also reproduces the author's desktop: Orbital floating bar (bottom, half-size gap),
 #           dock left / workspaces center / divider + clock right, Super+S launcher binding,
-#           8/12 window gaps and default dock pins. Your shell.json is backed up first.
+#           8/12 window gaps, text size 10 and default dock pins. Your shell.json is backed up first.
 #
 # Idempotent. Never edits shell.json by hand (uses `omarchy plugin enable`),
 # backs up anything it replaces OUTSIDE the plugins folder (the shell scans it).
@@ -91,6 +91,8 @@ full_setup() {
       }
     ' "$sj" > "$tmp" && mv "$tmp" "$sj"
   fi
+  # Text size the layout was tuned at (shell, GTK and terminals), like the author's machine.
+  run omarchy display text size 10 || echo "    (could not set the text size)"
   # Hyprland: bindings + gaps (gaps go BEFORE Omarchy's toggles so the gaps toggle still wins).
   run cp "$REPO/hypr/orbital-bindings.lua" "$HYPR/orbital-bindings.lua"
   run cp "$REPO/hypr/orbital-gaps.lua" "$HYPR/orbital-gaps.lua"

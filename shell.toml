@@ -2,6 +2,11 @@
 # Taskbar: floating glass, bottom 12px, blur 24px, dark translucent
 # Launcher: Level 2 — slightly darker, more opaque
 
+# Orbital's proportions are tuned for a 10px text base (Omarchy's default is 12).
+# `omarchy display text size N` overrides this per machine.
+[font]
+base-size = 10
+
 [bar]
 background = "#0A1422"
 background-alpha = 0.72
