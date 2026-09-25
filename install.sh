@@ -2,8 +2,12 @@
 # Orbital installer: theme companions that `omarchy theme install` cannot ship.
 #
 #   omarchy theme install https://github.com/<you>/omarchy-orbital-theme   # the theme itself
-#   ./install.sh [--bar-widgets] [--no-restart] [--dry-run]                # plugins + Hyprland glass
+#   ./install.sh [--full] [--bar-widgets] [--no-restart] [--dry-run]      # plugins + Hyprland glass
 #   ./install.sh --uninstall
+#
+#   --full  also reproduces the author's desktop: Orbital floating bar (bottom, half-size gap),
+#           dock left / workspaces center / divider + clock right, Super+S launcher binding,
+#           8/12 window gaps and default dock pins. Your shell.json is backed up first.
 #
 # Idempotent. Never edits shell.json by hand (uses `omarchy plugin enable`),
 # backs up anything it replaces OUTSIDE the plugins folder (the shell scans it).
@@ -24,11 +28,11 @@ LIBS=(orbital.ui)
 WIDGETS=("orbital.dock:left" "orbital.workspaces:center" "orbital.clock:right")
 EXTRA_WIDGETS=(orbital.divider)
 
-DRY=0 RESTART=1 BAR=0 UNINSTALL=0
+DRY=0 RESTART=1 BAR=0 UNINSTALL=0 FULL=0
 for a in "$@"; do
   case $a in
-    --dry-run) DRY=1 ;; --no-restart) RESTART=0 ;; --bar-widgets) BAR=1 ;; --uninstall) UNINSTALL=1 ;;
-    -h|--help) sed -n 2,9p "$0"; exit 0 ;;
+    --dry-run) DRY=1 ;; --no-restart) RESTART=0 ;; --bar-widgets) BAR=1 ;; --full) FULL=1; BAR=1 ;; --uninstall) UNINSTALL=1 ;;
+    -h|--help) sed -n 2,13p "$0"; exit 0 ;;
     *) echo "unknown option: $a" >&2; exit 2 ;;
   esac
 done
@@ -39,17 +43,78 @@ have_omarchy() { command -v omarchy >/dev/null 2>&1; }
 
 uninstall() {
   say "Removing Orbital plugins, Hyprland hook and crash drop-in"
-  for id in "${OVERLAYS[@]}" "${LIBS[@]}" "${EXTRA_WIDGETS[@]}" "${WIDGETS[@]%%:*}"; do
+  for id in "${OVERLAYS[@]}" "${LIBS[@]}" orbital.floating-bar "${EXTRA_WIDGETS[@]}" "${WIDGETS[@]%%:*}"; do
     have_omarchy && run omarchy plugin disable "$id" 2>/dev/null || true
     run rm -rf "$PLUGINS/$id"
   done
-  run rm -f "$HYPR/orbital.lua" "$DROPIN/orbital.conf"
+  run rm -f "$HYPR/orbital.lua" "$HYPR/orbital-gaps.lua" "$HYPR/orbital-bindings.lua" "$DROPIN/orbital.conf"
   [[ -f $HYPR/hyprland.lua ]] && run sed -i '/-- orbital$/d' "$HYPR/hyprland.lua"
+  say "shell.json is not reverted automatically; restore a backup: $CFG/omarchy/shell.json.bak-orbital-*"
   systemctl --user daemon-reload 2>/dev/null || true
   say "Done. The theme itself: omarchy theme remove orbital. Baseline kept in $BASE."
 }
 
 if (( UNINSTALL )); then uninstall; exit 0; fi
+
+desktop_id() { # first installed .desktop among candidates
+  local c; for c in "$@"; do
+    for d in /usr/share/applications ~/.local/share/applications; do [[ -f $d/$c.desktop ]] && { echo "$c"; return; }; done
+  done
+}
+
+full_setup() {
+  say "Full desktop: floating bar, layout, bindings, gaps, dock pins"
+  local sj="$CFG/omarchy/shell.json"
+  run mkdir -p "$CFG/omarchy"
+  if [[ ! -f $sj ]]; then run cp "${OMARCHY_PATH:-/usr/share/omarchy}/config/omarchy/shell.json" "$sj"; fi
+  run cp "$sj" "$sj.bak-orbital-$STAMP"
+  if (( ! DRY )); then
+    local tmp; tmp="$(mktemp)"
+    jq '
+      .bar = (.bar // {}) |
+      .bar.id = "orbital.floating-bar" | .bar.position = "bottom" | .bar.transparent = false |
+      .bar.cornerRadius = 10 | .bar.floatGapScale = 0.5 | .bar.centerAnchor = "orbital.workspaces" |
+      (.bar.layout // {}) as $l |
+      ([($l.left // [])[], ($l.center // [])[], ($l.right // [])[]]) as $all |
+      ($all | map(select(.id == "omarchy.indicators"))) as $ind |
+      ($l.right // []) as $right |
+      .bar.layout = {
+        left:   [{id: "orbital.dock"}],
+        center: [{id: "orbital.workspaces"}],
+        right:  ( ($right | map(select(.id == "omarchy.tray")))
+                + $ind
+                + ($right | map(select(.id != "omarchy.tray" and .id != "omarchy.indicators"
+                                        and .id != "orbital.divider" and .id != "orbital.clock" and .id != "omarchy.clock")))
+                + [{id: "orbital.divider"},
+                   {id: "orbital.clock", format: "HH:mm", formatAlt: "d MMMM '"'"'W'"'"'ww yyyy", verticalFormat: "HH\n—\nmm"}] )
+      }
+    ' "$sj" > "$tmp" && mv "$tmp" "$sj"
+  fi
+  # Hyprland: bindings + gaps (gaps go BEFORE Omarchy's toggles so the gaps toggle still wins).
+  run cp "$REPO/hypr/orbital-bindings.lua" "$HYPR/orbital-bindings.lua"
+  run cp "$REPO/hypr/orbital-gaps.lua" "$HYPR/orbital-gaps.lua"
+  if [[ -f $HYPR/hyprland.lua ]] && (( ! DRY )); then
+    grep -qF 'hypr.orbital-bindings' "$HYPR/hyprland.lua" || printf 'require("hypr.orbital-bindings") -- orbital\n' >> "$HYPR/hyprland.lua"
+    if ! grep -qF 'hypr.orbital-gaps' "$HYPR/hyprland.lua"; then
+      if grep -q 'require("default.hypr.toggles")' "$HYPR/hyprland.lua"; then
+        sed -i 's|^require("default.hypr.toggles")|require("hypr.orbital-gaps") -- orbital\n&|' "$HYPR/hyprland.lua"
+      else printf 'require("hypr.orbital-gaps") -- orbital\n' >> "$HYPR/hyprland.lua"; fi
+    fi
+  fi
+  # Dock pins: only if the user has none yet; from what is actually installed.
+  local pins="$HOME/.local/state/omarchy/orbital-dock.json"
+  if [[ ! -f $pins ]] && (( ! DRY )); then
+    local b t f entries=()
+    b="$(xdg-settings get default-web-browser 2>/dev/null | sed 's/\.desktop$//')"
+    t="$(desktop_id com.mitchellh.ghostty Alacritty kitty foot)"
+    f="$(desktop_id org.gnome.Nautilus org.kde.dolphin thunar)"
+    for e in "$b" "$t" "$f"; do [[ -n $e ]] && entries+=("$e"); done
+    if (( ${#entries[@]} )); then
+      mkdir -p "$(dirname "$pins")"
+      printf '%s\n' "${entries[@]}" | jq -R '{key: (. | ascii_downcase), entry: .}' | jq -s '{version: 1, pinned: .}' > "$pins"
+    fi
+  fi
+}
 
 # 1. Requirements (fail early, name what is missing).
 missing=()
@@ -75,7 +140,7 @@ run mkdir -p "$BASE"
 if (( ! DRY )); then
   (cd "$REPO" && tar cf - --exclude=./plugins --exclude=./hypr --exclude=./systemd --exclude=./scripts \
      --exclude=./docs --exclude=./backgrounds --exclude=./.git --exclude=./install.sh \
-     --exclude=./README.md --exclude=./CHANGELOG.md --exclude=./LICENSE* .) | tar xf - -C "$BASE"
+     --exclude=./README.md --exclude=./CHANGELOG.md --exclude=./LICENSE* --exclude='*.png' --exclude='*.jpg' .) | tar xf - -C "$BASE"
 fi
 
 # 4. Hyprland glass/blur/animations (theme .lua files are dropped by `theme install`).
@@ -101,6 +166,8 @@ if (( BAR )); then
 else
   echo "    Bar widgets not touched. To use them: ./install.sh --bar-widgets  (dock left, workspaces center, clock right)"
 fi
+
+if (( FULL )); then full_setup; fi
 
 if (( RESTART )) && (( ! DRY )); then say "Restarting the shell"; omarchy restart shell || true; fi
 say "Now apply the theme: omarchy theme set Orbital"

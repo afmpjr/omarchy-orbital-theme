@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "id": "orbital.floating-bar",
+  "name": "Orbital Floating Bar",
+  "version": "1.6.0",
+  "author": "Charlieras262 (fork: afmpjr)",
+  "description": "Orbital's floating bar: a fork of charlieras262.floating-bar (MIT) with a floatGapScale option (scale the auto-detected window gap, e.g. 0.5 for half). Full bar replacement: floats over the desktop with rounded corners on whichever edge you place it, gap matching Hyprland's window spacing",
+  "kinds": [
+    "bar"
+  ],
+  "entryPoints": {
+    "bar": "Bar.qml"
+  },
+  "omarchy": {
+    "clonedFrom": "omarchy.bar"
+  },
+  "license": "MIT"
+}

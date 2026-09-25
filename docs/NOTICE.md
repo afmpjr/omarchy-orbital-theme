@@ -4,8 +4,9 @@
   (Omarchy, MIT).
 - `orbital.dock` is adapted from `claudsondouglas/arc.dock` (MIT, Copyright (c) 2026 Claudson): its app grouping and window
   matching. The original license text is kept in `plugins/orbital.dock/LICENSE-arc.dock`, as MIT requires.
-- Not bundled: the floating bar plugin (`charlieras262.floating-bar`, whose gap scale was patched locally in the author's setup),
-  Omaland, and the lock-screen fork. The theme works with the stock bar.
+- `orbital.floating-bar` is a fork of `charlieras262/floating-bar` (MIT, Copyright (c) 2026 Charlieras262; license kept in
+  `plugins/orbital.floating-bar/LICENSE`). The only change is the `floatGapScale` option in `Bar.qml`.
+- Not bundled: Omaland and the lock-screen fork (third-party). The theme works without them.
 
 ## License
 

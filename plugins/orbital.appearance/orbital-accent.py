@@ -67,7 +67,9 @@ def apply(name, p):
         for f in files:
             src = os.path.join(root, f)
             dst = os.path.join(THEME, rel, f)
-            t = open(src).read()
+            try: t = open(src).read()
+            except UnicodeDecodeError:  # binary (images): copy as is
+                shutil.copyfile(src, dst); continue
             if not any(s in rel + "/" + f for s in SKIP):
                 t = transform(t, p, bare=f in ('ghostty.conf', 'foot.ini'))
             open(dst, "w").write(t)
