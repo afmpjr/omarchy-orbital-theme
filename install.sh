@@ -7,6 +7,7 @@
 #
 #   --full  also reproduces the author's desktop: Orbital floating bar (bottom, half-size gap),
 #           dock left / workspaces center / divider + clock right, Super+S launcher binding,
+#           (--keep-bar keeps the bar you already use instead of switching to orbital.floating-bar),
 #           4-finger touchpad swipe switches workspaces (--no-gestures skips it),
 #           frees Ctrl+Enter in Ghostty (--fix-terminal-shortcuts does only that), 8/12 window gaps, text size 10, keyboard layout widget + Alt+Shift and default dock pins. Your shell.json is backed up first.
 #
@@ -40,12 +41,12 @@ WIDGETS=("orbital.dock:left" "orbital.workspaces:center" "orbital.keyboard:right
 EXTRA_WIDGETS=(orbital.divider)
 BAR_IDS=(orbital.floating-bar orbital.bar)
 
-DRY=0 RESTART=1 BAR=0 UNINSTALL=0 FULL=0 KBLAYOUTS= LAUNCHER_KEY=1 ALT_SHIFT=1 GESTURES=1 TERM_FIX=0
+DRY=0 RESTART=1 BAR=0 UNINSTALL=0 FULL=0 KBLAYOUTS= LAUNCHER_KEY=1 ALT_SHIFT=1 GESTURES=1 KEEP_BAR=0 TERM_FIX=0
 while (( $# )); do
   a=$1; shift
   case $a in
     --dry-run) DRY=1 ;; --no-restart) RESTART=0 ;; --bar-widgets) BAR=1 ;; --full) FULL=1; BAR=1 ;;
-    --no-launcher-key) LAUNCHER_KEY=0 ;; --no-alt-shift) ALT_SHIFT=0 ;; --no-gestures) GESTURES=0 ;; --fix-terminal-shortcuts) TERM_FIX=1 ;;
+    --no-launcher-key) LAUNCHER_KEY=0 ;; --no-alt-shift) ALT_SHIFT=0 ;; --no-gestures) GESTURES=0 ;; --keep-bar) KEEP_BAR=1 ;; --fix-terminal-shortcuts) TERM_FIX=1 ;;
     --keyboard-layouts) KBLAYOUTS="${1:?--keyboard-layouts needs a list, e.g. us,br}"; shift ;; --uninstall) UNINSTALL=1 ;;
     # The header comment is the help text: print the block of '#' lines under the shebang.
     -h|--help) awk 'NR>1 && /^#/ { sub(/^# ?/, ""); print; next } NR>1 { exit }' "$0"; exit 0 ;;
@@ -56,6 +57,21 @@ done
 say() { echo "==> $*"; }
 nap() { [[ ${ORBITAL_INSTALL_NO_WAIT:-} == 1 ]] || sleep "$1"; }  # tests skip the waits
 run() { if (( DRY )); then echo "    [dry-run] $*"; else "$@"; fi; }
+# Does your own Hyprland config (every .lua except Orbital'"'"'s own files) already have a live line matching this
+# ERE? Used to adopt what you already have instead of loading a second copy of it.
+user_hypr_has() {
+  local f d dirs=("$HYPR")
+  # dotfiles setups symlink hyprland.lua and keep the rest (e.g. a keybindings/ folder) next to the real file
+  [[ -e $HYPR/hyprland.lua ]] && dirs+=("$(dirname "$(readlink -f "$HYPR/hyprland.lua")")")
+  for d in "${dirs[@]}"; do
+    for f in "$d"/*.lua "$d"/*/*.lua; do
+      [[ -f $f ]] || continue
+      case ${f##*/} in orbital.lua|orbital-*.lua) continue ;; esac
+      grep -E "$1" "$f" 2>/dev/null | grep -vqE '^[[:space:]]*--' && return 0
+    done
+  done
+  return 1
+}
 have_omarchy() { command -v omarchy >/dev/null 2>&1; }
 problem() { PROBLEMS+=("$1"); echo "    ! $1" >&2; }
 warn() { WARNINGS+=("$1"); }
@@ -134,7 +150,7 @@ reconcile_hypr_requires() {
     fi
   done
   (( ${#dangling[@]} )) || return 0
-  sed -i -E "/require\(\"hypr\.($re)\"\)/d" "$HYPR/hyprland.lua" \
+  sed -i --follow-symlinks -E "/require\(\"hypr\.($re)\"\)/d" "$HYPR/hyprland.lua" \
     || { problem "could not remove the require(s) whose file is missing (${dangling[*]}) from $HYPR/hyprland.lua"; return 1; }
   say "Removed require(s) whose file is missing: ${dangling[*]}"
   echo "    (that part of the theme is off; re-run install.sh to get it back)"
@@ -146,9 +162,9 @@ uninstall() {
     have_omarchy && run omarchy plugin disable "$id" 2>/dev/null || true
     run rm -rf "$PLUGINS/$id"
   done
-  [[ -f $CFG/ghostty/config ]] && run sed -i '/^# orbital-shortcuts/,/^# orbital-shortcuts end/d' "$CFG/ghostty/config"
+  [[ -f $CFG/ghostty/config ]] && run sed -i --follow-symlinks '/^# orbital-shortcuts/,/^# orbital-shortcuts end/d' "$CFG/ghostty/config"
   run rm -f "$HYPR/orbital.lua" "$HYPR/orbital-gaps.lua" "$HYPR/orbital-bindings.lua" "$HYPR/orbital-gestures.lua" "$HYPR/orbital-keyboard.lua" "$DROPIN/orbital.conf"
-  [[ -f $HYPR/hyprland.lua ]] && run sed -i '/-- orbital$/d' "$HYPR/hyprland.lua"
+  [[ -f $HYPR/hyprland.lua ]] && run sed -i --follow-symlinks '/-- orbital$/d' "$HYPR/hyprland.lua"
   say "shell.json is not reverted automatically; restore a backup: $CFG/omarchy/shell.json.bak-orbital-*"
   systemctl --user daemon-reload 2>/dev/null || true
   say "Done. The theme itself: omarchy theme remove orbital. Baseline kept in $BASE."
@@ -186,10 +202,12 @@ full_shell_json() {
   run cp "$sj" "$sj.bak-orbital-$STAMP"
   if (( DRY )); then return 0; fi
   tmp="$(mktemp)"
-  if ! jq --argjson bell "$( [[ -d $PLUGINS/$NOTIF_ID ]] && echo true || echo false )" --arg bellid "$NOTIF_ID" '
+  if ! jq --argjson keep "$( (( KEEP_BAR )) && echo true || echo false )" --argjson bell "$( [[ -d $PLUGINS/$NOTIF_ID ]] && echo true || echo false )" --arg bellid "$NOTIF_ID" '
       .bar = (.bar // {}) |
-      .bar.id = "orbital.floating-bar" | .bar.position = "bottom" | .bar.transparent = false |
-      .bar.cornerRadius = 10 | .bar.floatGapScale = 0.5 | .bar.centerAnchor = "orbital.workspaces" |
+      (if $keep then . else
+        .bar.id = "orbital.floating-bar" | .bar.position = "bottom" | .bar.transparent = false |
+        .bar.cornerRadius = 10 | .bar.floatGapScale = 0.5 end) |
+      .bar.centerAnchor = "orbital.workspaces" |
       (.bar.layout // {}) as $l |
       ([($l.left // [])[], ($l.center // [])[], ($l.right // [])[]]) as $all |
       ($all | map(select(.id == "omarchy.indicators"))) as $ind |
@@ -245,12 +263,17 @@ keyboard_setup() {
   # usual Alt-then-Shift does nothing. Drop any grp: option and use two release binds instead: they
   # fire once per Alt+Shift chord in either order (mods at release time are ALT+SHIFT), and never on
   # Alt or Shift alone.
+  if [[ -f $HYPR/orbital-keyboard.lua ]] && ! grep -q 'generated by orbital install.sh' "$HYPR/orbital-keyboard.lua"; then
+    echo "    Keyboard: $HYPR/orbital-keyboard.lua is yours (not generated by this installer); keeping it as it is."
+    return 0
+  fi
   opts="$(echo "$opts" | tr ',' '\n' | { grep -v '^grp:' || true; } | paste -sd, -)"
   say "Keyboard layouts: $layouts (Alt+Shift switches, either order)"
   ensure_dir "$HYPR" || { problem "could not create $HYPR"; return 1; }
   if (( DRY )); then return 0; fi
   if ! cat > "$HYPR/orbital-keyboard.lua" <<LUA
--- Orbital keyboard: layouts + Alt+Shift switching (loaded last). Edit or delete freely.
+-- Orbital keyboard: layouts + Alt+Shift switching (loaded last; generated by orbital install.sh).
+-- Remove the "generated by" words from this comment to stop the installer from rewriting the file.
 hl.config({ input = { kb_layout = "$layouts", kb_options = "$opts" } })
 LUA
   then problem "could not write $HYPR/orbital-keyboard.lua"; return 1; fi
@@ -288,18 +311,25 @@ full_setup() {
     return 1
   fi
   # Hyprland: bindings + gaps (gaps go BEFORE Omarchy's toggles so the gaps toggle still wins).
-  if (( LAUNCHER_KEY )); then
+  if (( LAUNCHER_KEY )) && user_hypr_has 'orbital\.launcher'; then
+    LAUNCHER_KEY=0; echo "    Launcher key: your Hyprland config already opens the launcher; not adding a second binding."
+  elif (( LAUNCHER_KEY )); then
     run cp "$REPO/hypr/orbital-bindings.lua" "$HYPR/orbital-bindings.lua" || { problem "could not install $HYPR/orbital-bindings.lua"; return 1; }
   else echo "    Launcher key: skipped (--no-launcher-key); bind it yourself: omarchy-shell shell toggle orbital.launcher"; fi
-  run cp "$REPO/hypr/orbital-gaps.lua" "$HYPR/orbital-gaps.lua" || { problem "could not install $HYPR/orbital-gaps.lua"; return 1; }
+  local own_gaps=0
+  if user_hypr_has 'gaps_in[[:space:]]*='; then
+    own_gaps=1; echo "    Gaps: your Hyprland config already sets them; leaving them alone."
+  else
+    run cp "$REPO/hypr/orbital-gaps.lua" "$HYPR/orbital-gaps.lua" || { problem "could not install $HYPR/orbital-gaps.lua"; return 1; }
+  fi
   if [[ -f $HYPR/hyprland.lua ]] && (( ! DRY )); then
     if (( LAUNCHER_KEY )) && ! grep -qF 'hypr.orbital-bindings' "$HYPR/hyprland.lua" \
       && ! printf 'require("hypr.orbital-bindings") -- orbital\n' >> "$HYPR/hyprland.lua"; then
       problem "could not add the launcher binding require to $HYPR/hyprland.lua"; return 1
     fi
-    if ! grep -qF 'hypr.orbital-gaps' "$HYPR/hyprland.lua"; then
+    if (( ! own_gaps )) && ! grep -qF 'hypr.orbital-gaps' "$HYPR/hyprland.lua"; then
       if grep -q 'require("default.hypr.toggles")' "$HYPR/hyprland.lua"; then
-        sed -i 's|^require("default.hypr.toggles")|require("hypr.orbital-gaps") -- orbital\n&|' "$HYPR/hyprland.lua" \
+        sed -i --follow-symlinks 's|^require("default.hypr.toggles")|require("hypr.orbital-gaps") -- orbital\n&|' "$HYPR/hyprland.lua" \
           || { problem "could not add the gaps require to $HYPR/hyprland.lua"; return 1; }
       elif ! printf 'require("hypr.orbital-gaps") -- orbital\n' >> "$HYPR/hyprland.lua"; then
         problem "could not add the gaps require to $HYPR/hyprland.lua"; return 1
@@ -436,6 +466,9 @@ apply_hypr() {
   say "Installing the Hyprland part ($HYPR/orbital.lua)"
   ensure_dir "$HYPR" || { problem "could not create $HYPR"; return 1; }
   trip hypr && { problem "could not install $HYPR/orbital.lua (simulated failure)"; return 1; }
+  if user_hypr_has 'orbital-\.\*'; then
+    echo "    Glass rules: your Hyprland config already has them; not loading a second copy (hypr/orbital.lua)."; return 0
+  fi
   if (( DRY )); then echo "    [dry-run] install $REPO/hypr/orbital.lua -> $HYPR/orbital.lua (+ require in hyprland.lua)"; return 0; fi
   snapshot "$HYPR/orbital.lua"
   cp "$REPO/hypr/orbital.lua" "$HYPR/orbital.lua" || { problem "could not install $HYPR/orbital.lua"; return 1; }
@@ -560,7 +593,9 @@ apply_enable() {
   (( DRY )) && return 0
   TOUCHED_SHELL_JSON=1
   local cur; cur="$(jq -r '.bar.id // "omarchy.bar"' "$SJ" 2>/dev/null || echo omarchy.bar)"
-  if [[ $cur != orbital.floating-bar && $cur != orbital.bar ]]; then
+  if (( KEEP_BAR )); then
+    echo "    Bar: keeping your current one ($cur)."
+  elif [[ $cur != orbital.floating-bar && $cur != orbital.bar ]]; then
     enable_verified orbital.floating-bar || return 1
     echo "    (revert with: omarchy plugin enable $cur)"
   fi
@@ -568,7 +603,7 @@ apply_enable() {
   local want other
   want="$(jq -r '.bar.id // ""' "$SJ" 2>/dev/null || true)"
   if [[ $want == orbital.bar ]]; then other=orbital.floating-bar; else other=orbital.bar; fi
-  if [[ $want != "$other" ]] && omarchy plugin list 2>/dev/null | grep -qE "^$other +enabled"; then
+  if (( ! KEEP_BAR )) && [[ $want != "$other" ]] && omarchy plugin list 2>/dev/null | grep -qE "^$other +enabled"; then
     if ! omarchy plugin disable "$other" >/dev/null 2>&1; then
       problem "could not disable the unused bar ($other)"; return 1
     fi
@@ -617,12 +652,12 @@ verify_all() {
   local bar other; bar="$(jq -r '.bar.id // ""' "$SJ" 2>/dev/null || true)"
   case $bar in
     orbital.floating-bar|orbital.bar) ;;
-    *) problem "the bar in use is '${bar:-none}', not an Orbital one" ;;
+    *) (( KEEP_BAR )) || problem "the bar in use is '${bar:-none}', not an Orbital one" ;;
   esac
   # Only the bar named in .bar.id is ever loaded, so exactly one of the two may be enabled.
   if [[ $bar == orbital.bar ]]; then other=orbital.floating-bar; else other=orbital.bar; fi
-  grep -qE "^$bar +enabled" <<<"$list" || problem "the bar in use ($bar) is not enabled after the install"
-  if grep -qE "^$other +enabled" <<<"$list"; then
+  (( KEEP_BAR )) || grep -qE "^$bar +enabled" <<<"$list" || problem "the bar in use ($bar) is not enabled after the install"
+  if (( ! KEEP_BAR )) && grep -qE "^$other +enabled" <<<"$list"; then
     problem "both bars are enabled at once ($bar and $other); the shell would load only one"
   fi
   if (( BAR )); then
@@ -642,11 +677,11 @@ verify_all() {
       || problem "orbital.workspaces is not in the bar layout"
   fi
   if (( FULL )); then
-    [[ $(jq -r '.bar.position' "$SJ") == bottom ]] || problem "the bar should be at the bottom with --full"
+    (( KEEP_BAR )) || [[ $(jq -r '.bar.position' "$SJ") == bottom ]] || problem "the bar should be at the bottom with --full"
   fi
 
   # Every file the theme hooks into has to exist, or Hyprland takes the whole config down.
-  for f in "$HYPR/hyprland.lua" "$HYPR/orbital.lua" "$DROPIN/orbital.conf"; do
+  for f in "$HYPR/hyprland.lua" "$DROPIN/orbital.conf"; do
     [[ -f $f ]] || problem "$f is missing after the install"
   done
   if [[ -f $HYPR/hyprland.lua ]]; then

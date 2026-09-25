@@ -213,4 +213,31 @@ grep -q 'run ./install.sh again' <<<"$out" || bad "the failure report does not s
 export HOME="$SAVED_HOME"
 ok "the failure report names the problem and the next step"
 
+# An existing setup (dotfiles with symlinks, glass rules, launcher key, gesture, own keyboard file and a
+# third-party bar already in place): the installer adopts it and adds nothing twice.
+export HOME="$T/adopt"; rm -rf "$HOME"; D="$HOME/dotfiles"
+mkdir -p "$HOME/.config/omarchy/themes" "$HOME/.config/hypr" "$HOME/.config/omarchy" "$D/keybindings" "$HOME/.local/share/applications"
+cp -r "$REPO" "$HOME/.config/omarchy/themes/orbital"; rm -rf "$HOME/.config/omarchy/themes/orbital/.git"
+cp /usr/share/omarchy/config/omarchy/shell.json "$HOME/.config/omarchy/shell.json"
+jq '.bar.id = "someone.floating-bar"' "$HOME/.config/omarchy/shell.json" > "$HOME/.sj" && mv "$HOME/.sj" "$HOME/.config/omarchy/shell.json"
+printf 'require("default.hypr.omarchy")\nrequire("hypr.looknfeel")\nrequire("default.hypr.toggles")\nrequire("hypr.orbital-keyboard")\n' > "$D/hyprland.lua"
+printf 'hl.layer_rule({ match = { namespace = "^(orbital-.*)$" }, blur = true })\n' > "$D/looknfeel.lua"
+printf 'o.bind("SUPER + S", "Search", "omarchy-shell shell toggle orbital.launcher")\n' > "$D/keybindings/windows-like.lua"
+printf 'hl.gesture({ fingers = 4, direction = "horizontal", action = "workspace" })\nhl.config({ input = { kb_layout = "br,us" } })\n' > "$D/input.lua"
+printf -- '-- my own keyboard file\nhl.config({ input = { kb_layout = "br,us" } })\n' > "$D/orbital-keyboard.lua"
+for f in hyprland looknfeel input orbital-keyboard; do ln -s "$D/$f.lua" "$HOME/.config/hypr/$f.lua"; done
+cp "$D/orbital-keyboard.lua" "$HOME/kb.orig"; cp "$D/hyprland.lua" "$HOME/hl.orig"
+"$REPO/install.sh" --full --keep-bar --no-restart >/dev/null 2>"$HOME/err" || { cat "$HOME/err"; bad "install on an existing setup failed"; }
+"$REPO/install.sh" --full --keep-bar --no-restart >/dev/null 2>&1 || bad "second install failed"
+H="$HOME/.config/hypr"
+[[ -L $H/hyprland.lua ]] || bad "hyprland.lua symlink was replaced by a plain file"
+[[ ! -e $H/orbital.lua && ! -e $H/orbital-bindings.lua && ! -e $H/orbital-gestures.lua ]] || bad "duplicated glass/launcher key/gesture"
+cmp -s "$D/orbital-keyboard.lua" "$HOME/kb.orig" || bad "the user's own keyboard file was overwritten"
+cmp -s "$D/hyprland.lua" "$HOME/hl.orig" || [[ $(grep -c 'hypr.orbital-gaps' "$D/hyprland.lua") == 1 ]] || bad "hyprland.lua changed unexpectedly"
+[[ $(grep -c 'orbital-gaps' "$D/hyprland.lua") -le 1 ]] || bad "gaps required twice"
+[[ $(jq -r .bar.id "$HOME/.config/omarchy/shell.json") == someone.floating-bar ]] || bad "--keep-bar changed the bar"
+[[ $(jq -c '[.bar.layout[][]?.id] | group_by(.) | map(select(length > 1)) | length' "$HOME/.config/omarchy/shell.json") == 0 ]] || bad "a widget is placed twice"
+export HOME="$SAVED_HOME"
+ok "existing setup adopted: nothing duplicated, symlinks and your own files untouched"
+
 echo "ALL PASSED"

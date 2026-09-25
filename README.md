@@ -136,6 +136,10 @@ fullscreen, Ctrl+Shift+Enter zooms a split, Ctrl+Tab switches tabs); and Orbital
 **Ctrl+Enter** in Ghostty (`--fix-terminal-shortcuts` does only that), because it made Claude Code and other TUIs jump to
 fullscreen. `--full` also enables the **4-finger horizontal touchpad swipe** to switch workspaces (`--no-gestures` skips it; it is left alone if your config already sets a gesture). The two bindings `--full` adds are opt-out: `--no-launcher-key` (SUPER+S opens the launcher and replaces Omarchy's own
 SUPER+S) and `--no-alt-shift` (Alt+Shift layout switching; it also fires after editor chords such as Alt+Shift+Down).
+**Already have a setup?** The installer adopts what it finds instead of adding a second copy: glass rules, a launcher key, gaps or a
+gesture already in your Hyprland config (dotfiles symlinks are followed, and never replaced) are left alone, and an
+`orbital-keyboard.lua` you wrote yourself is kept. `--keep-bar` keeps the bar you use now instead of switching to
+`orbital.floating-bar`. Preview everything first with `./install.sh --full --dry-run`.
 Without `--full` Orbital binds nothing at all, so your own keys are left as they are.
 
 ## Avatar
