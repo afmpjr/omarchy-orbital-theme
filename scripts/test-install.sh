@@ -21,6 +21,8 @@ cp -r "$REPO" "$HOME/.config/omarchy/themes/orbital"; rm -rf "$HOME/.config/omar
 mkdir -p "$HOME/.config/omarchy" "$HOME/.local/share/applications"
 cp /usr/share/omarchy/config/omarchy/shell.json "$HOME/.config/omarchy/shell.json"
 printf 'require("default.hypr.toggles")\n' >> "$HOME/.config/hypr/hyprland.lua"
+# Omarchy's stock input.lua: kb_layout/kb_options only in comments (a grep with no match must not abort the installer)
+printf -- '-- hl.config({ input = { kb_layout = "us" } })\nhl.config({ input = { repeat_rate = 40 } })\n' > "$HOME/.config/hypr/input.lua"
 touch "$HOME/.local/share/applications/com.mitchellh.ghostty.desktop"
 "$REPO/install.sh" --full --no-restart >/dev/null
 SJ="$HOME/.config/omarchy/shell.json"

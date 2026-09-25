@@ -77,6 +77,14 @@ Item {
     Util.execDetached(command)
   }
 
+  // Only try the picture when the file exists (a missing one logs a warning per open).
+  FileView {
+    id: avatarFile
+    path: Quickshell.env("HOME") + "/.config/omarchy/avatar.png"
+    printErrors: false
+    watchChanges: false
+  }
+
   // Real name/email, same source the lock screen (a lock-screen plugin) uses:
   // ~/.local/state/omarchy/identity.json, refreshed by
   // `omarchy-refresh-identity` (real GitHub profile via `gh api user` when
@@ -191,7 +199,7 @@ Item {
               fillMode: Image.PreserveAspectCrop
               asynchronous: true
               cache: false
-              source: root.avatarSource
+              source: avatarFile.loaded ? root.avatarSource : ""
               visible: status === Image.Ready
             }
 

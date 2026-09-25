@@ -101,8 +101,8 @@ full_shell_json() {
 keyboard_setup() {
   local input="$HYPR/input.lua" layouts="$KBLAYOUTS" opts="compose:caps,shift:both_capslock_cancel"
   if [[ -f $input ]]; then
-    [[ -n $layouts ]] || layouts="$(grep -E '^[[:space:]]*kb_layout[[:space:]]*=' "$input" | head -1 | sed -E 's/.*=[[:space:]]*"([^"]*)".*/\1/')"
-    local existing; existing="$(grep -E '^[[:space:]]*kb_options[[:space:]]*=' "$input" | head -1 | sed -E 's/.*=[[:space:]]*"([^"]*)".*/\1/')"
+    [[ -n $layouts ]] || layouts="$(grep -E '^[[:space:]]*kb_layout[[:space:]]*=' "$input" | head -1 | sed -E 's/.*=[[:space:]]*"([^"]*)".*/\1/' || true)"
+    local existing; existing="$(grep -E '^[[:space:]]*kb_options[[:space:]]*=' "$input" | head -1 | sed -E 's/.*=[[:space:]]*"([^"]*)".*/\1/' || true)"
     [[ -n $existing ]] && opts="$existing"
   fi
   if [[ $layouts != *,* ]]; then
@@ -113,7 +113,7 @@ keyboard_setup() {
   # usual Alt-then-Shift does nothing. Drop any grp: option and use two release binds instead: they
   # fire once per Alt+Shift chord in either order (mods at release time are ALT+SHIFT), and never on
   # Alt or Shift alone.
-  opts="$(echo "$opts" | tr ',' '\n' | grep -v '^grp:' | paste -sd, -)"
+  opts="$(echo "$opts" | tr ',' '\n' | { grep -v '^grp:' || true; } | paste -sd, -)"
   say "Keyboard layouts: $layouts (Alt+Shift switches, either order)"
   run mkdir -p "$HYPR"
   if (( ! DRY )); then
@@ -228,6 +228,7 @@ else
 fi
 
 if (( FULL )); then full_setup; fi
+if (( ! DRY )); then hyprctl reload >/dev/null 2>&1 || true; fi
 
 if (( RESTART )) && (( ! DRY )); then say "Restarting the shell"; omarchy restart shell || true; fi
 say "Now apply the theme: omarchy theme set Orbital"

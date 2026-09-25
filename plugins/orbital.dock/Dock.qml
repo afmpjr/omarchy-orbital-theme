@@ -424,6 +424,14 @@ BarWidget {
         return Util.fileUrl(path)
       }
 
+      // Only try the picture when the file exists (a missing one logs a warning per load).
+      FileView {
+        id: avatarFile
+        path: Quickshell.env("HOME") + "/.config/omarchy/avatar.png"
+        printErrors: false
+        watchChanges: false
+      }
+
       // Circular masking (layer.effect + MultiEffect) rendered this
       // whole Item blank in practice, root cause not yet nailed down —
       // dropped rather than shipping an invisible avatar. Square for
@@ -435,7 +443,7 @@ BarWidget {
         height: width
         fillMode: Image.PreserveAspectCrop
         asynchronous: true
-        source: avatarSlot.avatarSource
+        source: avatarFile.loaded ? avatarSlot.avatarSource : ""
         cache: false
         visible: status === Image.Ready
       }
