@@ -128,3 +128,10 @@ column still needs the author's confirmation**. Third-party notices in [`docs/NO
 ## Development
 
 `scripts/test-install.sh` runs the installer and the color picker in a throwaway `$HOME` with a stubbed `omarchy`.
+`scripts/e2e-fresh-install.sh` is the honest test: it resets a clean Omarchy VM and follows the four
+commands above from the public URL, then checks the theme, the 13 plugin folders, the enabled plugins, the bar in use,
+the Hyprland hook and `hyprctl configerrors`. It needs a VM you can wipe (`TESTBED=/path/to/omarchy-testbed`).
+
+Note: Omarchy itself refuses terminal/Lua/VS Code files that arrive with a theme installed from a git repo, so
+`kitty.toml`, `alacritty.toml`, `foot.ini`, `ghostty.conf`, `neovim.lua` and `vscode.json` in this repo are reference
+copies only; the installer applies what it can through `omarchy config` and never writes into your dotfiles.

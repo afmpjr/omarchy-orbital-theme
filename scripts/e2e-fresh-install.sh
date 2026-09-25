@@ -55,7 +55,7 @@ done
 "$TB" ssh "$ENVSET; test -x $GT/install.sh" || bad "install.sh lost its exec bit in the clone"
 N="$("$TB" ssh "$ENVSET; ls -1 $GT/backgrounds | wc -l")"
 [[ $N == 6 ]] || bad "expected 6 wallpapers in the published repo, found $N"
-ok "published repo is complete (docs, license, executable installer, 7 wallpapers)"
+ok "published repo is complete (docs, license, executable installer, $N wallpapers)"
 
 # Theme applied.
 THEME="$("$TB" ssh "$ENVSET; cat ~/.local/state/omarchy/current/theme.name")"
@@ -101,11 +101,14 @@ done
 [[ -z $INVALID ]] || bad "this Omarchy rejects:$INVALID"
 ok "every installed manifest passes 'omarchy plugin validate'"
 
-# Viewport for the screenshot: plain hyprctl forms, because a payload with escaped quotes inside a
-# quoted ssh argument trips bash when the whole command sits in a command substitution.
-"$TB" ssh "$ENVSET; hyprctl keyword monitor ,1366x768@60,auto,1" >/dev/null
-"$TB" ssh "$ENVSET; hyprctl dispatch workspace 9" >/dev/null
-for i in 1 2 3 4; do "$TB" ssh "$ENVSET; hyprctl layers" 2>/dev/null | grep -q orbital-launcher && break; "$TB" ssh "$ENVSET; omarchy-shell shell toggle orbital.launcher '{}'" >/dev/null 2>&1; sleep 3; done
-sleep 4; "$TB" shot "$OUT" >/dev/null
-echo "screenshot: $OUT"
+# Screenshot: best effort. The guest keeps its native 1280x800 (this Hyprland's `hyprctl dispatch`
+# is the Lua form, so the classic `workspace 9` is a syntax error there and resizing is not worth
+# fighting for a test artifact); a missing launcher in the picture must not fail the run.
+for i in 1 2 3 4; do
+  "$TB" ssh "$ENVSET; hyprctl layers" 2>/dev/null | grep -q orbital-launcher && break
+  "$TB" ssh "$ENVSET; omarchy-shell shell toggle orbital.launcher '{}'" >/dev/null 2>&1 || true
+  sleep 3
+done
+sleep 3
+if "$TB" shot "$OUT" >/dev/null 2>&1; then echo "screenshot: $OUT"; else echo "warn - could not take the screenshot"; fi
 echo "FRESH INSTALL OK"
