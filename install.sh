@@ -709,10 +709,18 @@ verify_all() {
   (( DRY )) && { echo "    [dry-run] would verify: plugins enabled, bar in use, widgets placed, no dangling require"; return 0; }
   trip verify && { problem "verification failed (simulated failure)"; return 1; }
 
-  list="$(omarchy plugin list 2>/dev/null || true)"
-  for id in "${OVERLAYS[@]}" "${EXTRA_WIDGETS[@]}" "${WIDGETS[@]%%:*}"; do
-    grep -qE "^$id +enabled" <<<"$list" || problem "$id is installed but not enabled after the install"
+  # Right after a shell restart the plugin list can come back empty or half done for a while, so read it
+  # again for up to half a minute before calling a plugin "not enabled".
+  local try missing
+  for try in $(seq 1 15); do
+    list="$(omarchy plugin list 2>/dev/null || true)"; missing=()
+    for id in "${OVERLAYS[@]}" "${EXTRA_WIDGETS[@]}" "${WIDGETS[@]%%:*}"; do
+      grep -qE "^$id +enabled" <<<"$list" || missing+=("$id")
+    done
+    (( ${#missing[@]} == 0 )) && break
+    nap 2
   done
+  for id in "${missing[@]}"; do problem "$id is installed but not enabled after the install"; done
 
   jq -e . "$SJ" >/dev/null 2>&1 || problem "$SJ is not valid JSON after the install"
   local bar other; bar="$(jq -r '.bar.id // ""' "$SJ" 2>/dev/null || true)"
