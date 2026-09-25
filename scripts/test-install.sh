@@ -260,4 +260,20 @@ grep -q "# mine" "$TD/colors.toml" || bad "an existing theme file was overwritte
 export HOME="$SAVED_HOME"
 ok "run from any folder: missing theme files copied to themes/orbital, existing ones untouched"
 
+# --refresh-theme overwrites (after a backup); --theme-dir keeps the copy elsewhere and links to it.
+export HOME="$T/anywhere"
+"$REPO/install.sh" --bar-widgets --refresh-theme --no-restart >/dev/null 2>&1 || bad "--refresh-theme failed"
+grep -q "# mine" "$TD/colors.toml" && bad "--refresh-theme did not overwrite the theme copy"
+ls -d "$HOME/.config/omarchy/backups/orbital-theme-"* >/dev/null 2>&1 || bad "--refresh-theme made no backup"
+grep -q "# mine" "$HOME"/.config/omarchy/backups/orbital-theme-*/colors.toml || bad "the backup does not hold the old copy"
+export HOME="$T/elsewhere"; rm -rf "$HOME"; mkdir -p "$HOME/.config/omarchy" "$HOME/.config/hypr" "$HOME/.local/share/applications"
+cp /usr/share/omarchy/config/omarchy/shell.json "$HOME/.config/omarchy/shell.json"
+printf 'require("default.hypr.omarchy")\nrequire("default.hypr.toggles")\n' > "$HOME/.config/hypr/hyprland.lua"
+"$REPO/install.sh" --bar-widgets --theme-dir "$HOME/my-themes/orbital" --no-restart >/dev/null 2>"$HOME/err" || { cat "$HOME/err"; bad "--theme-dir install failed"; }
+[[ -f $HOME/my-themes/orbital/colors.toml ]] || bad "theme not copied to --theme-dir"
+[[ $(readlink "$HOME/.config/omarchy/themes/orbital") == "$HOME/my-themes/orbital" ]] || bad "themes/orbital does not link to --theme-dir"
+"$REPO/install.sh" --bar-widgets --theme-dir "$HOME/my-themes/orbital" --no-restart >/dev/null 2>&1 || bad "second --theme-dir install failed"
+export HOME="$SAVED_HOME"
+ok "--refresh-theme backs up and overwrites; --theme-dir keeps the copy elsewhere and links to it"
+
 echo "ALL PASSED"

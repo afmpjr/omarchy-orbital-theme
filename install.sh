@@ -7,6 +7,7 @@
 #
 #   --full  also reproduces the author's desktop: Orbital floating bar (bottom, half-size gap),
 #           dock left / workspaces center / divider + clock right, Super+S launcher binding,
+#           (--refresh-theme overwrites the theme copy in themes/orbital, --theme-dir DIR keeps that copy elsewhere and links to it),
 #           (--keep-bar keeps the bar you already use instead of switching to orbital.floating-bar),
 #           4-finger touchpad swipe switches workspaces (--no-gestures skips it),
 #           frees Ctrl+Enter in Ghostty (--fix-terminal-shortcuts does only that), 8/12 window gaps, text size 10, keyboard layout widget + Alt+Shift and default dock pins. Your shell.json is backed up first.
@@ -42,12 +43,13 @@ WIDGETS=("orbital.dock:left" "orbital.workspaces:center" "orbital.keyboard:right
 EXTRA_WIDGETS=(orbital.divider)
 BAR_IDS=(orbital.floating-bar orbital.bar)
 
-DRY=0 RESTART=1 BAR=0 UNINSTALL=0 FULL=0 KBLAYOUTS='' LAUNCHER_KEY=1 ALT_SHIFT=1 GESTURES=1 KEEP_BAR=0 TERM_FIX=0
+DRY=0 RESTART=1 BAR=0 UNINSTALL=0 FULL=0 KBLAYOUTS='' LAUNCHER_KEY=1 ALT_SHIFT=1 GESTURES=1 KEEP_BAR=0 REFRESH_THEME=0 THEME_TARGET='' TERM_FIX=0
 while (( $# )); do
   a=$1; shift
   case $a in
     --dry-run) DRY=1 ;; --no-restart) RESTART=0 ;; --bar-widgets) BAR=1 ;; --full) FULL=1; BAR=1 ;;
-    --no-launcher-key) LAUNCHER_KEY=0 ;; --no-alt-shift) ALT_SHIFT=0 ;; --no-gestures) GESTURES=0 ;; --keep-bar) KEEP_BAR=1 ;; --fix-terminal-shortcuts) TERM_FIX=1 ;;
+    --no-launcher-key) LAUNCHER_KEY=0 ;; --no-alt-shift) ALT_SHIFT=0 ;; --no-gestures) GESTURES=0 ;; --keep-bar) KEEP_BAR=1 ;; --refresh-theme) REFRESH_THEME=1 ;;
+    --theme-dir) THEME_TARGET="${1:?--theme-dir needs a folder}"; shift ;; --fix-terminal-shortcuts) TERM_FIX=1 ;;
     --keyboard-layouts) KBLAYOUTS="${1:?--keyboard-layouts needs a list, e.g. us,br}"; shift ;; --uninstall) UNINSTALL=1 ;;
     # The header comment is the help text: print the block of '#' lines under the shebang.
     -h|--help) awk 'NR>1 && /^#/ { sub(/^# ?/, ""); print; next } NR>1 { exit }' "$0"; exit 0 ;;
@@ -420,7 +422,7 @@ checks() {
   fi
 
   # Every place we will write to has to be writable before we start.
-  for d in "$PLUGINS" "$BACKUPS" "$HYPR" "$DROPIN" "$BASE" "$THEME_DIR"; do
+  for d in "$PLUGINS" "$BACKUPS" "$HYPR" "$DROPIN" "$BASE" "${THEME_TARGET:-$THEME_DIR}"; do
     writable_path "$d" || problem "cannot write to $d (or to create it)"
   done
   [[ -f $HYPR/hyprland.lua ]] && { [[ -w $HYPR/hyprland.lua ]] || problem "$HYPR/hyprland.lua is not writable"; } \
@@ -478,19 +480,50 @@ apply_baseline() {
 
 # Run from a clone anywhere (not from themes/orbital, where `omarchy theme install` puts it): copy the theme
 # files that are not there yet into ~/.config/omarchy/themes/orbital, so `omarchy theme set orbital` works.
-# Nothing already there is overwritten: the accent picker rewrites those files, and yours are yours.
+# Nothing already there is overwritten unless --refresh-theme (the accent picker rewrites those files, so a
+# refresh puts the default blue back, after saving the old copy under ~/.config/omarchy/backups).
+# --theme-dir DIR (or the prompt, in a terminal) keeps the copy in DIR; themes/orbital then links to it,
+# because Omarchy only looks in its own themes folder.
+choose_theme_dir() {
+  [[ -n $THEME_TARGET ]] && return 0
+  THEME_TARGET="$THEME_DIR"
+  [[ -t 0 && -t 1 && $DRY == 0 && ${ORBITAL_INSTALL_NO_WAIT:-} != 1 ]] || return 0
+  [[ $(readlink -f "$REPO") == "$(readlink -m "$THEME_DIR")" ]] && return 0
+  local ans; read -r -p "Where should the theme files go? [$THEME_DIR] " ans || ans=""
+  [[ -n $ans ]] && THEME_TARGET="${ans/#\~/$HOME}"
+  return 0
+}
+
 apply_theme_copy() {
-  local here dest; here="$(readlink -f "$REPO")"; dest="$(readlink -m "$THEME_DIR")"
-  [[ $here == "$dest" ]] && return 0
-  say "Copying the theme files that are missing from $THEME_DIR"
-  ensure_dir "$THEME_DIR" || { problem "could not create $THEME_DIR"; return 1; }
-  if (( DRY )); then echo "    [dry-run] copy what is missing from $REPO into $THEME_DIR"; return 0; fi
-  snapshot "$THEME_DIR"
+  local here dest link; here="$(readlink -f "$REPO")"
+  link="$(readlink -m "$THEME_DIR")"
+  [[ -n $THEME_TARGET ]] || THEME_TARGET="$THEME_DIR"
+  dest="$(readlink -m "$THEME_TARGET")"
+  [[ $here == "$dest" || $here == "$link" ]] && return 0
+  say "Copying the theme files ${REFRESH_THEME:+(refreshing) }to $dest"
+  ensure_dir "$dest" || { problem "could not create $dest"; return 1; }
+  if (( DRY )); then echo "    [dry-run] copy $( (( REFRESH_THEME )) && echo everything || echo what is missing ) from $REPO into $dest$( [[ $dest != "$link" ]] && echo " (and link $link to it)" )"; return 0; fi
+  snapshot "$dest"
+  if (( REFRESH_THEME )) && [[ -d $dest ]] && [[ -n $(ls -A "$dest" 2>/dev/null) ]]; then
+    local bk="$CFG/omarchy/backups/orbital-theme-$STAMP"
+    mkdir -p "$CFG/omarchy/backups" && cp -a "$dest" "$bk" || { problem "could not back up $dest before refreshing it"; return 1; }
+    echo "    Old theme copy saved in $bk (the accent color goes back to the default blue; pick yours again in Appearance)"
+  fi
+  local mode=--skip-old-files; (( REFRESH_THEME )) && mode=--overwrite
   (cd "$REPO" && tar cf - --exclude=./.git --exclude=./plugins --exclude=./hypr --exclude=./systemd --exclude=./scripts \
      --exclude=./docs --exclude=./test --exclude=./test-output --exclude=./preview-web --exclude=./install.sh \
      --exclude='./AI_HANDOFF*' --exclude=__pycache__ .) \
-    | tar xf - -C "$THEME_DIR" --skip-old-files || { problem "could not copy the theme into $THEME_DIR"; return 1; }
-  [[ -f $THEME_DIR/colors.toml ]] || { problem "the theme copy in $THEME_DIR has no colors.toml"; return 1; }
+    | tar xf - -C "$dest" $mode || { problem "could not copy the theme into $dest"; return 1; }
+  [[ -f $dest/colors.toml ]] || { problem "the theme copy in $dest has no colors.toml"; return 1; }
+  if [[ $dest != "$link" ]]; then
+    ensure_dir "$(dirname "$link")" || { problem "could not create $(dirname "$link")"; return 1; }
+    if [[ -L $link ]]; then snapshot "$link"; ln -sfn "$dest" "$link" || { problem "could not link $link to $dest"; return 1; }
+    elif [[ -e $link ]]; then
+      problem "$link already exists and is not a link; move it away, or drop --theme-dir to keep the theme there"; return 1
+    else
+      snapshot "$link"; ln -s "$dest" "$link" || { problem "could not link $link to $dest"; return 1; }
+    fi
+  fi
 }
 
 apply_hypr() {
@@ -735,6 +768,7 @@ verify_all() {
 # ---------------------------------------------------------------------------------------------
 # Run it.
 # ---------------------------------------------------------------------------------------------
+choose_theme_dir
 if ! checks; then
   DONE=1   # nothing was touched; the exit handler must not try to roll back
   echo >&2
