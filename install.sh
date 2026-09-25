@@ -2,12 +2,12 @@
 # Orbital installer: theme companions that `omarchy theme install` cannot ship.
 #
 #   omarchy theme install https://github.com/<you>/omarchy-orbital-theme   # the theme itself
-#   ./install.sh [--full] [--bar-widgets] [--no-restart] [--dry-run]      # plugins + Hyprland glass
+#   ./install.sh [--full] [--keyboard-layouts us,br] [--bar-widgets] [--no-restart] [--dry-run]      # plugins + Hyprland glass
 #   ./install.sh --uninstall
 #
 #   --full  also reproduces the author's desktop: Orbital floating bar (bottom, half-size gap),
 #           dock left / workspaces center / divider + clock right, Super+S launcher binding,
-#           8/12 window gaps, text size 10 and default dock pins. Your shell.json is backed up first.
+#           8/12 window gaps, text size 10, keyboard layout widget + Alt+Shift and default dock pins. Your shell.json is backed up first.
 #
 # Idempotent. Never edits shell.json by hand (uses `omarchy plugin enable`),
 # backs up anything it replaces OUTSIDE the plugins folder (the shell scans it).
@@ -26,14 +26,16 @@ STAMP="$(date +%Y%m%dT%H%M%S)"
 
 OVERLAYS=(orbital.launcher orbital.account orbital.appearance orbital.worldclock orbital.crash)
 LIBS=(orbital.ui)
-WIDGETS=("orbital.dock:left" "orbital.workspaces:center" "orbital.clock:right")
+WIDGETS=("orbital.dock:left" "orbital.workspaces:center" "orbital.keyboard:right" "orbital.clock:right")
 EXTRA_WIDGETS=(orbital.divider)
 
-DRY=0 RESTART=1 BAR=0 UNINSTALL=0 FULL=0
-for a in "$@"; do
+DRY=0 RESTART=1 BAR=0 UNINSTALL=0 FULL=0 KBLAYOUTS=
+while (( $# )); do
+  a=$1; shift
   case $a in
-    --dry-run) DRY=1 ;; --no-restart) RESTART=0 ;; --bar-widgets) BAR=1 ;; --full) FULL=1; BAR=1 ;; --uninstall) UNINSTALL=1 ;;
-    -h|--help) sed -n 2,13p "$0"; exit 0 ;;
+    --dry-run) DRY=1 ;; --no-restart) RESTART=0 ;; --bar-widgets) BAR=1 ;; --full) FULL=1; BAR=1 ;;
+    --keyboard-layouts) KBLAYOUTS="${1:?--keyboard-layouts needs a list, e.g. us,br}"; shift ;; --uninstall) UNINSTALL=1 ;;
+    -h|--help) sed -n 2,14p "$0"; exit 0 ;;
     *) echo "unknown option: $a" >&2; exit 2 ;;
   esac
 done
@@ -49,7 +51,7 @@ uninstall() {
     have_omarchy && run omarchy plugin disable "$id" 2>/dev/null || true
     run rm -rf "$PLUGINS/$id"
   done
-  run rm -f "$HYPR/orbital.lua" "$HYPR/orbital-gaps.lua" "$HYPR/orbital-bindings.lua" "$DROPIN/orbital.conf"
+  run rm -f "$HYPR/orbital.lua" "$HYPR/orbital-gaps.lua" "$HYPR/orbital-bindings.lua" "$HYPR/orbital-keyboard.lua" "$DROPIN/orbital.conf"
   [[ -f $HYPR/hyprland.lua ]] && run sed -i '/-- orbital$/d' "$HYPR/hyprland.lua"
   say "shell.json is not reverted automatically; restore a backup: $CFG/omarchy/shell.json.bak-orbital-*"
   systemctl --user daemon-reload 2>/dev/null || true
@@ -86,11 +88,34 @@ full_shell_json() {
         right:  ( ($right | map(select(.id == "omarchy.tray")))
                 + $ind
                 + ($right | map(select(.id != "omarchy.tray" and .id != "omarchy.indicators"
-                                        and .id != "orbital.divider" and .id != "orbital.clock" and .id != "omarchy.clock")))
-                + [{id: "orbital.divider"},
+                                        and .id != "orbital.divider" and .id != "orbital.keyboard" and .id != "orbital.clock" and .id != "omarchy.clock")))
+                + [{id: "orbital.keyboard"}, {id: "orbital.divider"},
                    {id: "orbital.clock", format: "HH:mm", formatAlt: "d MMMM '"'"'W'"'"'ww yyyy", verticalFormat: "HH\n—\nmm"}] )
       }
     ' "$sj" > "$tmp" && cat "$tmp" > "$sj" && rm -f "$tmp"
+  fi
+}
+
+# Alt+Shift switches layouts (xkb grp:alt_shift_toggle). Uses the layouts you already have in
+# ~/.config/hypr/input.lua, or --keyboard-layouts us,br. Written to its own file, loaded last.
+keyboard_setup() {
+  local input="$HYPR/input.lua" layouts="$KBLAYOUTS" opts="compose:caps,shift:both_capslock_cancel"
+  if [[ -f $input ]]; then
+    [[ -n $layouts ]] || layouts="$(grep -E '^[[:space:]]*kb_layout[[:space:]]*=' "$input" | head -1 | sed -E 's/.*=[[:space:]]*"([^"]*)".*/\1/')"
+    local existing; existing="$(grep -E '^[[:space:]]*kb_options[[:space:]]*=' "$input" | head -1 | sed -E 's/.*=[[:space:]]*"([^"]*)".*/\1/')"
+    [[ -n $existing ]] && opts="$existing"
+  fi
+  if [[ $layouts != *,* ]]; then
+    echo "    Keyboard: only one layout configured; pass --keyboard-layouts us,br to enable switching (the tray widget stays hidden until then)."
+    return 0
+  fi
+  opts="$(echo "$opts" | tr ',' '\n' | grep -v '^grp:' | paste -sd, -)"
+  opts="${opts:+$opts,}grp:alt_shift_toggle"
+  say "Keyboard layouts: $layouts (Alt+Shift switches)"
+  run mkdir -p "$HYPR"
+  if (( ! DRY )); then
+    printf -- '-- Orbital keyboard: layouts + Alt+Shift toggle (loaded last). Edit or delete freely.\nhl.config({ input = { kb_layout = "%s", kb_options = "%s" } })\n' "$layouts" "$opts" > "$HYPR/orbital-keyboard.lua"
+    grep -qF 'hypr.orbital-keyboard' "$HYPR/hyprland.lua" || printf 'require("hypr.orbital-keyboard") -- orbital\n' >> "$HYPR/hyprland.lua"
   fi
 }
 
@@ -109,6 +134,7 @@ full_setup() {
       else printf 'require("hypr.orbital-gaps") -- orbital\n' >> "$HYPR/hyprland.lua"; fi
     fi
   fi
+  keyboard_setup
   # Dock pins: only if the user has none yet; from what is actually installed.
   local pins="$HOME/.local/state/omarchy/orbital-dock.json"
   if [[ ! -f $pins ]] && (( ! DRY )); then

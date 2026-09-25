@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "id": "orbital.keyboard",
+  "name": "Orbital Keyboard Layout",
+  "version": "1.0.0",
+  "author": "afmpjr (based on Omarchy's keyboard-layout widget)",
+  "license": "MIT",
+  "description": "Shows the active keyboard layout in the tray; click opens a dropdown to switch layouts. Alt+Shift also cycles when kb_options has grp:alt_shift_toggle (install.sh --full sets it).",
+  "kinds": ["bar-widget"],
+  "entryPoints": { "barWidget": "Keyboard.qml" },
+  "barWidget": {
+    "displayName": "Keyboard layout (Orbital)",
+    "description": "Active layout + dropdown to switch",
+    "category": "Compositor",
+    "allowMultiple": false
+  }
+}

@@ -38,6 +38,14 @@ grep -q "orbital-bindings" "$HOME/.config/hypr/hyprland.lua" || bad "bindings ho
 jq -e '.pinned | map(.entry) | index("com.mitchellh.ghostty")' "$HOME/.local/state/omarchy/orbital-dock.json" >/dev/null || bad "dock pins"; ok "default dock pins from installed apps"
 "$REPO/install.sh" --full --no-restart >/dev/null
 [[ $(jq -c '.bar.layout.right | map(.id) | map(select(. == "orbital.clock")) | length' "$SJ") == 1 ]] || bad "full not idempotent"; ok "full is idempotent"
+[[ $(jq -r '.bar.layout.right[-3].id' "$SJ") == orbital.keyboard ]] || bad "keyboard widget not in layout"; ok "keyboard widget placed before divider + clock"
+[[ ! -f $HOME/.config/hypr/orbital-keyboard.lua ]] || bad "keyboard file written with a single layout"; ok "single layout: no keyboard config forced"
+"$REPO/install.sh" --full --no-restart --keyboard-layouts br,us >/dev/null
+KB="$HOME/.config/hypr/orbital-keyboard.lua"
+grep -q 'kb_layout = "br,us"' "$KB" && grep -q 'grp:alt_shift_toggle' "$KB" || bad "keyboard config"; ok "Alt+Shift toggle configured for br,us"
+[[ $(grep -c 'hypr.orbital-keyboard' "$HOME/.config/hypr/hyprland.lua") == 1 ]] || bad "keyboard hook twice"
+"$REPO/install.sh" --full --no-restart --keyboard-layouts br,us >/dev/null
+[[ $(grep -c 'hypr.orbital-keyboard' "$HOME/.config/hypr/hyprland.lua") == 1 ]] || bad "keyboard hook not idempotent"; ok "keyboard hook idempotent"
 for id in orbital.launcher orbital.dock orbital.account orbital.appearance orbital.worldclock orbital.crash orbital.ui orbital.clock orbital.workspaces orbital.divider; do
   [[ -d $HOME/.config/omarchy/plugins/$id ]] || bad "plugin $id missing"
 done; ok "plugins installed"
