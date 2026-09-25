@@ -76,6 +76,8 @@ ls "$HOME/.config/omarchy/shell.json.bak-orbital-"* >/dev/null || bad "shell.jso
 G="$(grep -n 'hypr.orbital-gaps' "$HOME/.config/hypr/hyprland.lua" | cut -d: -f1)"; TG="$(grep -n 'default.hypr.toggles' "$HOME/.config/hypr/hyprland.lua" | cut -d: -f1)"
 (( G < TG )) || bad "gaps must load before toggles"; ok "gaps load before the gaps toggle"
 grep -q "orbital-bindings" "$HOME/.config/hypr/hyprland.lua" || bad "bindings hook"; ok "launcher binding hooked"
+grep -q "orbital-gestures" "$HOME/.config/hypr/hyprland.lua" && grep -q "hl.gesture" "$HOME/.config/hypr/orbital-gestures.lua" || bad "gesture hook"; ok "4-finger swipe hooked"
+[[ $(grep -c 'orbital-gestures' "$HOME/.config/hypr/hyprland.lua") == 1 ]] || bad "gesture require duplicated"
 jq -e '.pinned | map(.entry) | index("com.mitchellh.ghostty")' "$HOME/.local/state/omarchy/orbital-dock.json" >/dev/null || bad "dock pins"; ok "default dock pins from installed apps"
 "$REPO/install.sh" --full --no-restart >/dev/null
 [[ $(jq -c '.bar.layout.right | map(.id) | map(select(. == "orbital.clock")) | length' "$SJ") == 1 ]] || bad "full not idempotent"; ok "full is idempotent"

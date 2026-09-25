@@ -7,6 +7,7 @@
 #
 #   --full  also reproduces the author's desktop: Orbital floating bar (bottom, half-size gap),
 #           dock left / workspaces center / divider + clock right, Super+S launcher binding,
+#           4-finger touchpad swipe switches workspaces (--no-gestures skips it),
 #           frees Ctrl+Enter in Ghostty (--fix-terminal-shortcuts does only that), 8/12 window gaps, text size 10, keyboard layout widget + Alt+Shift and default dock pins. Your shell.json is backed up first.
 #
 # Both bar plugins are copied (orbital.floating-bar, the default, and orbital.bar, the self-contained
@@ -39,12 +40,12 @@ WIDGETS=("orbital.dock:left" "orbital.workspaces:center" "orbital.keyboard:right
 EXTRA_WIDGETS=(orbital.divider)
 BAR_IDS=(orbital.floating-bar orbital.bar)
 
-DRY=0 RESTART=1 BAR=0 UNINSTALL=0 FULL=0 KBLAYOUTS= LAUNCHER_KEY=1 ALT_SHIFT=1 TERM_FIX=0
+DRY=0 RESTART=1 BAR=0 UNINSTALL=0 FULL=0 KBLAYOUTS= LAUNCHER_KEY=1 ALT_SHIFT=1 GESTURES=1 TERM_FIX=0
 while (( $# )); do
   a=$1; shift
   case $a in
     --dry-run) DRY=1 ;; --no-restart) RESTART=0 ;; --bar-widgets) BAR=1 ;; --full) FULL=1; BAR=1 ;;
-    --no-launcher-key) LAUNCHER_KEY=0 ;; --no-alt-shift) ALT_SHIFT=0 ;; --fix-terminal-shortcuts) TERM_FIX=1 ;;
+    --no-launcher-key) LAUNCHER_KEY=0 ;; --no-alt-shift) ALT_SHIFT=0 ;; --no-gestures) GESTURES=0 ;; --fix-terminal-shortcuts) TERM_FIX=1 ;;
     --keyboard-layouts) KBLAYOUTS="${1:?--keyboard-layouts needs a list, e.g. us,br}"; shift ;; --uninstall) UNINSTALL=1 ;;
     # The header comment is the help text: print the block of '#' lines under the shebang.
     -h|--help) awk 'NR>1 && /^#/ { sub(/^# ?/, ""); print; next } NR>1 { exit }' "$0"; exit 0 ;;
@@ -127,7 +128,7 @@ reconcile_hypr_requires() {
   (( DRY )) && return 0
   [[ -f $HYPR/hyprland.lua ]] || return 0
   local mod re="" dangling=()
-  for mod in orbital orbital-gaps orbital-bindings orbital-keyboard; do
+  for mod in orbital orbital-gaps orbital-bindings orbital-gestures orbital-keyboard; do
     if grep -qF "hypr.$mod\")" "$HYPR/hyprland.lua" && [[ ! -f $HYPR/$mod.lua ]]; then
       dangling+=("$mod"); re="${re:+$re|}$mod"
     fi
@@ -146,7 +147,7 @@ uninstall() {
     run rm -rf "$PLUGINS/$id"
   done
   [[ -f $CFG/ghostty/config ]] && run sed -i '/^# orbital-shortcuts/,/^# orbital-shortcuts end/d' "$CFG/ghostty/config"
-  run rm -f "$HYPR/orbital.lua" "$HYPR/orbital-gaps.lua" "$HYPR/orbital-bindings.lua" "$HYPR/orbital-keyboard.lua" "$DROPIN/orbital.conf"
+  run rm -f "$HYPR/orbital.lua" "$HYPR/orbital-gaps.lua" "$HYPR/orbital-bindings.lua" "$HYPR/orbital-gestures.lua" "$HYPR/orbital-keyboard.lua" "$DROPIN/orbital.conf"
   [[ -f $HYPR/hyprland.lua ]] && run sed -i '/-- orbital$/d' "$HYPR/hyprland.lua"
   say "shell.json is not reverted automatically; restore a backup: $CFG/omarchy/shell.json.bak-orbital-*"
   systemctl --user daemon-reload 2>/dev/null || true
@@ -266,6 +267,19 @@ LUA
   fi
 }
 
+# 4-finger horizontal swipe = workspace switch. Left alone when the user's own config already sets a gesture.
+gestures_setup() {
+  if (( ! GESTURES )); then echo "    Gestures: skipped (--no-gestures)"; return 0; fi
+  if grep -qsE '^[[:space:]]*hl\.gesture\(' "$HYPR"/*.lua; then
+    echo "    Gestures: your Hyprland config already defines one; leaving it alone."; return 0
+  fi
+  run cp "$REPO/hypr/orbital-gestures.lua" "$HYPR/orbital-gestures.lua" || { problem "could not install $HYPR/orbital-gestures.lua"; return 1; }
+  if [[ -f $HYPR/hyprland.lua ]] && (( ! DRY )) && ! grep -qF 'hypr.orbital-gestures' "$HYPR/hyprland.lua" \
+    && ! printf 'require("hypr.orbital-gestures") -- orbital\n' >> "$HYPR/hyprland.lua"; then
+    problem "could not add the gestures require to $HYPR/hyprland.lua"; return 1
+  fi
+}
+
 full_setup() {
   say "Full desktop: bindings, gaps, text size, dock pins"
   # Text size the layout was tuned at (shell, GTK and terminals), like the author's machine.
@@ -293,6 +307,7 @@ full_setup() {
     fi
   fi
   keyboard_setup || return 1
+  gestures_setup || return 1
   terminal_shortcuts || return 1
   # Dock pins: only if the user has none yet; from what is actually installed.
   local pins="$HOME/.local/state/omarchy/orbital-dock.json"
@@ -636,7 +651,7 @@ verify_all() {
   done
   if [[ -f $HYPR/hyprland.lua ]]; then
     local mod dangling=()
-    for mod in orbital orbital-gaps orbital-bindings orbital-keyboard; do
+    for mod in orbital orbital-gaps orbital-bindings orbital-gestures orbital-keyboard; do
       grep -qF "hypr.$mod\")" "$HYPR/hyprland.lua" && [[ ! -f $HYPR/$mod.lua ]] && dangling+=("$mod")
     done
     (( ${#dangling[@]} == 0 )) || problem "require() with no file: ${dangling[*]} (Hyprland would refuse to load the config)"

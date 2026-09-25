@@ -134,7 +134,7 @@ keyboard on the seat (needed when keyd/fcitx5 sit between the keys and Hyprland)
 binds without Super that steal chords from every app; Ghostty built-ins that shadow keys TUIs expect (Ctrl+Enter is
 fullscreen, Ctrl+Shift+Enter zooms a split, Ctrl+Tab switches tabs); and Orbital's own additions. `install.sh --full` frees
 **Ctrl+Enter** in Ghostty (`--fix-terminal-shortcuts` does only that), because it made Claude Code and other TUIs jump to
-fullscreen. The two bindings `--full` adds are opt-out: `--no-launcher-key` (SUPER+S opens the launcher and replaces Omarchy's own
+fullscreen. `--full` also enables the **4-finger horizontal touchpad swipe** to switch workspaces (`--no-gestures` skips it; it is left alone if your config already sets a gesture). The two bindings `--full` adds are opt-out: `--no-launcher-key` (SUPER+S opens the launcher and replaces Omarchy's own
 SUPER+S) and `--no-alt-shift` (Alt+Shift layout switching; it also fires after editor chords such as Alt+Shift+Down).
 Without `--full` Orbital binds nothing at all, so your own keys are left as they are.
 
