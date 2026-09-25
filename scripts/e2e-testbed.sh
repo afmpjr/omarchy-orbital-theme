@@ -12,7 +12,7 @@ echo -n "Waiting for the guest"; until "$TB" ssh true 2>/dev/null; do echo -n .;
 until "$TB" ssh 'pgrep -x quickshell >/dev/null && pgrep -x Hyprland >/dev/null' 2>/dev/null; do sleep 3; done; sleep 8
 "$TB" push "$REPO" omarchy-orbital-theme
 ENVSET='export OMARCHY_PATH=/usr/share/omarchy XDG_RUNTIME_DIR=/run/user/1000 HYPRLAND_INSTANCE_SIGNATURE=$(ls -t /run/user/1000/hypr | head -1)'
-"$TB" ssh "$ENVSET; omarchy theme install file:///home/tester/omarchy-orbital-theme >/dev/null 2>&1; cd ~/.config/omarchy/themes/orbital && ./install.sh --full >/tmp/install.log 2>&1; tail -3 /tmp/install.log"
+"$TB" ssh "$ENVSET; omarchy theme install file:///home/tester/omarchy-orbital-theme >/dev/null 2>&1; cd ~/.config/omarchy/themes/orbital && ./install.sh --full --keyboard-layouts us,br >/tmp/install.log 2>&1; tail -3 /tmp/install.log"
 sleep 10
 "$TB" ssh "$ENVSET; hyprctl eval 'hl.monitor({ output = \"\", mode = \"1366x768@60\", position = \"auto\", scale = 1 })' >/dev/null; hyprctl dispatch 'hl.dsp.focus({ workspace = \"9\" })' >/dev/null; for i in 1 2 3 4; do hyprctl layers | grep -q orbital-launcher && break; omarchy-shell shell toggle orbital.launcher '{}'; sleep 3; done"
 sleep 4; "$TB" shot "$OUT"

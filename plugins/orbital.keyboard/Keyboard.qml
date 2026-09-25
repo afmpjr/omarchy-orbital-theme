@@ -89,6 +89,13 @@ BarWidget {
     refreshTimer.restart()
   }
 
+  // Shape contract for `omarchy-shell shell toggle orbital.keyboard` (open/close/opened on the
+  // widget root, like the calendar): lets a hotkey or a script open the dropdown.
+  readonly property bool opened: root.menuOpen
+  function open() { root.menuOpen = true; root.menuFocus = root.activeIndex }
+  function close() { root.menuOpen = false }
+  function toggle(payload) { if (root.menuOpen) root.close(); else root.open() }
+
   function toggleMenu() {
     root.menuOpen = !root.menuOpen
     if (root.menuOpen) root.menuFocus = root.activeIndex
