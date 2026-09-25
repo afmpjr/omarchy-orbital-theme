@@ -5,7 +5,7 @@
 //
 // Real data sources, none invented:
 //   - Avatar: same file orbital.dock's own avatar uses
-//     (~/.config/omarchy/avatar.png), same Quickshell.iconPath fallback.
+//     (~/.config/omarchy/avatar.png), falling back to the Omarchy icon.
 //   - Name/email: the identity cache below (`identity.json`), falling back
 //     to `git config --global user.name`/`user.email` read via a real
 //     Process at open() time. Nothing is hardcoded; the mockup's
@@ -185,12 +185,24 @@ Item {
             spacing: Style.space(10)
 
             Image {
+              id: avatarPhoto
               width: Style.space(44)
               height: Style.space(44)
               fillMode: Image.PreserveAspectCrop
               asynchronous: true
+              cache: false
               source: root.avatarSource
               visible: status === Image.Ready
+            }
+
+            // No custom avatar (see orbital-avatar): show the Omarchy icon instead.
+            Image {
+              width: Style.space(44)
+              height: Style.space(44)
+              fillMode: Image.PreserveAspectFit
+              asynchronous: true
+              visible: avatarPhoto.status !== Image.Ready
+              source: Util.fileUrl((Quickshell.env("OMARCHY_PATH") || "/usr/share/omarchy") + "/icon.png")
             }
 
             Column {

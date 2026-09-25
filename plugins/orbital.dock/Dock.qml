@@ -405,7 +405,7 @@ BarWidget {
     // Lock/Sleep/Restart/Shut Down — see Account.qml's own header for
     // what's real vs. left out). Right click opens a terminal. A real
     // photo when one is set (~/.config/omarchy/avatar.png); falls back
-    // to the Omarchy glyph when it isn't.
+    // to the Omarchy icon ($OMARCHY_PATH/icon.png) when it isn't.
     Item {
       id: avatarSlot
       width: root.barSize
@@ -436,6 +436,7 @@ BarWidget {
         fillMode: Image.PreserveAspectCrop
         asynchronous: true
         source: avatarSlot.avatarSource
+        cache: false
         visible: status === Image.Ready
       }
 
@@ -446,7 +447,7 @@ BarWidget {
         fillMode: Image.PreserveAspectFit
         asynchronous: true
         visible: avatarImage.status !== Image.Ready
-        source: Quickshell.iconPath("avatar-default", true)
+        source: Util.fileUrl((Quickshell.env("OMARCHY_PATH") || "/usr/share/omarchy") + "/icon.png")
       }
 
       MouseArea {

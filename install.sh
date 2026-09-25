@@ -174,3 +174,4 @@ if (( FULL )); then full_setup; fi
 
 if (( RESTART )) && (( ! DRY )); then say "Restarting the shell"; omarchy restart shell || true; fi
 say "Now apply the theme: omarchy theme set Orbital"
+echo "    Optional: set your avatar with  ~/.config/omarchy/plugins/orbital.account/orbital-avatar <image>"

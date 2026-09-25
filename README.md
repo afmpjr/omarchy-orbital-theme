@@ -44,6 +44,19 @@ Open the account menu (avatar in the dock) -> **Appearance**. Every color rotate
 It regenerates the theme from a pristine copy in `~/.local/state/omarchy/orbital-accent-base/`, so choices never compound.
 CLI: `python3 ~/.config/omarchy/plugins/orbital.appearance/orbital-accent.py <preset|#rrggbb|list|current>`.
 
+## Avatar
+
+The dock and the account card show `~/.config/omarchy/avatar.png` (the same file the lock-screen plugins read). Without it they
+show the Omarchy icon. To set yours:
+
+```bash
+~/.config/omarchy/plugins/orbital.account/orbital-avatar ~/Pictures/me.jpg   # any image, cropped to a square
+~/.config/omarchy/plugins/orbital.account/orbital-avatar --github            # your GitHub picture (needs `gh auth login`)
+~/.config/omarchy/plugins/orbital.account/orbital-avatar --reset             # back to the Omarchy icon
+```
+
+Name and e-mail on the card come from `omarchy-refresh-identity` (GitHub) or `git config --global user.name/email`.
+
 ## Requirements
 
 Omarchy with the Quickshell-based shell (plugins), Hyprland with Lua config, `python3`, `jq`. Weather uses `wttr.in`; the
