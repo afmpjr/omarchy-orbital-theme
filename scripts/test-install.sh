@@ -245,4 +245,19 @@ grep -qF 'hypr.orbital-keyboard' "$D/hyprland.lua" || bad "uninstall removed the
 export HOME="$SAVED_HOME"
 ok "existing setup adopted: nothing duplicated, symlinks and your own files untouched"
 
+# Run from a clone anywhere: the theme files are copied into themes/orbital, only what is missing.
+export HOME="$T/anywhere"; rm -rf "$HOME"; mkdir -p "$HOME/.config/omarchy" "$HOME/.config/hypr" "$HOME/.local/share/applications"
+cp /usr/share/omarchy/config/omarchy/shell.json "$HOME/.config/omarchy/shell.json"
+printf 'require("default.hypr.omarchy")\nrequire("default.hypr.toggles")\n' > "$HOME/.config/hypr/hyprland.lua"
+"$REPO/install.sh" --bar-widgets --no-restart >/dev/null 2>"$HOME/err" || { cat "$HOME/err"; bad "install from a clone elsewhere failed"; }
+TD="$HOME/.config/omarchy/themes/orbital"
+[[ -f $TD/colors.toml && -f $TD/shell.toml && -f $TD/.omarchy-theme.yml && -d $TD/backgrounds ]] || bad "theme files were not copied to themes/orbital"
+[[ ! -e $TD/plugins && ! -e $TD/.git && ! -e $TD/install.sh ]] || bad "package-only files leaked into the theme copy"
+echo "# mine" >> "$TD/colors.toml"; rm -f "$TD/shell.toml"
+"$REPO/install.sh" --bar-widgets --no-restart >/dev/null 2>&1 || bad "second install from a clone failed"
+grep -q "# mine" "$TD/colors.toml" || bad "an existing theme file was overwritten"
+[[ -f $TD/shell.toml ]] || bad "a missing theme file was not restored"
+export HOME="$SAVED_HOME"
+ok "run from any folder: missing theme files copied to themes/orbital, existing ones untouched"
+
 echo "ALL PASSED"

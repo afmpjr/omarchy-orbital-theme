@@ -29,6 +29,7 @@ CFG="$HOME/.config"
 PLUGINS="$CFG/omarchy/plugins"
 BACKUPS="$CFG/omarchy/plugin-backups"
 BASE="$HOME/.local/state/omarchy/orbital-accent-base"
+THEME_DIR="$CFG/omarchy/themes/orbital"
 HYPR="$CFG/hypr"
 DROPIN="$CFG/systemd/user/omarchy-crash-watch.service.d"
 SJ="$CFG/omarchy/shell.json"
@@ -419,7 +420,7 @@ checks() {
   fi
 
   # Every place we will write to has to be writable before we start.
-  for d in "$PLUGINS" "$BACKUPS" "$HYPR" "$DROPIN" "$BASE"; do
+  for d in "$PLUGINS" "$BACKUPS" "$HYPR" "$DROPIN" "$BASE" "$THEME_DIR"; do
     writable_path "$d" || problem "cannot write to $d (or to create it)"
   done
   [[ -f $HYPR/hyprland.lua ]] && { [[ -w $HYPR/hyprland.lua ]] || problem "$HYPR/hyprland.lua is not writable"; } \
@@ -473,6 +474,23 @@ apply_baseline() {
      --exclude=./README.md --exclude=./CHANGELOG.md --exclude='./LICENSE*' --exclude='*.png' --exclude='*.jpg' .) \
     | tar xf - -C "$BASE" || { problem "could not write the pristine theme copy to $BASE"; return 1; }
   [[ -f $BASE/colors.toml ]] || { problem "the baseline in $BASE has no colors.toml"; return 1; }
+}
+
+# Run from a clone anywhere (not from themes/orbital, where `omarchy theme install` puts it): copy the theme
+# files that are not there yet into ~/.config/omarchy/themes/orbital, so `omarchy theme set orbital` works.
+# Nothing already there is overwritten: the accent picker rewrites those files, and yours are yours.
+apply_theme_copy() {
+  local here dest; here="$(readlink -f "$REPO")"; dest="$(readlink -m "$THEME_DIR")"
+  [[ $here == "$dest" ]] && return 0
+  say "Copying the theme files that are missing from $THEME_DIR"
+  ensure_dir "$THEME_DIR" || { problem "could not create $THEME_DIR"; return 1; }
+  if (( DRY )); then echo "    [dry-run] copy what is missing from $REPO into $THEME_DIR"; return 0; fi
+  snapshot "$THEME_DIR"
+  (cd "$REPO" && tar cf - --exclude=./.git --exclude=./plugins --exclude=./hypr --exclude=./systemd --exclude=./scripts \
+     --exclude=./docs --exclude=./test --exclude=./test-output --exclude=./preview-web --exclude=./install.sh \
+     --exclude='./AI_HANDOFF*' --exclude=__pycache__ .) \
+    | tar xf - -C "$THEME_DIR" --skip-old-files || { problem "could not copy the theme into $THEME_DIR"; return 1; }
+  [[ -f $THEME_DIR/colors.toml ]] || { problem "the theme copy in $THEME_DIR has no colors.toml"; return 1; }
 }
 
 apply_hypr() {
@@ -708,6 +726,7 @@ verify_all() {
     id="$(basename "$d")"
     diff -rq "$d" "$PLUGINS/$id" >/dev/null 2>&1 || problem "plugins/$id in $PLUGINS differs from the package"
   done
+  [[ -f $THEME_DIR/colors.toml ]] || problem "the theme is not in $THEME_DIR (omarchy theme set orbital would fail)"
   [[ -f $BASE/colors.toml ]] || problem "the color picker baseline ($BASE/colors.toml) is missing"
 
   (( ${#PROBLEMS[@]} == 0 ))
@@ -749,6 +768,7 @@ trap on_exit EXIT
 ok=1
 apply_plugins    || ok=0
 (( ok )) && { apply_baseline || ok=0; }
+(( ok )) && { apply_theme_copy || ok=0; }
 (( ok )) && { apply_hypr      || ok=0; }
 (( ok )) && { apply_dropin    || ok=0; }
 (( ok )) && { apply_shell_json || ok=0; }
