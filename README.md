@@ -96,8 +96,10 @@ fixing the cause and running the same command again is always safe. Failures wor
 | `Cannot install yet. Nothing was changed.` | A pre-flight check failed: nothing was even started. The list under it is everything wrong at once. |
 | `the Omarchy shell is not answering` | `omarchy plugin list` fails, so no plugin could be enabled. Start the shell and retry. |
 | `this Omarchy rejects the manifest of <id>` | Your Omarchy version does not accept that plugin's `manifest.json`. |
+| `could not place <widget> in the <section> section of the bar` | The shell stopped answering mid-install. The installer retries and checks the layout itself, so this means it really did not land. |
+| `the right side of the bar is out of order` | The widgets are there but not in the order the divider was designed for (keyboard, hairline, clock). |
 | `... is installed but not enabled after the install` | The verification pass: Omarchy did not keep the change. This is what stops a half-installed theme. |
-| `both bars are enabled at once` | Only the bar in `shell.json`'s `.bar.id` is ever loaded; the installer turns the other one off. |
+| `both bars are enabled at once` | Only the bar in `shell.json`'s `.bar.id` is ever loaded. The installer disables the other one; if it still shows up here, something else re-enabled it. |
 
 ## Color picker
 
