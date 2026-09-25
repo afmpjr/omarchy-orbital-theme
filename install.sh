@@ -247,7 +247,17 @@ restart_shell_wait() { # the running shell keeps its config in memory and rewrit
   for n in $(seq 1 30); do omarchy plugin list >/dev/null 2>&1 && break; nap 2; done
   nap 3
 }
-if (( FULL )); then install_notification_center; full_shell_json; if (( ! DRY )); then restart_shell_wait; fi; fi
+stop_shell() { # same kill loop as omarchy-restart-shell: returns only once the shell has fully exited
+  while timeout 5 quickshell kill -p "$OMARCHY_PATH/shell" --any-display >/dev/null 2>&1; do :; done
+}
+# The shell rewrites shell.json from memory when it changes state or exits, so the layout is edited with the
+# shell STOPPED and only then started again; otherwise the edit is silently overwritten.
+if (( FULL )); then
+  install_notification_center
+  if (( ! DRY )); then stop_shell; fi
+  full_shell_json
+  if (( ! DRY )); then restart_shell_wait; fi
+fi
 if (( ! DRY )); then omarchy-shell shell rescanPlugins >/dev/null 2>&1 || true; nap 2; fi
 say "Enabling plugins"
 enable_verified() { # `plugin enable` talks to the running shell; confirm it stuck, retry if not
