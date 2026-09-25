@@ -29,3 +29,6 @@ OTHER_OFF="$(grep -c '^orbital\.bar .*disabled' <<<"$LIST" || true)"
 [[ $OTHER_OFF == 1 ]] || { echo "FAIL: the unused bar alternative should be the only disabled one"; exit 1; }
 [[ $DISABLED == 1 ]] || { echo "FAIL: $DISABLED orbital plugin(s) disabled, expected only the inactive bar"; exit 1; }
 echo "all orbital plugins enabled except the inactive bar alternative (bar.id=$BAR)"
+INVALID="$("$TB" ssh "$ENVSET; for d in ~/.config/omarchy/plugins/orbital.*/; do [ -f \$d/manifest.json ] || continue; omarchy plugin validate \$d >/dev/null || echo INVALID \$d; done" | tr -d '\r')"
+[[ -z $INVALID ]] || { echo "FAIL: this Omarchy rejects: $INVALID"; exit 1; }
+echo "every installed orbital manifest passes 'omarchy plugin validate'"

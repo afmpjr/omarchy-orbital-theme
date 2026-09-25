@@ -183,8 +183,9 @@ Item {
         onEntered: bg.color = Color.accent + "44"
         onExited: bg.color = hovered ? Color.accent + "33" : "transparent"
         onDropped: {
-            var data = JSON.parse(drop.mimeData.getData("application/x-dock-item"))
-            if (data.index !== modelData.index) {
+            var data = null
+            try { data = JSON.parse(drop.mimeData.getData("application/x-dock-item")) } catch (e) { return }
+            if (data && data.index !== modelData.index) {
                 root.dockModel.reorderPinned(data.index, modelData.index)
             }
         }

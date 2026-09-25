@@ -86,19 +86,39 @@ Name and e-mail on the card come from `omarchy-refresh-identity` (GitHub) or `gi
 
 ## Requirements
 
-Omarchy with the Quickshell-based shell (plugins), Hyprland with Lua config, `python3`, `jq`. Weather uses `wttr.in`; the
-crash dialog uses `systemd-coredump`. The bar is whichever you use; the dock/clock/workspaces are ordinary bar widgets.
+Omarchy with the Quickshell-based shell (plugins), Hyprland with Lua config, `python3`, `jq`. The bar is whichever you
+use; the dock/clock/workspaces are ordinary bar widgets.
+
+Beyond those, a few commands are called at runtime by individual widgets. `install.sh` checks for them and tells you
+which one is missing instead of leaving you with a blank widget:
+
+| Command | Used by | If missing |
+|---------|---------|-----------|
+| `hyprctl` | floating-bar gaps, keyboard device list | bar gaps fall back to the default, keyboard layout widget is empty |
+| `xkbcli` | keyboard widget, exotic layouts | only the standard layouts are offered |
+| `curl` | weather in the clock | the weather line stays empty |
+| `timedatectl` | world clock | the timezone list is empty |
+| `omarchy-reminder` | reminder indicator | indicator hidden |
+| `omarchy-update-available` | system update indicator | indicator hidden |
+| `omarchy-voxtype-status` | dictation indicator | indicator hidden |
+
+The crash dialog needs `systemd-coredump`; weather needs network access to `wttr.in`.
 
 Tested on Omarchy 4.x. The plugins are read from `~/.config/omarchy/plugins/` and the theme from
 `~/.config/omarchy/themes/orbital/`, so nothing is written outside those, `~/.config/hypr/`, `~/.config/systemd/user/` and
 `~/.local/state/omarchy/`.
+
+If a `require("hypr.orbital-*")` line in `~/.config/hypr/hyprland.lua` has no matching `.lua` file, Hyprland refuses to
+load the config at all. `install.sh` drops such a dangling line (and says so) instead of leaving it there.
 
 ## Known limits
 
 - Layout was tuned at 1366x768 at scale 1 with the system monospace font; other scales are untested.
 - `hypr/orbital.lua` is loaded last from `~/.config/hypr/hyprland.lua`; if you set the same options later they win.
 - The QML cache of `omarchy-shell` means new/edited plugins need `omarchy restart shell`.
-- Not yet tested on a clean account, another resolution/scale or another font.
+- A plugin whose QML `import` cannot be resolved (an Omarchy or Quickshell build without that module) does not load;
+  the rest of the shell is unaffected. `scripts/test-install.sh` checks every manifest with `omarchy plugin validate`
+  (the schema is Omarchy's, not the theme's) and `scripts/e2e-testbed.sh` repeats it on a clean Omarchy VM.
 
 ## License
 

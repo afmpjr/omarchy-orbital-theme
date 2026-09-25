@@ -49,6 +49,24 @@ nap() { [[ ${ORBITAL_INSTALL_NO_WAIT:-} == 1 ]] || sleep "$1"; }  # tests skip t
 run() { if (( DRY )); then echo "    [dry-run] $*"; else "$@"; fi; }
 have_omarchy() { command -v omarchy >/dev/null 2>&1; }
 
+# A require without its file is a hard Hyprland error ("module not found"), and it takes the
+# whole config down with it. The generated orbital-keyboard.lua is the usual victim: deleted by
+# hand, replaced by a dotfiles sync, or never written because the user has no Ghostty config.
+reconcile_hypr_requires() {
+  (( DRY )) && return 0
+  [[ -f $HYPR/hyprland.lua ]] || return 0
+  local mod re="" dangling=()
+  for mod in orbital orbital-gaps orbital-bindings orbital-keyboard; do
+    if grep -qF "hypr.$mod\")" "$HYPR/hyprland.lua" && [[ ! -f $HYPR/$mod.lua ]]; then
+      dangling+=("$mod"); re="${re:+$re|}$mod"
+    fi
+  done
+  (( ${#dangling[@]} )) || return 0
+  sed -i -E "/require\(\"hypr\.($re)\"\)/d" "$HYPR/hyprland.lua"
+  say "Removed require(s) whose file is missing: ${dangling[*]}"
+  echo "    (that part of the theme is off; re-run install.sh to get it back)"
+}
+
 uninstall() {
   say "Removing Orbital plugins, Hyprland hook and crash drop-in"
   for id in "${OVERLAYS[@]}" "${LIBS[@]}" orbital.floating-bar orbital.bar "${EXTRA_WIDGETS[@]}" "${WIDGETS[@]%%:*}"; do
@@ -201,6 +219,24 @@ for c in python3 jq bash; do command -v "$c" >/dev/null || missing+=("$c"); done
 have_omarchy || missing+=("omarchy")
 if (( ${#missing[@]} )); then echo "Missing requirements: ${missing[*]}" >&2; exit 1; fi
 
+# Optional: the plugins shell out to these. None is fatal, so this only names what goes empty,
+# instead of leaving a blank widget with no explanation.
+OPTIONAL_DEPS=(
+  "hyprctl:gaps for the floating bar and the keyboard device list"
+  "xkbcli:exotic layouts in the keyboard widget"
+  "curl:weather in the clock"
+  "timedatectl:timezone list for the world clock"
+  "omarchy-reminder:reminder indicator"
+  "omarchy-update-available:system update indicator"
+  "omarchy-voxtype-status:dictation indicator"
+)
+thin=()
+for d in "${OPTIONAL_DEPS[@]}"; do command -v "${d%%:*}" >/dev/null || thin+=("$d"); done
+if (( ${#thin[@]} )); then
+  say "Optional dependencies missing (the theme installs anyway):"
+  for d in "${thin[@]}"; do echo "    ${d%%:*} not found - ${d#*:} will be empty"; done
+fi
+
 # 2. Plugins (own ids only; backups go outside the scanned folder).
 say "Installing plugins into $PLUGINS"
 run mkdir -p "$PLUGINS" "$BACKUPS"
@@ -292,6 +328,7 @@ else
 fi
 
 if (( FULL )); then full_setup; elif (( TERM_FIX )); then terminal_shortcuts; fi
+reconcile_hypr_requires
 if (( ! DRY )); then hyprctl reload >/dev/null 2>&1 || true; fi
 
 if (( RESTART )) && (( ! DRY )); then say "Restarting the shell"; omarchy restart shell || true; fi

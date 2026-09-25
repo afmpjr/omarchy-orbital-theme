@@ -5,6 +5,7 @@
 # and uninstall cleans up. Does not touch the real system.
 set -euo pipefail
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
+REAL_OMARCHY="$(command -v omarchy || true)"   # the real CLI, for plugin validate (the stub below replaces it on PATH)
 T="$(mktemp -d)"; trap 'rm -rf "$T"' EXIT
 export ORBITAL_INSTALL_NO_WAIT=1 HOME="$T/home"; mkdir -p "$HOME/.config/hypr" "$T/bin" "$HOME/.config/omarchy/themes"
 printf 'require("default.hypr.omarchy")\n' > "$HOME/.config/hypr/hyprland.lua"
@@ -71,10 +72,34 @@ grep -q 'kb_layout = "br,us"' "$KB" && grep -q 'Shift_L", next_layout, { release
 for id in orbital.launcher orbital.dock orbital.account orbital.appearance orbital.worldclock orbital.crash orbital.ui orbital.clock orbital.workspaces orbital.divider orbital.floating-bar orbital.bar; do
   [[ -d $HOME/.config/omarchy/plugins/$id ]] || bad "plugin $id missing"
 done; ok "plugins installed (both bars present, only .bar.id is ever loaded)"
+# The schema is Omarchy's, not ours: ask the real CLI, so a manifest that this Omarchy would
+# reject cannot ship. orbital.ui is a shared library and deliberately has no manifest.
+if [[ -n $REAL_OMARCHY ]]; then
+  for d in "$REPO"/plugins/*/; do
+    id="$(basename "$d")"
+    if [[ -f $d/manifest.json ]]; then
+      OMARCHY_PATH=/usr/share/omarchy "$REAL_OMARCHY" plugin validate "$d" >/dev/null 2>&1 || bad "omarchy plugin validate rejected $id"
+    else
+      [[ $id == orbital.ui ]] || bad "$id has no manifest.json"
+    fi
+  done
+  ok "every manifest passes 'omarchy plugin validate'"
+else
+  echo "skip - 'omarchy plugin validate' (no omarchy on PATH)"
+fi
 grep -q 'require("hypr.orbital")' "$HOME/.config/hypr/hyprland.lua" && [[ -f $HOME/.config/hypr/orbital.lua ]] || bad "hyprland hook"; ok "hyprland hook"
 "$REPO/install.sh" --no-restart >/dev/null
 [[ $(grep -c 'require("hypr.orbital")' "$HOME/.config/hypr/hyprland.lua") == 1 ]] || bad "hook not idempotent"; ok "idempotent hook"
 [[ $(jq -r '.bar.layout.right[-2].id' "$HOME/.config/omarchy/shell.json") == orbital.clock ]] || bad "--full layout was disturbed by widget placement"
+# The generated keyboard file can disappear (hand-deleted, or a dotfiles sync that drops it) while
+# its require stays: that is a hard Hyprland error. The installer must drop the dangling require.
+rm -f "$HOME/.config/hypr/orbital-keyboard.lua"
+printf 'require("hypr.orbital-keyboard") -- orbital\n' >> "$HOME/.config/hypr/hyprland.lua"
+[[ -n $(grep -c 'hypr.orbital-keyboard' "$HOME/.config/hypr/hyprland.lua") ]] || bad "test setup: dangling require not created"
+"$REPO/install.sh" --no-restart >/dev/null
+! grep -q 'hypr.orbital-keyboard' "$HOME/.config/hypr/hyprland.lua" || bad "dangling require kept: Hyprland would fail to load the config"
+grep -q 'require("hypr.orbital")' "$HOME/.config/hypr/hyprland.lua" || bad "reconcile dropped a require that has its file"
+ok "dangling require removed, valid ones kept"
 ! grep -q "plugin enable orbital.clock --section" "$HOME/omarchy-calls.log" || bad "--full must not re-place widgets"; ok "--full keeps its layout (no widget re-placement)"
 [[ -f $HOME/.local/state/omarchy/orbital-accent-base/colors.toml ]] || bad "baseline"
 grep -q '^accent = "#39A9FF"' "$HOME/.local/state/omarchy/orbital-accent-base/colors.toml" || bad "baseline not blue"; ok "pristine blue baseline"
