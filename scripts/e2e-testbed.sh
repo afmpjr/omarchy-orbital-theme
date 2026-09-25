@@ -5,7 +5,9 @@
 #   scripts/e2e-testbed.sh [out.png]
 set -euo pipefail
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
-TB="${TESTBED:-/mnt/dados/projects/omarchy-testbed}/scripts/tb"
+# The VM harness lives in a separate repository; point TESTBED at its scripts/tb.
+TB="${TESTBED:-$HOME/.local/share/omarchy-testbed}/scripts/tb"
+[[ -x $TB ]] || { echo "Set TESTBED to an omarchy-testbed checkout (expected $TB to be executable)." >&2; exit 1; }
 OUT="${1:-$REPO/docs/e2e-launcher.png}"
 "$TB" reset; "$TB" up >/dev/null
 echo -n "Waiting for the guest"; until "$TB" ssh true 2>/dev/null; do echo -n .; sleep 5; done; echo

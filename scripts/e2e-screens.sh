@@ -4,7 +4,9 @@
 #   scripts/e2e-screens.sh [outdir]
 set -uo pipefail
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
-TB="${TESTBED:-/mnt/dados/projects/omarchy-testbed}/scripts/tb"
+# The VM harness lives in a separate repository; point TESTBED at its scripts/tb.
+TB="${TESTBED:-$HOME/.local/share/omarchy-testbed}/scripts/tb"
+[[ -x $TB ]] || { echo "Set TESTBED to an omarchy-testbed checkout (expected $TB to be executable)." >&2; exit 1; }
 OUT="${1:-$REPO/test-output}"; mkdir -p "$OUT"; rm -f "$OUT"/*.png
 E='export OMARCHY_PATH=/usr/share/omarchy XDG_RUNTIME_DIR=/run/user/1000 HYPRLAND_INSTANCE_SIGNATURE=$(ls -t /run/user/1000/hypr | head -1)'
 vm() { "$TB" ssh "$E; $*"; }
