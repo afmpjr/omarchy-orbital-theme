@@ -298,6 +298,10 @@ if (( FULL )); then
   if (( ! DRY )); then restart_shell_wait; fi
 fi
 if (( ! DRY )); then omarchy-shell shell rescanPlugins >/dev/null 2>&1 || true; nap 2; fi
+wait_shell() { # `plugin enable` needs a responsive shell; right after a rescan or a restart it is busy
+  local n; for n in $(seq 1 15); do omarchy plugin list >/dev/null 2>&1 && return 0; nap 2; done; return 1
+}
+if (( ! DRY )) && ! wait_shell; then echo "    (the shell is not answering yet; the plugin states below may be unconfirmed)"; fi
 say "Enabling plugins"
 enable_verified() { # `plugin enable` talks to the running shell; confirm it stuck, retry if not
   local id="$1" n
@@ -306,18 +310,30 @@ enable_verified() { # `plugin enable` talks to the running shell; confirm it stu
     omarchy plugin list 2>/dev/null | grep -E "^$id +enabled" >/dev/null && { echo "    enabled $id"; return 0; }
     nap 2
   done
+  # An unresponsive shell is not a failed enable: say which one it was instead of crying wolf.
+  omarchy plugin list >/dev/null 2>&1 || { echo "    ($id: shell busy, state unconfirmed)"; return 0; }
   echo "    (could not enable $id)"; return 1
 }
 for id in "${OVERLAYS[@]}"; do if (( DRY )); then echo "    [dry-run] enable $id"; else enable_verified "$id" || true; fi; done
+# The theme ships its own bar, so use it: without this the plugins install but the user keeps
+# Omarchy's stock bar. Reverting is one command, printed below.
+if (( ! DRY )); then
+  cur="$(jq -r '.bar.id // "omarchy.bar"' "$SJ" 2>/dev/null || echo omarchy.bar)"
+  if [[ $cur != orbital.floating-bar && $cur != orbital.bar ]]; then
+    enable_verified orbital.floating-bar || true
+    echo "    (revert with: omarchy plugin enable $cur)"
+  fi
+fi
 if (( BAR )); then
   if (( FULL )); then
     echo "    Bar layout already written by --full."
   else
     for w in "${WIDGETS[@]}"; do run omarchy plugin enable "${w%%:*}" --section "${w##*:}" || echo "    (could not place ${w%%:*})"; done
+    for id in "${EXTRA_WIDGETS[@]}"; do run omarchy plugin enable "$id" --section right || echo "    (could not place $id)"; done
     # `enable --section` inserts at the START of a section; right-hand widgets belong at the end
-    # (keyboard, then clock), so move them there.
+    # (keyboard, divider, clock), so move them there.
     if (( ! DRY )); then
-      for id in orbital.keyboard orbital.clock; do
+      for id in orbital.keyboard orbital.divider orbital.clock; do
         n="$(jq '.bar.layout.right | length' "$SJ" 2>/dev/null || echo 0)"
         (( n > 0 )) && omarchy bar move "$id" --section right --index $((n - 1)) >/dev/null 2>&1 || true
       done

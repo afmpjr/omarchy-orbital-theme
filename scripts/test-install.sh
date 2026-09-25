@@ -14,7 +14,15 @@ cat > "$T/bin/omarchy" <<'STUB'
 # Minimal stand-in for the omarchy CLI: records calls, remembers enabled plugins, "installs" plugins.
 echo "omarchy $*" >> "$HOME/omarchy-calls.log"
 case "$1 $2" in
-  "plugin enable") echo "$3" >> "$HOME/enabled.txt" ;;
+  "plugin enable")
+    echo "$3" >> "$HOME/enabled.txt"
+    SJ="$HOME/.config/omarchy/shell.json"
+    if [[ $4 == --section ]]; then   # the real CLI puts the widget in that section
+      jq --arg id "$3" --arg sec "$5" '.bar.layout[$sec] = ((.bar.layout[$sec] // []) + [{id: $id}])' "$SJ" > "$HOME/.sj.new" && mv "$HOME/.sj.new" "$SJ"
+    fi
+    case "$3" in   # picking a bar is what the real CLI records in shell.json
+      omarchy.bar|orbital.bar|orbital.floating-bar) jq --arg id "$3" '.bar.id = $id' "$SJ" > "$HOME/.sj.new" && mv "$HOME/.sj.new" "$SJ" ;;
+    esac ;;
   "plugin add") mkdir -p "$HOME/.config/omarchy/plugins/jankeesvw.notification-center"; echo jankeesvw.notification-center >> "$HOME/enabled.txt" ;;
   "plugin list") [[ -f $HOME/enabled.txt ]] && sort -u "$HOME/enabled.txt" | awk '{printf "%-32s enabled   stub\n", $1}' ;;
 esac
@@ -101,6 +109,16 @@ printf 'require("hypr.orbital-keyboard") -- orbital\n' >> "$HOME/.config/hypr/hy
 grep -q 'require("hypr.orbital")' "$HOME/.config/hypr/hyprland.lua" || bad "reconcile dropped a require that has its file"
 ok "dangling require removed, valid ones kept"
 ! grep -q "plugin enable orbital.clock --section" "$HOME/omarchy-calls.log" || bad "--full must not re-place widgets"; ok "--full keeps its layout (no widget re-placement)"
+
+# The path the README documents: plugins + widgets, no --full. The theme's own bar has to be the one
+# in use, or the widgets land on Omarchy's stock bar and the divider never shows up at all.
+cp /usr/share/omarchy/config/omarchy/shell.json "$SJ"; chmod 644 "$SJ"
+"$REPO/install.sh" --bar-widgets --no-restart >/dev/null
+[[ $(jq -r '.bar.id' "$SJ") == orbital.floating-bar ]] || bad "README path: theme bar not selected (bar.id=$(jq -r '.bar.id // "none"' "$SJ"))"
+grep -qx 'orbital.divider' "$HOME/enabled.txt" || bad "README path: divider left disabled"
+jq -e '.bar.layout.left | map(.id) | index("orbital.dock")' "$SJ" >/dev/null || bad "README path: dock not on the left"
+jq -e '.bar.layout.right | map(.id) | index("orbital.divider")' "$SJ" >/dev/null || bad "README path: divider not on the right"
+ok "README path: theme bar selected, divider enabled and placed, widgets kept"
 [[ -f $HOME/.local/state/omarchy/orbital-accent-base/colors.toml ]] || bad "baseline"
 grep -q '^accent = "#39A9FF"' "$HOME/.local/state/omarchy/orbital-accent-base/colors.toml" || bad "baseline not blue"; ok "pristine blue baseline"
 
