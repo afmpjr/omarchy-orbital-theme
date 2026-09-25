@@ -368,8 +368,8 @@ checks() {
     || problem "no $HYPR/hyprland.lua to hook into (this does not look like an Omarchy Hyprland setup)"
 
   # `omarchy plugin enable` needs a live shell; without it nothing can be enabled and every later
-  # step would fail for the wrong reason.
-  if have_omarchy && ! omarchy plugin list >/dev/null 2>&1; then
+  # step would fail for the wrong reason. A shell that is still starting up gets a chance to answer.
+  if have_omarchy && ! wait_shell; then
     problem "the Omarchy shell is not answering ('omarchy plugin list' failed); start it and run this again"
   fi
   (( ${#PROBLEMS[@]} == 0 ))

@@ -25,7 +25,10 @@ readme_says() {
 "$TB" reset; "$TB" up >/dev/null
 echo -n "Waiting for the guest"; until "$TB" ssh true 2>/dev/null; do echo -n .; sleep 5; done; echo
 until "$TB" ssh 'pgrep -x quickshell >/dev/null && pgrep -x Hyprland >/dev/null' 2>/dev/null; do sleep 3; done; sleep 8
+# The shell has to answer its IPC before install.sh can enable anything; a booting desktop says no.
 ENVSET='export OMARCHY_PATH=/usr/share/omarchy XDG_RUNTIME_DIR=/run/user/1000 HYPRLAND_INSTANCE_SIGNATURE=$(ls -t /run/user/1000/hypr | head -1)'
+# The shell has to answer its IPC before install.sh can enable anything; a desktop still booting says no.
+until "$TB" ssh "$ENVSET; omarchy plugin list" >/dev/null 2>&1; do sleep 5; done
 
 # The account must start with nothing of Orbital in it, or this proves nothing. (Omarchy itself
 # creates ~/.config/omarchy on first boot, so the check is for Orbital, not for an empty folder.)
