@@ -129,9 +129,30 @@ function layoutDescriptions(text) {
   return out
 }
 
+// The variant xkb uses when kb_variant leaves it empty, where that is worth spelling out:
+// Brazil's default layout is ABNT2.
+var defaultDetail = { br: "ABNT2" }
+
+// "abnt2" -> "ABNT2", "intl" -> "Intl", "no_dead_keys" -> "No dead keys".
+function variantDetail(code, variant) {
+  var v = String(variant || "").trim()
+  if (v === "") return defaultDetail[code] || ""
+  if (/^abnt/i.test(v)) return v.toUpperCase()
+  v = v.replace(/nodeadkeys/i, "no dead keys").replace(/[_-]+/g, " ")
+  return v.charAt(0).toUpperCase() + v.slice(1)
+}
+
+// "br" + "abnt2" -> "BR \u00b7 ABNT2"; the country is the 2-3 letter xkb layout code, never a long name.
+function standardName(code, variant) {
+  var c = String(code || "").toUpperCase().substring(0, 3)
+  var d = variantDetail(String(code || "").toLowerCase(), variant)
+  return d ? c + " \u00b7 " + d : c
+}
+
 // The layouts Hyprland is configured with, in switching order:
-// [{ index, code, label, description }]. Codes come from kb_layout ("br,us");
-// a variant ("intl") pairs with the same position in kb_variant.
+// [{ index, code, label, description, fullDescription }]. Codes come from kb_layout ("br,us");
+// a variant ("intl") pairs with the same position in kb_variant. `description` is the short
+// standard name shown in the menu ("BR \u00b7 ABNT2"); `fullDescription` is xkb's own text.
 function layoutList(keyboard, descriptions, briefs) {
   if (!keyboard || !keyboard.layout) return []
   var codes = String(keyboard.layout).split(",")
@@ -139,8 +160,8 @@ function layoutList(keyboard, descriptions, briefs) {
   return codes.map(function (code, i) {
     code = code.trim()
     var variant = (variants[i] || "").trim()
-    var description = (descriptions || {})[code + "|" + variant] || (descriptions || {})[code + "|"] || code
-    return { index: i, code: code, label: shortLabel(description, briefs), description: description }
+    var full = (descriptions || {})[code + "|" + variant] || (descriptions || {})[code + "|"] || code
+    return { index: i, code: code, label: shortLabel(full, briefs), description: standardName(code, variant), fullDescription: full }
   })
 }
 
@@ -148,6 +169,7 @@ if (typeof module !== "undefined") {
   module.exports = {
     layoutDescriptions: layoutDescriptions,
     layoutList: layoutList,
+    standardName: standardName,
     eventKeyboardName: eventKeyboardName,
     isTypedKeyboard: isTypedKeyboard,
     layoutBriefs: layoutBriefs,

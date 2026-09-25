@@ -156,6 +156,39 @@ BarWidget {
     return null
   }
 
+  // A window parked on a special workspace (the scratchpad terminal above all) is always "running",
+  // but it is not something the user opened: keep it out of the dock while its special workspace is
+  // hidden, and show it while it is up. Pinning it still shows it always (pinned slots are not filtered).
+  // The special workspace showing right now ("special:scratchpad", or "" when none): from the Hyprland
+  // activespecial event, and once at startup from hyprctl (the monitor objects Quickshell keeps do not
+  // refresh when a special workspace is toggled).
+  property string shownSpecial: ""
+
+  Connections {
+    target: Hyprland
+    function onRawEvent(event) {
+      if (!event || String(event.name) !== "activespecial") return
+      root.shownSpecial = String(event.data || "").split(",")[0]
+    }
+  }
+
+  Process {
+    command: ["bash", "-c", "hyprctl monitors -j | jq -r '[.[].specialWorkspace.name] | map(select(. != \"\")) | .[0] // \"\"'"]
+    running: true
+    stdout: SplitParser { onRead: function(line) { root.shownSpecial = String(line).trim() } }
+  }
+
+  function isHiddenSpecial(top) {
+    var list = (Hyprland.toplevels && Hyprland.toplevels.values) || []
+    for (var i = 0; i < list.length; i++) {
+      var h = list[i]
+      if (!h || h.wayland !== top) continue
+      var ws = h.workspace
+      return !!ws && String(ws.name).indexOf("special:") === 0 && String(ws.name) !== root.shownSpecial
+    }
+    return false
+  }
+
   // ---------------------------------------------------------------- pinned
 
   // { key, entry } per pinned app — entry is the .desktop id, key is the
@@ -198,7 +231,7 @@ BarWidget {
     var win = slot.QsWindow.window
     if (win) root.tooltipTargetX = slot.mapToItem(win.contentItem, slot.width / 2, 0).x
     root.tooltipAnchorItem = slot
-    root.tooltipText = (slot.entry ? slot.entry.name : slot.key) + "  ·  right-click for options"
+    root.tooltipText = (slot.entry ? slot.entry.name : slot.key)
   }
 
   function hideTooltip() {
@@ -271,7 +304,7 @@ BarWidget {
       var top = root.runningToplevels[i]
       if (!top) continue
       var rk = root.keyFor(top.appId)
-      if (rk.length === 0 || seen[rk]) continue
+      if (rk.length === 0 || seen[rk] || root.isHiddenSpecial(top)) continue
       seen[rk] = true
       list.push({ key: rk, entry: root.entryFor(rk), pinned: false })
     }

@@ -233,7 +233,7 @@ BarWidget {
       text: root.timeOnlyText
       horizontalMargin: 8.75
       verticalPadding: 8.75
-      fontSize: Style.font.body + 2
+      fontSize: Style.font.body + 4
       onPressed: function(b) {
         if (b === Qt.RightButton) root.cycleFormat()
         else if (b === Qt.MiddleButton) { if (root.bar) root.bar.run("omarchy-menu-timezone") }

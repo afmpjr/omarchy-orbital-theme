@@ -5,6 +5,15 @@ unreleased, so the entries describe the current state rather than a sequence of 
 
 ## Unreleased
 
+### Dock, keyboard and clock
+
+- Dock tooltips show just the app name (no "right-click for options").
+- A window on a special workspace (the scratchpad terminal) is not listed in the dock while that workspace is hidden;
+  it appears while it is up, and pinning it keeps it always.
+- The layout menu names each layout by its 2-3 letter country code plus the variant, e.g. `BR · ABNT2`, `US · Intl`
+  (`scripts/test-keyboard-model.sh`).
+- The time in the bar is 2px larger.
+
 ### Languages
 
 - The interface is available in English and Brazilian Portuguese (system locale, or `ORBITAL_LANG=pt|en`); day and month

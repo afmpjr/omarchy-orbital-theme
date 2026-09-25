@@ -264,7 +264,7 @@ BarWidget {
     fixedWidth: flagImage.status === Image.Ready ? Style.space(34) : -1
     fontSize: Style.font.caption
     horizontalMargin: 6
-    tooltipText: root.layoutFull
+    tooltipText: root.layouts.length > root.activeIndex ? root.layouts[root.activeIndex].description : root.layoutFull
     onPressed: function() { root.toggleMenu() }
 
     Image {
