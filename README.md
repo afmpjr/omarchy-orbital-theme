@@ -4,7 +4,7 @@ A dark, glassy Omarchy theme inspired by Earth seen from orbit: floating taskbar
 world clock, a themed crash dialog, and a **color picker that recolors the accent *and* the glass tint** (18 colors, including
 white, gray and black, or any hex).
 
-> Status: **pre-release.** Developed and measured on one machine (Omarchy 4.x, 1366x768 @2x). See *Known limits*.
+> Status: **pre-release.** Developed and measured on one machine (Omarchy 4.x, 1366x768 at scale 1). See *Known limits*.
 
 ## What is in the box
 
@@ -51,7 +51,7 @@ crash dialog uses `systemd-coredump`. The bar is whichever you use; the dock/clo
 
 ## Known limits
 
-- Layout was tuned at 1366x768 @2x with the system monospace font; other scales are untested.
+- Layout was tuned at 1366x768 at scale 1 with the system monospace font; other scales are untested.
 - `hypr/orbital.lua` is loaded last from `~/.config/hypr/hyprland.lua`; if you set the same options later they win.
 - The QML cache of `omarchy-shell` means new/edited plugins need `omarchy restart shell`.
 
