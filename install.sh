@@ -500,7 +500,7 @@ apply_theme_copy() {
   [[ -n $THEME_TARGET ]] || THEME_TARGET="$THEME_DIR"
   dest="$(readlink -m "$THEME_TARGET")"
   [[ $here == "$dest" || $here == "$link" ]] && return 0
-  say "Copying the theme files ${REFRESH_THEME:+(refreshing) }to $dest"
+  say "Copying the theme files $( (( REFRESH_THEME )) && echo "(refreshing) ")to $dest"
   ensure_dir "$dest" || { problem "could not create $dest"; return 1; }
   if (( DRY )); then echo "    [dry-run] copy $( (( REFRESH_THEME )) && echo everything || echo what is missing ) from $REPO into $dest$( [[ $dest != "$link" ]] && echo " (and link $link to it)" )"; return 0; fi
   snapshot "$dest"
@@ -510,7 +510,9 @@ apply_theme_copy() {
     echo "    Old theme copy saved in $bk (the accent color goes back to the default blue; pick yours again in Appearance)"
   fi
   local mode=--skip-old-files; (( REFRESH_THEME )) && mode=--overwrite
-  (cd "$REPO" && tar cf - --exclude=./.git --exclude=./plugins --exclude=./hypr --exclude=./systemd --exclude=./scripts \
+  # Wallpapers are the user's: once a backgrounds/ folder has any, the theme's own are not added to it.
+  local skipbg=(); [[ -n $(ls -A "$dest/backgrounds" 2>/dev/null) ]] && skipbg=(--exclude=./backgrounds)
+  (cd "$REPO" && tar cf - ${skipbg[@]+"${skipbg[@]}"} --exclude=./.git --exclude=./plugins --exclude=./hypr --exclude=./systemd --exclude=./scripts \
      --exclude=./docs --exclude=./test --exclude=./test-output --exclude=./preview-web --exclude=./install.sh \
      --exclude='./AI_HANDOFF*' --exclude=__pycache__ .) \
     | tar xf - -C "$dest" $mode || { problem "could not copy the theme into $dest"; return 1; }

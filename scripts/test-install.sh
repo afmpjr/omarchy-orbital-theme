@@ -276,4 +276,12 @@ printf 'require("default.hypr.omarchy")\nrequire("default.hypr.toggles")\n' > "$
 export HOME="$SAVED_HOME"
 ok "--refresh-theme backs up and overwrites; --theme-dir keeps the copy elsewhere and links to it"
 
+# Wallpapers are the user's: when backgrounds/ already has one, the theme's own are not added.
+export HOME="$T/anywhere"
+rm -rf "$TD/backgrounds"; mkdir -p "$TD/backgrounds"; : > "$TD/backgrounds/mine.png"
+"$REPO/install.sh" --bar-widgets --no-restart >/dev/null 2>&1 || bad "install with the user's own wallpaper failed"
+[[ $(ls "$TD/backgrounds") == mine.png ]] || bad "the theme added its wallpaper next to the user's"
+export HOME="$SAVED_HOME"
+ok "the user's own wallpaper stays the only one"
+
 echo "ALL PASSED"
