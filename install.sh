@@ -13,6 +13,7 @@
 # backs up anything it replaces OUTSIDE the plugins folder (the shell scans it).
 set -euo pipefail
 
+export OMARCHY_PATH="${OMARCHY_PATH:-/usr/share/omarchy}"
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CFG="$HOME/.config"
 PLUGINS="$CFG/omarchy/plugins"
