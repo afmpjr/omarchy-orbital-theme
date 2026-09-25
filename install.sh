@@ -221,7 +221,13 @@ if [[ ! -f $SJ ]]; then
   say "Creating $SJ from Omarchy's defaults"
   run mkdir -p "$CFG/omarchy"; run cp "$OMARCHY_PATH/config/omarchy/shell.json" "$SJ"; run chmod 644 "$SJ"
 fi
-if (( FULL )); then install_notification_center; full_shell_json; nap 3; fi
+restart_shell_wait() { # the running shell keeps its config in memory and rewrites shell.json on every change
+  local n            # (e.g. `plugin enable`), so a hand edit is lost unless the shell reloads it first
+  omarchy restart shell >/dev/null 2>&1 || true
+  for n in $(seq 1 30); do omarchy plugin list >/dev/null 2>&1 && break; nap 2; done
+  nap 3
+}
+if (( FULL )); then install_notification_center; full_shell_json; if (( ! DRY )); then restart_shell_wait; fi; fi
 if (( ! DRY )); then omarchy-shell shell rescanPlugins >/dev/null 2>&1 || true; nap 2; fi
 say "Enabling plugins"
 enable_verified() { # `plugin enable` talks to the running shell; confirm it stuck, retry if not
