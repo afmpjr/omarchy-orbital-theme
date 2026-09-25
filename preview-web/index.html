@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Orbital — Sci-Fi OS Preview</title>
+<style>
+  :root{
+    --bg:#050B14;--surface:#0A1422;--surface-light:#101E30;--border:rgba(255,255,255,0.08);
+    --accent:#39A9FF;--accent2:#1769AA;--cyan:#5BC0FF;--text:#F4F8FF;--muted:#60758C;--secondary:#91A4BB;
+    --taskbar-bg:rgba(7,15,28,0.72);--launcher-bg:rgba(10,20,34,0.84);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%;font-family:Inter,system-ui,"Segoe UI",sans-serif;background:var(--bg);color:var(--text);overflow:hidden}
+  /* Desktop wallpaper - astronaut + earth from mockup */
+  .desktop{
+    position:fixed;inset:0;
+    background:
+      linear-gradient(180deg, rgba(5,11,20,0.10) 0%, rgba(5,11,20,0.25) 100%),
+      url('../backgrounds/01-orbital-astronaut.png') center/cover no-repeat,
+      radial-gradient(1200px 800px at 70% 15%, rgba(57,169,255,0.10), transparent 60%),
+      var(--bg);
+    display:flex;flex-direction:column;
+  }
+  /* fallback if file:// blocked: use gradient earth */
+  .desktop::before{
+    content:"";position:absolute;inset:0;pointer-events:none;
+    background: radial-gradient(900px 600px at 85% 50%, rgba(80,180,255,0.08), transparent 65%);
+  }
+  .spacer{flex:1}
+  /* Taskbar — §4-§14 */
+  .taskbar{
+    position:relative;
+    margin: 0 16px 12px 16px;
+    display:flex;align-items:center;gap:0;
+    background: var(--taskbar-bg);
+    backdrop-filter: blur(24px) saturate(130%);
+    -webkit-backdrop-filter: blur(24px) saturate(130%);
+    border:1px solid var(--border);
+    border-radius:16px;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.35), 0 1px 0 rgba(255,255,255,0.04) inset;
+    padding:6px 12px;
+    height:44px;
+    z-index:10;
+  }
+  .avatar{
+    width:32px;height:32px;border-radius:999px;overflow:hidden;flex-shrink:0;
+    border:1px solid rgba(255,255,255,0.12);
+    box-shadow: 0 0 0 2px rgba(57,169,255,0.18), 0 2px 12px rgba(0,0,0,0.3);
+    background: radial-gradient(circle at 30% 30%, #2a3f5a, #0a1422);
+    display:flex;align-items:center;justify-content:center;font-size:16px;cursor:pointer;
+    transition: transform 160ms ease, box-shadow 160ms ease;
+  }
+  .avatar:hover{transform:scale(1.06);box-shadow:0 0 0 2px rgba(57,169,255,0.35)}
+  .sep{width:1px;height:22px;background:rgba(255,255,255,0.08);margin:0 10px;flex-shrink:0}
+  .apps{ display:flex;gap:6px;align-items:center;flex:1; min-width:0; overflow:hidden}
+  .app{
+    width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;
+    background:transparent;border:1px solid transparent;cursor:pointer;position:relative;
+    transition: transform 160ms ease, background 160ms ease, border-color 160ms ease;
+    font-size:18px;
+  }
+  .app:hover{background:rgba(255,255,255,0.06);transform:scale(1.06);border-color:rgba(57,169,255,0.12)}
+  .app.active{background:rgba(57,169,255,0.14);border-color:rgba(57,169,255,0.22)}
+  .dot{position:absolute;bottom:2px;left:50%;transform:translateX(-50%);width:4px;height:4px;border-radius:99px;background:var(--accent);opacity:0;transition:opacity 160ms}
+  .app.running .dot{opacity:1}
+  .workspaces{display:flex;gap:6px;align-items:center;flex-shrink:0}
+  .ws{
+    min-width:28px;height:28px;padding:0 10px;border-radius:999px;
+    display:flex;align-items:center;justify-content:center;
+    font-size:12px;font-weight:500;color:var(--secondary);
+    background:transparent;border:1px solid transparent;cursor:pointer;
+    transition: all 160ms ease;
+  }
+  .ws.active{background:rgba(57,169,255,0.18);color:var(--text);border-color:rgba(57,169,255,0.35);box-shadow:0 0 12px rgba(57,169,255,0.18)}
+  .ws:hover{background:rgba(255,255,255,0.06);color:var(--text)}
+  .ws.add{width:28px;padding:0;font-size:16px}
+  .system{ display:flex;gap:4px;align-items:center; margin-left:4px}
+  .sys{
+    width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;
+    color:var(--text);opacity:0.85;cursor:pointer;transition:background 160ms;
+    font-size:13px;
+  }
+  .sys:hover{background:rgba(255,255,255,0.06)}
+  .clock{
+    font-size:13px;font-weight:500;color:var(--text);white-space:nowrap;margin-left:8px;padding-left:10px;
+    border-left:1px solid rgba(255,255,255,0.08);line-height:1.2;
+  }
+  .clock span{color:var(--secondary);font-weight:400}
+  /* Launcher — §15-§21 */
+  .overlay{
+    position:fixed;inset:0;background:rgba(5,11,20,0.18);backdrop-filter:blur(2px);
+    opacity:0;pointer-events:none;transition:opacity 180ms ease;z-index:5;
+  }
+  .overlay.open{opacity:1;pointer-events:auto}
+  .launcher{
+    position:fixed;left:50%;bottom:68px;transform:translateX(-50%) translateY(8px) scale(0.98);
+    width:min(640px, calc(100vw - 32px));height:min(560px, calc(100vh - 100px));
+    background: var(--launcher-bg);
+    backdrop-filter: blur(24px) saturate(130%);
+    -webkit-backdrop-filter: blur(24px) saturate(130%);
+    border:1px solid var(--border);border-radius:20px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.40);
+    display:flex;flex-direction:column;overflow:hidden;
+    opacity:0;pointer-events:none;transition: all 180ms cubic-bezier(0.22,1,0.36,1);z-index:6;
+  }
+  .launcher.open{opacity:1;pointer-events:auto;transform:translateX(-50%) translateY(0) scale(1)}
+  @media(prefers-reduced-motion:reduce){ .launcher,.app,.ws{transition:none} }
+  .search-wrap{padding:16px 16px 12px 16px;flex-shrink:0}
+  .search{
+    width:100%;height:40px;border-radius:12px;
+    background: rgba(16,30,48,1);border:1px solid var(--border);
+    display:flex;align-items:center;gap:10px;padding:0 12px;
+    transition: border-color 160ms, box-shadow 160ms;
+  }
+  .search:focus-within{border-color:var(--accent);box-shadow:0 0 0 2px rgba(57,169,255,0.15)}
+  .search input{flex:1;background:transparent;border:0;outline:0;color:var(--text);font-size:14px}
+  .search input::placeholder{color:var(--muted)}
+  .kbd{font-size:11px;color:var(--muted);background:rgba(255,255,255,0.06);border:1px solid var(--border);border-radius:6px;padding:3px 6px}
+  .cats{
+    display:flex;gap:6px;padding:0 16px 12px 16px;overflow-x:auto;scrollbar-width:none;flex-shrink:0;
+  }
+  .cats::-webkit-scrollbar{display:none}
+  .cat{
+    white-space:nowrap;padding:6px 14px;border-radius:999px;font-size:12px;font-weight:500;
+    color:var(--secondary);background:transparent;border:1px solid transparent;cursor:pointer;transition:all 160ms;
+  }
+  .cat.active{background:var(--accent);color:var(--bg);border-color:var(--accent)}
+  .cat:hover:not(.active){background:rgba(255,255,255,0.06);color:var(--text)}
+  .grid{
+    flex:1;overflow:auto;padding:8px 12px 16px 12px;
+    display:grid;grid-template-columns: repeat(6, 1fr);gap:8px;align-content:start;
+  }
+  @media(max-width:640px){ .grid{grid-template-columns: repeat(4, 1fr)} }
+  @media(max-width:420px){ .grid{grid-template-columns: repeat(3, 1fr)} }
+  .item{
+    display:flex;flex-direction:column;align-items:center;gap:8px;
+    padding:12px 6px;border-radius:14px;cursor:pointer;
+    background:transparent;border:1px solid transparent;transition: all 160ms ease;
+  }
+  .item:hover{background:rgba(255,255,255,0.06);transform:scale(1.02);border-color:rgba(57,169,255,0.10);box-shadow:0 4px 16px rgba(0,0,0,0.12)}
+  .item:focus-visible{outline:0;background:rgba(57,169,255,0.14);border-color:var(--accent)}
+  .icon{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:22px;box-shadow:0 2px 12px rgba(0,0,0,0.2)}
+  .label{font-size:12px;color:var(--text);text-align:center;line-height:1.2;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  /* icons colorful fallback like mockup */
+  .hint{position:fixed;top:16px;left:50%;transform:translateX(-50%);background:rgba(10,20,34,0.8);border:1px solid var(--border);border-radius:999px;padding:6px 14px;font-size:12px;color:var(--secondary);backdrop-filter:blur(12px);z-index:20}
+</style>
+</head>
+<body>
+<div class="desktop">
+  <div class="hint">Super abre launcher • Esc fecha • ⌘K foca busca — Orbital preview</div>
+  <div class="spacer"></div>
+
+  <!-- Taskbar -->
+  <div class="taskbar" role="toolbar" aria-label="Taskbar">
+    <div class="avatar" title="User" tabindex="0">🧑‍🚀</div>
+    <div class="sep"></div>
+    <div class="apps" id="apps"></div>
+    <div class="sep"></div>
+    <div class="workspaces" id="workspaces"></div>
+    <div class="sep"></div>
+    <div class="system">
+      <div class="sys" title="Network">◈</div>
+      <div class="sys" title="Audio">🔊</div>
+      <div class="sys" title="Battery">🔋</div>
+      <div class="sys" title="Chevron">⌃</div>
+    </div>
+    <div class="clock" id="clock">Wed, Sep 17&nbsp;&nbsp;11:24</div>
+  </div>
+</div>
+
+<div class="overlay" id="overlay"></div>
+
+<!-- Launcher -->
+<div class="launcher" id="launcher" role="dialog" aria-label="Application launcher">
+  <div class="search-wrap">
+    <label class="search">
+      <span style="opacity:0.7">⌕</span>
+      <input id="searchInput" placeholder="Search for apps, files, and settings..." autocomplete="off"/>
+      <span class="kbd">⌘ K</span>
+    </label>
+  </div>
+  <div class="cats" id="cats"></div>
+  <div class="grid" id="grid" role="grid"></div>
+</div>
+
+<script>
+const appsData = [
+  {id:'firefox', name:'Firefox', icon:'🦊', bg:'#ff6b2c', cat:'Productivity', pinned:true, running:true},
+  {id:'chrome', name:'Chrome', icon:'🌐', bg:'#4285f4', cat:'Productivity', pinned:true, running:false},
+  {id:'vscode', name:'VS Code', icon:'⬢', bg:'#007acc', cat:'Development', pinned:true, running:true},
+  {id:'spotify', name:'Spotify', icon:'♫', bg:'#1db954', cat:'Media', pinned:true, running:false},
+  {id:'figma', name:'Figma', icon:'◈', bg:'#a259ff', cat:'Productivity', pinned:true, running:false},
+  {id:'notion', name:'Notion', icon:'N', bg:'#ffffff', cat:'Productivity', pinned:false, running:false},
+  {id:'discord', name:'Discord', icon:'💬', bg:'#5865f2', cat:'Media', pinned:true, running:true},
+  {id:'terminal', name:'Terminal', icon:'>_', bg:'#0a1422', cat:'Development', pinned:true, running:true},
+  {id:'docker', name:'Docker', icon:'🐳', bg:'#2496ed', cat:'Development', pinned:false, running:false},
+  {id:'postman', name:'Postman', icon:'↗', bg:'#ff6c37', cat:'Development', pinned:false, running:false},
+  {id:'github', name:'GitHub', icon:'◯', bg:'#24292e', cat:'Development', pinned:false, running:false},
+  {id:'slack', name:'Slack', icon:'⬡', bg:'#e01e5a', cat:'Productivity', pinned:false, running:false},
+  {id:'photos', name:'Photos', icon:'🌸', bg:'#ff6b9d', cat:'Media', pinned:false, running:false},
+  {id:'files', name:'Files', icon:'📁', bg:'#3aa0ff', cat:'Utilities', pinned:false, running:false},
+  {id:'calendar', name:'Calendar', icon:'17', bg:'#ffffff', cat:'Productivity', pinned:false, running:false},
+  {id:'settings', name:'Settings', icon:'⚙', bg:'#60758c', cat:'Utilities', pinned:false, running:false},
+  {id:'calc', name:'Calculator', icon:'⌨', bg:'#60758c', cat:'Utilities', pinned:false, running:false},
+  {id:'weather', name:'Weather', icon:'☁', bg:'#3aa0ff', cat:'Utilities', pinned:false, running:false},
+];
+const catsData = ['All Apps','Productivity','Development','Media','Utilities','Games'];
+let activeCat = 'All Apps';
+let filter = '';
+
+const appsEl = document.getElementById('apps');
+const gridEl = document.getElementById('grid');
+const catsEl = document.getElementById('cats');
+const launcher = document.getElementById('launcher');
+const overlay = document.getElementById('overlay');
+const searchInput = document.getElementById('searchInput');
+
+function renderTaskbar(){
+  appsEl.innerHTML='';
+  appsData.filter(a=>a.pinned).forEach(a=>{
+    const d=document.createElement('button');
+    d.className='app'+(a.running?' running':'');
+    d.title=a.name;
+    d.innerHTML=`<span style="font-size:18px">${a.icon}</span><span class="dot"></span>`;
+    d.onclick=()=>{ a.running=!a.running; renderTaskbar(); renderGrid(); };
+    appsEl.appendChild(d);
+  });
+}
+const workspaces = [
+  {id:'1', active:true},{id:'2', active:false},{id:'3', active:false}
+];
+function renderWorkspaces(){
+  const el=document.getElementById('workspaces');
+  el.innerHTML='';
+  workspaces.forEach(w=>{
+    const b=document.createElement('button'); b.className='ws'+(w.active?' active':''); b.textContent=w.id;
+    b.onclick=()=>{ workspaces.forEach(x=>x.active=false); w.active=true; renderWorkspaces(); };
+    el.appendChild(b);
+  });
+  const add=document.createElement('button'); add.className='ws add'; add.textContent='+';
+  add.onclick=()=>{ const n=String(workspaces.length+1); workspaces.push({id:n,active:false}); renderWorkspaces(); };
+  el.appendChild(add);
+}
+function renderCats(){
+  catsEl.innerHTML='';
+  catsData.forEach(c=>{
+    const b=document.createElement('button'); b.className='cat'+(c===activeCat?' active':''); b.textContent=c;
+    b.onclick=()=>{ activeCat=c; renderCats(); renderGrid(); };
+    catsEl.appendChild(b);
+  });
+}
+function renderGrid(){
+  const q = filter.toLowerCase();
+  gridEl.innerHTML='';
+  appsData.filter(a=>{
+    if(q && !a.name.toLowerCase().includes(q)) return false;
+    if(activeCat!=='All Apps' && a.cat!==activeCat) return false;
+    return true;
+  }).forEach(a=>{
+    const d=document.createElement('button'); d.className='item'; d.setAttribute('role','gridcell');
+    d.innerHTML=`<div class="icon" style="background:${a.bg};color:${a.bg==='#ffffff'?'#0a1422':'#fff'}">${a.icon}</div><div class="label">${a.name}</div>`;
+    d.title=a.name;
+    gridEl.appendChild(d);
+  });
+  if(gridEl.children.length===0){
+    gridEl.innerHTML='<div style="grid-column:1/-1;text-align:center;color:var(--muted);padding:40px 0">No apps found</div>';
+  }
+}
+function openLauncher(){ launcher.classList.add('open'); overlay.classList.add('open'); searchInput.focus(); }
+function closeLauncher(){ launcher.classList.remove('open'); overlay.classList.remove('open'); }
+document.addEventListener('keydown', e=>{
+  if((e.metaKey||e.ctrlKey) && e.key.toLowerCase()==='k'){ e.preventDefault(); openLauncher(); }
+  if(e.key==='Meta' || e.key==='Super'){ e.preventDefault(); launcher.classList.contains('open')?closeLauncher():openLauncher(); }
+  if(e.key==='Escape'){ closeLauncher(); }
+});
+overlay.addEventListener('click', closeLauncher);
+searchInput.addEventListener('input', e=>{ filter=e.target.value; renderGrid(); });
+
+// taskbar avatar opens launcher too
+document.querySelector('.avatar').addEventListener('click', ()=> launcher.classList.contains('open')?closeLauncher():openLauncher());
+
+// clock
+function tick(){
+  const now=new Date();
+  const opts={weekday:'short', month:'short', day:'numeric'};
+  const d=now.toLocaleDateString('en-US', opts);
+  const t=now.toLocaleTimeString('en-US', {hour:'2-digit', minute:'2-digit', hour12:false});
+  document.getElementById('clock').innerHTML = d+'&nbsp;&nbsp;'+t;
+}
+tick(); setInterval(tick, 30000);
+
+// Try to load local wallpaper as data URL if file:// blocked: fallback already via CSS gradient
+// Attempt to inline the mockup as background via JS fetch (if served via http)
+fetch('../backgrounds/01-orbital-astronaut.png').catch(()=>{});
+
+renderTaskbar(); renderWorkspaces(); renderCats(); renderGrid();
+
+// Keyboard nav for grid
+gridEl.addEventListener('keydown', e=>{
+  const items=[...gridEl.querySelectorAll('.item')];
+  let idx=items.indexOf(document.activeElement);
+  if(e.key==='ArrowRight'){ e.preventDefault(); items[Math.min(idx+1, items.length-1)]?.focus(); }
+  if(e.key==='ArrowLeft'){ e.preventDefault(); items[Math.max(idx-1,0)]?.focus(); }
+});
+</script>
+</body>
+</html>
