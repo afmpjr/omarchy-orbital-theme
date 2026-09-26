@@ -4,7 +4,8 @@ All notable changes to the Orbital theme. The theme is still **pre-release**; v0
 
 ## Unreleased
 
-Nothing yet.
+- `install.sh --windows-keys` adds an opt-in set of Windows-style shortcuts (`hypr/orbital-keys-windows.lua`); never part of `--full`,
+  skipped when your config already has them, removed by `--uninstall`.
 
 ## v0.1.0 — 2026-09-26
 

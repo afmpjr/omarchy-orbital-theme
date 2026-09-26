@@ -151,6 +151,7 @@ SUPER+S) and `--no-alt-shift` (Alt+Shift layout switching; it also fires after e
 | `--full` | The author's whole desktop: bar layout, launcher key, gaps, text size 10, keyboard layouts + Alt+Shift, 4-finger swipe, dock pins |
 | `--bar-widgets` | Only place the Orbital widgets in your current bar |
 | `--keyboard-layouts us,br` | Layouts for the keyboard widget (default: the ones in your `input.lua`) |
+| `--windows-keys` | Windows-style shortcuts (opt-in, never part of `--full`): Super+L lock, Super+V clipboard history, Super+Shift+S snip, Alt+F4, F11, ... The full list is at the top of [`hypr/orbital-keys-windows.lua`](hypr/orbital-keys-windows.lua); it replaces some Omarchy defaults |
 | `--keep-bar` | Keep the bar you use now instead of switching to `orbital.floating-bar` |
 | `--no-launcher-key`, `--no-alt-shift`, `--no-gestures` | Skip that one binding |
 | `--fix-terminal-shortcuts` | Free Ctrl+Enter in Ghostty (also part of `--full`) |

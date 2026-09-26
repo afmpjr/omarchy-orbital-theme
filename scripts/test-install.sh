@@ -284,4 +284,19 @@ rm -rf "$TD/backgrounds"; mkdir -p "$TD/backgrounds"; : > "$TD/backgrounds/mine.
 export HOME="$SAVED_HOME"
 ok "the user's own wallpaper stays the only one"
 
+# --windows-keys: opt-in, installed once, never by --full alone, removed by --uninstall.
+export HOME="$T/winkeys"; rm -rf "$HOME"; mkdir -p "$HOME/.config/omarchy" "$HOME/.config/hypr" "$HOME/.local/share/applications"
+cp /usr/share/omarchy/config/omarchy/shell.json "$HOME/.config/omarchy/shell.json"
+printf 'require("default.hypr.omarchy")\nrequire("default.hypr.toggles")\n' > "$HOME/.config/hypr/hyprland.lua"
+"$REPO/install.sh" --bar-widgets --no-restart >/dev/null 2>&1 || bad "plain install failed"
+[[ ! -e $HOME/.config/hypr/orbital-keys-windows.lua ]] || bad "Windows keys installed without --windows-keys"
+"$REPO/install.sh" --bar-widgets --windows-keys --no-restart >/dev/null 2>"$HOME/err" || { cat "$HOME/err"; bad "--windows-keys install failed"; }
+"$REPO/install.sh" --bar-widgets --windows-keys --no-restart >/dev/null 2>&1 || bad "second --windows-keys install failed"
+[[ -f $HOME/.config/hypr/orbital-keys-windows.lua ]] || bad "Windows keys file missing"
+[[ $(grep -c 'orbital-keys-windows' "$HOME/.config/hypr/hyprland.lua") == 1 ]] || bad "Windows keys required twice"
+"$REPO/install.sh" --uninstall --no-restart >/dev/null 2>&1 || bad "uninstall failed"
+[[ ! -e $HOME/.config/hypr/orbital-keys-windows.lua ]] && ! grep -q 'orbital-keys-windows' "$HOME/.config/hypr/hyprland.lua" || bad "uninstall left the Windows keys"
+export HOME="$SAVED_HOME"
+ok "--windows-keys is opt-in, idempotent and removed by --uninstall"
+
 echo "ALL PASSED"
