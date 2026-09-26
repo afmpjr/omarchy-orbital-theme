@@ -4,7 +4,7 @@ A dark, glassy Omarchy theme inspired by Earth seen from orbit: floating taskbar
 world clock, a themed crash dialog, and a **color picker that recolors the accent *and* the glass tint** (18 colors, including
 white, gray and black, or any hex).
 
-> Status: **pre-release.** Developed and measured on one machine (Omarchy 4.x, 1366x768 at scale 1). See *Known limits*.
+> Status: **pre-release (v0.1.0).** Developed on one machine (Omarchy 4.0.4, 1366x768 at scale 1) and checked on a clean VM. See *Known limits*.
 
 ## What is in the box
 
@@ -197,7 +197,9 @@ which one is missing instead of leaving you with a blank widget:
 
 The crash dialog needs `systemd-coredump`; weather needs network access to `wttr.in`.
 
-Tested on Omarchy 4.x. The plugins are read from `~/.config/omarchy/plugins/` and the theme from
+**Versions.** Tested on Omarchy **4.0.4** with Hyprland **0.56.2** (Lua config) and Quickshell **0.3.1**, on a real machine and on a clean
+VM (`scripts/e2e-fresh-install.sh`). Anything older than Omarchy 4 (no Lua Hyprland config, no `omarchy plugin`) is not supported; other
+4.x releases are expected to work but have not been tested: please open an issue with the result. The plugins are read from `~/.config/omarchy/plugins/` and the theme from
 `~/.config/omarchy/themes/orbital/`, so nothing is written outside those, `~/.config/hypr/`, `~/.config/systemd/user/` and
 `~/.local/state/omarchy/`.
 
@@ -229,3 +231,4 @@ column still needs the author's confirmation**. Third-party notices in [`docs/NO
 commands above from the public URL, then checks the theme, the 13 plugin folders, the enabled plugins, the bar in use,
 the Hyprland hook and `hyprctl configerrors`. It needs a VM you can wipe (`TESTBED=/path/to/omarchy-testbed`).
 
+Contributing: [CONTRIBUTING.md](CONTRIBUTING.md). Security: [SECURITY.md](SECURITY.md). License: MIT ([LICENSE](LICENSE)); wallpaper and flag credits in [CREDITS.md](CREDITS.md).

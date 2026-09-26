@@ -1,9 +1,14 @@
 # Changelog
 
-All notable changes to the Orbital theme. The theme is still **pre-release**: everything below lives on `main` and is
-unreleased, so the entries describe the current state rather than a sequence of published versions.
+All notable changes to the Orbital theme. The theme is still **pre-release**; v0.1.0 is the first tag, and the entries describe the current state rather than a sequence of versions.
 
 ## Unreleased
+
+Nothing yet.
+
+## v0.1.0 — 2026-09-26
+
+First tagged version (pre-release): everything below.
 
 ### Dock, keyboard and clock
 
