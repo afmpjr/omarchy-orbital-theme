@@ -42,6 +42,21 @@ Item {
   id: root
 
   function tr(s) { return OrbitalUi.OrbitalI18n.t(s) }
+
+  // iconPath() returns "" for a name the system does not have, and an Image with an
+  // empty source is simply nothing on screen — a hole where the icon should be. Two of
+  // the names this panel used ("preferences-system-power", "system-reboot") are gone from
+  // current Adwaita, and any future icon rename would fail the same silent way. So every
+  // name goes through here, and a miss falls back to a name Adwaita does ship.
+  // Every icon in this panel goes through OrbitalIcons. Quickshell.iconPath()
+  // resolves nothing on a stock install (measured: "" for every name, valid or
+  // not), so an Image sourced straight from it is a silent hole. OrbitalIcons
+  // scans the XDG icon dirs and returns a file:// URL, and falls back to
+  // image-missing so a renamed icon can never leave an empty gap again.
+  function iconSource(name) {
+    return OrbitalUi.OrbitalIcons.file(name)
+  }
+
   property var shell: null
   property var manifest: null
 
@@ -253,7 +268,7 @@ Item {
             height: Style.space(16)
             fillMode: Image.PreserveAspectFit
             opacity: 0.5
-            source: Quickshell.iconPath("emblem-system-symbolic", true)
+              source: root.iconSource("emblem-system-symbolic")
 
             MouseArea {
               anchors.fill: parent
@@ -299,7 +314,7 @@ Item {
               height: Style.space(18)
               anchors.verticalCenter: parent.verticalCenter
               fillMode: Image.PreserveAspectFit
-              source: Quickshell.iconPath(linkRow.iconName, true)
+              source: root.iconSource(linkRow.iconName)
             }
 
             Text {
@@ -322,7 +337,7 @@ Item {
             fillMode: Image.PreserveAspectFit
             opacity: 0.4
             visible: linkRow.showChevron
-            source: Quickshell.iconPath("pan-end-symbolic", true)
+            source: root.iconSource("pan-end-symbolic")
           }
 
           MouseArea {
@@ -336,13 +351,13 @@ Item {
 
         LinkRow {
           label: tr("Appearance")
-          iconName: "preferences-desktop-theme"
+          iconName: "preferences-desktop-appearance-symbolic"
           onActivated: { root.close(); Util.execDetached("omarchy-shell shell toggle orbital.appearance '{}'") }
         }
 
         LinkRow {
           label: tr("Keyboard Shortcuts")
-          iconName: "preferences-desktop-keyboard-shortcuts"
+          iconName: "preferences-desktop-keyboard-shortcuts-symbolic"
           onActivated: root.run("omarchy-menu-keybindings")
         }
 
@@ -367,19 +382,22 @@ Item {
           width: parent.width
 
           LinkRow {
-            label: tr("Lock"); iconName: "system-lock-screen"; showChevron: false
+            label: tr("Lock"); iconName: "system-lock-screen-symbolic"; showChevron: false
             onActivated: root.run("omarchy system lock")
           }
+          // "preferences-system-power" and "system-reboot" are not on a current Adwaita
+          // (both were dropped from the legacy set), so these two rows drew nothing.
+          // media-playback-pause-symbolic is what GNOME Settings uses for suspend.
           LinkRow {
-            label: tr("Sleep"); iconName: "preferences-system-power"; showChevron: false
+            label: tr("Sleep"); iconName: "media-playback-pause-symbolic"; showChevron: false
             onActivated: root.run("systemctl suspend")
           }
           LinkRow {
-            label: tr("Restart"); iconName: "system-reboot"; showChevron: false
+            label: tr("Restart"); iconName: "system-reboot-symbolic"; showChevron: false
             onActivated: root.run("omarchy system reboot")
           }
           LinkRow {
-            label: tr("Shut Down"); iconName: "system-shutdown"; showChevron: false
+            label: tr("Shut Down"); iconName: "system-shutdown-symbolic"; showChevron: false
             onActivated: root.run("omarchy system shutdown")
           }
         }

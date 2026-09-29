@@ -24,7 +24,12 @@ screen() {
 }
 
 vm "hyprctl eval 'hl.monitor({ output = \"\", mode = \"1366x768@60\", position = \"auto\", scale = 1 })'; hyprctl dispatch 'hl.dsp.focus({ workspace = \"9\" })'" >/dev/null 2>&1
+sleep 3
 vm "omarchy-notification-dismiss-all 2>/dev/null; true" >/dev/null 2>&1
+
+# Screenshots are only comparable pixel by pixel at the same resolution, and the panel can
+# drift back to the preferred mode between shots. Pin the mode before every diff shot.
+pin_mode() { vm "hyprctl eval 'hl.monitor({ output = \"\", mode = \"1366x768@60\", position = \"auto\", scale = 1 })'" >/dev/null 2>&1; sleep 3; }
 
 screen desktop      "true"
 screen launcher     "omarchy-shell shell toggle orbital.launcher '{}'" orbital-launcher
@@ -38,9 +43,34 @@ screen crash        "omarchy-shell shell summon orbital.crash '$PAYLOAD'" orbita
 vm "omarchy-shell shell call orbital.crash close ''" >/dev/null 2>&1
 screen notification "notify-send 'Orbital' 'A themed notification toast' -t 6000"
 # accent picker end to end: pink, screenshot, back to blue
+# "the layer opened" is not the feature. The picker rewrites colors.toml and the shell is
+# supposed to repaint; this asks whether the new hue actually arrived. Matched by hue, not by
+# exact RGB: a themed accent shows up as antialiased strokes blended into the glass, and a
+# whole-screen pixel count would pass on wallpaper drift alone.
+# The baseline has to be provably blue first. An unverified "back to blue" at the end of the
+# previous run left the shell pink, and then this compared pink against pink and reported a
+# feature failure that was really a stale baseline.
+vm "python3 ~/.config/omarchy/plugins/orbital.appearance/orbital-accent.py blue" >/dev/null 2>&1; sleep 8
+pin_mode
+"$TB" shot "$OUT/00-accent-before.png" >/dev/null
+if "$REPO/scripts/visual-accent.py" "$OUT/00-accent-before.png" '#39A9FF' --min 20000 --quiet
+then :; else results+=("FAIL  the baseline is not blue, so the accent check below would compare pink to pink"); fi
 vm "python3 ~/.config/omarchy/plugins/orbital.appearance/orbital-accent.py pink" >/dev/null 2>&1; sleep 8
 screen accent-pink  "omarchy-shell shell toggle orbital.launcher '{}'" orbital-launcher
-vm "python3 ~/.config/omarchy/plugins/orbital.appearance/orbital-accent.py blue" >/dev/null 2>&1; sleep 6
+pin_mode
+"$TB" shot "$OUT/11-accent-after.png" >/dev/null
+if "$REPO/scripts/visual-accent.py" "$OUT/11-accent-after.png" '#FF39AC' \
+     --before "$OUT/00-accent-before.png" --min 400 --grow 2 --quiet
+then results+=("ok    accent repaints the running shell")
+else
+  case $? in
+    2) results+=("FAIL  accent screenshots are not comparable (different resolution)") ;;
+    *) results+=("FAIL  accent rewrote the theme files but the new hue never reached the screen") ;;
+  esac
+fi
+"$REPO/scripts/visual-accent.py" "$OUT/11-accent-after.png" '#FF39AC' \
+  --before "$OUT/00-accent-before.png" --min 400 --grow 2 | sed 's/^/      accent: /'
+vm "python3 ~/.config/omarchy/plugins/orbital.appearance/orbital-accent.py blue" >/dev/null 2>&1; sleep 8
 
 echo; echo "== screens (screenshots in $OUT)"; printf '%s\n' "${results[@]}"
 echo; echo "== plugin warnings/errors from the shell log"
