@@ -4,7 +4,7 @@ A dark, glassy Omarchy theme inspired by Earth seen from orbit: floating taskbar
 world clock, a themed crash dialog, and a **color picker that recolors the accent *and* the glass tint** (18 colors, including
 white, gray and black, or any hex).
 
-> Status: **pre-release (v0.1.0).** Developed on one machine (Omarchy 4.0.4, 1366x768 at scale 1) and checked on a clean VM. See *Known limits*.
+> Status: **pre-release (v0.2.0).** Developed on one machine (Omarchy 4.0.4, 1366x768 at scale 1) and checked on a clean VM. See *Known limits*.
 
 ## What is in the box
 
@@ -13,7 +13,7 @@ white, gray and black, or any hex).
 | Theme (repo root) | `colors.toml`, `shell.toml` (menu / popups / notifications glass tokens), terminals, GTK, btop, ... | `omarchy theme install` |
 | [`orbital.launcher`](plugins/orbital.launcher/) | App drawer: search, categories, Recommended, per-app context menu (pin, move to category, uninstall) | `install.sh` |
 | [`orbital.dock`](plugins/orbital.dock/) | Dock (bar widget): pinned + running apps, context menu | `install.sh --bar-widgets` |
-| [`orbital.clock`](plugins/orbital.clock/), [`orbital.workspaces`](plugins/orbital.workspaces/), [`orbital.divider`](plugins/orbital.divider/) | Calendar popup with real reminders and weather, numbered workspace chips, hairline divider (bar widgets) | `install.sh --bar-widgets` |
+| [`orbital.clock`](plugins/orbital.clock/), [`orbital.workspaces`](plugins/orbital.workspaces/), [`orbital.divider`](plugins/orbital.divider/) | Calendar popup with real reminders and weather, workspace previews with application icons, hairline divider (bar widgets) | `install.sh --bar-widgets` |
 | [`orbital.account`](plugins/orbital.account/) | Profile card, links, power actions | `install.sh` |
 | [`orbital.appearance`](plugins/orbital.appearance/) | Color picker window (+ `orbital-accent.py`) | `install.sh` |
 | [`orbital.worldclock`](plugins/orbital.worldclock/) | World clock, alarms, timer | `install.sh` |
