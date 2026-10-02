@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "id": "orbital.lockscreen",
+  "name": "Lock Screen Explorer (Orbital)",
+  "version": "1.5.5",
+  "author": "SirJul1337 (Orbital fork: real display name on the lock screen)",
+  "license": "MIT",
+  "description": "Lock screen designs for Omarchy with a picker to preview and switch between them",
+  "kinds": [
+    "service",
+    "overlay"
+  ],
+  "keepLoaded": true,
+  "entryPoints": {
+    "service": "Service.qml",
+    "overlay": "Explorer.qml"
+  },
+  "omarchy": {
+    "clonedFrom": "omarchy.lock"
+  }
+}

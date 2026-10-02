@@ -91,7 +91,7 @@ grep -q 'kb_layout = "br,us"' "$KB" && grep -q 'Shift_L", next_layout, { release
 [[ $(grep -c 'hypr.orbital-keyboard' "$HOME/.config/hypr/hyprland.lua") == 1 ]] || bad "keyboard hook twice"
 "$REPO/install.sh" --full --no-restart --keyboard-layouts br,us >/dev/null
 [[ $(grep -c 'hypr.orbital-keyboard' "$HOME/.config/hypr/hyprland.lua") == 1 ]] || bad "keyboard hook not idempotent"; ok "keyboard hook idempotent"
-for id in orbital.launcher orbital.dock orbital.account orbital.appearance orbital.worldclock orbital.crash orbital.ui orbital.clock orbital.workspaces orbital.divider orbital.floating-bar orbital.bar; do
+for id in orbital.launcher orbital.dock orbital.account orbital.appearance orbital.worldclock orbital.crash orbital.ui orbital.clock orbital.workspaces orbital.divider orbital.floating-bar orbital.bar orbital.lockscreen; do
   [[ -d $HOME/.config/omarchy/plugins/$id ]] || bad "plugin $id missing"
 done; ok "plugins installed (both bars present, only .bar.id is ever loaded)"
 # The schema is Omarchy's, not ours: ask the real CLI, so a manifest that this Omarchy would

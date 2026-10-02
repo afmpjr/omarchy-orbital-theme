@@ -42,6 +42,8 @@ OVERLAYS=(orbital.launcher orbital.account orbital.appearance orbital.worldclock
 LIBS=(orbital.ui)
 WIDGETS=("orbital.dock:left" "orbital.workspaces:center" "orbital.keyboard:right" "orbital.clock:right")
 EXTRA_WIDGETS=(orbital.divider)
+# service+overlay, not a bar widget: bundled because it is part of the Orbital lock screen.
+LOCKSCREEN=(orbital.lockscreen)
 BAR_IDS=(orbital.floating-bar orbital.bar)
 
 DRY=0 RESTART=1 BAR=0 UNINSTALL=0 FULL=0 KBLAYOUTS='' LAUNCHER_KEY=1 ALT_SHIFT=1 GESTURES=1 KEEP_BAR=0 WINDOWS_KEYS=0 REFRESH_THEME=0 THEME_TARGET='' TERM_FIX=0
@@ -162,7 +164,7 @@ reconcile_hypr_requires() {
 
 uninstall() {
   say "Removing Orbital plugins, Hyprland hook and crash drop-in"
-  for id in "${OVERLAYS[@]}" "${LIBS[@]}" "${BAR_IDS[@]}" "${EXTRA_WIDGETS[@]}" "${WIDGETS[@]%%:*}"; do
+  for id in "${OVERLAYS[@]}" "${LIBS[@]}" "${BAR_IDS[@]}" "${EXTRA_WIDGETS[@]}" "${WIDGETS[@]%%:*}" "${LOCKSCREEN[@]}"; do
     have_omarchy && run omarchy plugin disable "$id" 2>/dev/null || true
     run rm -rf "$PLUGINS/$id"
   done
@@ -657,7 +659,7 @@ move_verified() { # <id> <section> <index>: same shell-busy flakiness, so confir
 apply_enable() {
   local id w
   say "Enabling plugins"
-  for id in "${OVERLAYS[@]}"; do
+  for id in "${OVERLAYS[@]}" "${LOCKSCREEN[@]}"; do
     (( DRY )) && { echo "    [dry-run] enable $id"; continue; }
     enable_verified "$id" || return 1
   done
@@ -737,7 +739,7 @@ verify_all() {
   local try missing
   for try in $(seq 1 15); do
     list="$(omarchy plugin list 2>/dev/null || true)"; missing=()
-    for id in "${OVERLAYS[@]}" "${EXTRA_WIDGETS[@]}" "${WIDGETS[@]%%:*}"; do
+    for id in "${OVERLAYS[@]}" "${EXTRA_WIDGETS[@]}" "${WIDGETS[@]%%:*}" "${LOCKSCREEN[@]}"; do
       grep -qE "^$id +enabled" <<<"$list" || missing+=("$id")
     done
     (( ${#missing[@]} == 0 )) && break
