@@ -7,10 +7,12 @@ Numbered workspace previews for the bar. Occupied workspaces show proportionally
 
 ## Details
 
-- Occupancy comes from the workspace's toplevel list, so a workspace with only hidden windows still reads as occupied.
+- Occupancy comes from the live `hyprctl clients -j` snapshot the widget already polls, so a window that Hyprland's
+  toplevel cache has not picked up yet still shows up in its workspace.
 - The focused chip follows Hyprland's focused workspace, so it stays correct across monitors and special workspaces.
 - Application icons identify each window, and hovering a workspace shows the application names.
-- Window geometry is refreshed while resizing, so the previews track live layout changes.
+- Window geometry and workspace membership both come from that poll, so previews track resize, move and
+  close instantly — Hyprland emits no resize event for the toplevel cache to refresh from.
 - Gaps adapt when the bar is vertical (`trailingGap` collapses), so the chips do not double the spacing on a side edge.
 
 ## Attribution

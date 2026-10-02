@@ -12,9 +12,9 @@ import qs.Ui
 // pager actually tells you what's running instead of an arbitrary colour.
 // Clicking a button switches to that workspace.
 //
-// Window geometry starts from HyprlandToplevel.lastIpcObject. Since Hyprland
-// has no resize event that refreshes this cache, a short `hyprctl clients -j`
-// poll below keeps the live miniature accurate while a window is resized.
+// Window geometry and workspace membership come from a short
+// `hyprctl clients -j` poll. HyprlandToplevel.lastIpcObject is only a cache
+// and can omit geometry until Quickshell fetches the window again.
 //
 // Icon resolution (entryFor/iconSourceFor/iconIndex below) is copied from
 // orbital.dock's Dock.qml, which already solved this exact problem for the
@@ -182,8 +182,7 @@ BarWidget {
     var wins = root.windowsForWorkspace(wsId)
     var labels = []
     for (var i = 0; i < wins.length; i++) {
-      var geo = wins[i].lastIpcObject
-      labels.push(root.appLabel(geo ? geo.class : ""))
+      labels.push(root.appLabel(wins[i].class || ""))
     }
     return labels.join(", ")
   }
@@ -195,9 +194,8 @@ BarWidget {
   // live: `hyprctl clients -j` reflects a resize instantly, but neither the
   // miniature nor Hyprland.refreshToplevels() picked it up — so this polls
   // the same JSON Quickshell itself reads, directly, on a short interval,
-  // and the per-window geometry below prefers this live map over the
-  // (possibly stale) cached object.
-  property var liveGeometry: ({})
+  // and the per-window geometry below uses this live client snapshot.
+  property var liveClients: []
 
   Process {
     id: clientsPoll
@@ -205,15 +203,10 @@ BarWidget {
     stdout: StdioCollector {
       waitForEnd: true
       onStreamFinished: {
-        var map = {}
         try {
           var list = JSON.parse(text)
-          for (var i = 0; i < list.length; i++) {
-            var c = list[i]
-            if (c && c.address) map[c.address] = { at: c.at, size: c.size }
-          }
+          root.liveClients = Array.isArray(list) ? list : []
         } catch (e) {}
-        root.liveGeometry = map
       }
     }
   }
@@ -227,21 +220,17 @@ BarWidget {
   }
 
   // ------------------------------------------- window list helpers
-  // Returns the list of HyprlandToplevel objects for a given workspace id,
-  // excluding special workspaces and unmapped/hidden windows.
+  // Return live Hyprland client objects for this workspace. This avoids
+  // depending on a possibly incomplete HyprlandToplevel.lastIpcObject cache.
   function windowsForWorkspace(wsId) {
-    var all = (Hyprland.toplevels && Hyprland.toplevels.values) || []
     var result = []
-    for (var i = 0; i < all.length; i++) {
-      var t = all[i]
-      if (!t) continue
-      var ws = t.workspace
-      if (!ws || ws.id !== wsId) continue
-      // Exclude special workspaces (id < 0) — already filtered by wsId > 0
-      var geo = t.lastIpcObject
-      if (!geo || !geo.at || !geo.size) continue
-      if (geo.hidden) continue
-      result.push(t)
+    var clients = root.liveClients || []
+    for (var i = 0; i < clients.length; i++) {
+      var client = clients[i]
+      if (!client || !client.workspace || client.workspace.id !== wsId) continue
+      if (client.hidden || client.mapped === false) continue
+      if (!client.at || !client.size || client.size[0] <= 0 || client.size[1] <= 0) continue
+      result.push(client)
     }
     return result
   }
@@ -333,24 +322,15 @@ BarWidget {
             // .values triggers a binding update on the Repeater model.
             Repeater {
               model: {
-                // Touch .values to register a dependency so QML re-evaluates
-                // when any window is added, moved, or removed.
-                var _ = (wsItem.workspace && wsItem.workspace.toplevels)
-                  ? wsItem.workspace.toplevels.values : []
                 return root.windowsForWorkspace(wsItem.modelData)
               }
 
               Rectangle {
-                required property var modelData  // HyprlandToplevel
+                required property var modelData  // hyprctl client object
 
-                readonly property var geo: modelData ? modelData.lastIpcObject : null
-                // Prefer the freshly polled position/size (see root.liveGeometry
-                // above) over the cached one — falls back to the cached values
-                // for anything the live poll hasn't seen yet (e.g. right at
-                // startup, before the first poll lands).
-                readonly property var live: (geo && geo.address && root.liveGeometry[geo.address]) || null
-                readonly property var at: live ? live.at : (geo ? geo.at : null)
-                readonly property var sz: live ? live.size : (geo ? geo.size : null)
+                readonly property var geo: modelData
+                readonly property var at: geo ? geo.at : null
+                readonly property var sz: geo ? geo.size : null
                 readonly property bool valid: at && sz && sz[0] > 0 && sz[1] > 0
 
                 visible: valid

@@ -109,6 +109,20 @@ if [[ -n $REAL_OMARCHY ]]; then
 else
   echo "skip - 'omarchy plugin validate' (no omarchy on PATH)"
 fi
+# Every entryPoints target must exist on disk, exactly once. Omarchy's shell resolves these
+# paths, not install.sh, so a typo or a stale duplicate passes the whole suite and only
+# fails on the user's screen.
+for d in "$REPO"/plugins/*/; do
+  id="$(basename "$d")"
+  [[ -f $d/manifest.json ]] || continue
+  while IFS= read -r rel; do
+    [[ -n $rel ]] || continue
+    [[ -f $d/$rel ]] || bad "$id: entryPoints target missing on disk: $rel"
+    stem="${rel##*/}"
+    n=$(find "$d" -name "$stem" -type f | wc -l)
+    [[ $n == 1 ]] || bad "$id: $stem exists in $n copies (entryPoint is $rel) - stale duplicate"
+  done < <(jq -r '.entryPoints // {} | to_entries[].value' "$d/manifest.json")
+done; ok "every entryPoints target exists exactly once on disk"
 grep -q 'require("hypr.orbital")' "$HOME/.config/hypr/hyprland.lua" && [[ -f $HOME/.config/hypr/orbital.lua ]] || bad "hyprland hook"; ok "hyprland hook"
 "$REPO/install.sh" --no-restart >/dev/null
 [[ $(grep -c 'require("hypr.orbital")' "$HOME/.config/hypr/hyprland.lua") == 1 ]] || bad "hook not idempotent"; ok "idempotent hook"
