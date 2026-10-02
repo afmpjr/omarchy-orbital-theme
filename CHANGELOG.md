@@ -6,6 +6,9 @@ All notable changes to the Orbital theme. The theme is still **pre-release**; v0
 
 - `install.sh --windows-keys` adds an opt-in set of Windows-style shortcuts (`hypr/orbital-keys-windows.lua`); never part of `--full`,
   skipped when your config already has them, removed by `--uninstall`.
+- The account panel resolves themed system icons from XDG icon directories, including symbolic variants, with a visible fallback when an icon name is missing.
+- `orbital.workspaces` previews each open window in its on-screen position, labels it with the application icon, shows app names on hover, and tracks live resizes.
+- `orbital.ui` adds `OrbitalIcon`, a reusable icon component tinted with the selected accent colour, with an option to preserve the source colours.
 
 ## v0.1.0 — 2026-09-26
 
@@ -76,8 +79,8 @@ First tagged version (pre-release): everything below.
   confirmation) and `orbital.crash` with the shared `orbital.ui` contract (themed crash modal).
 - Theme-level font base size 10 and configurable text size; Alt+Shift layout switching that works in either order; a
   keybind audit that frees Ctrl+Enter in Ghostty.
-- `CREDITS.md` itemizes the provenance of the six wallpapers; `docs/NOTICE.md` covers attribution and the limits of a
-  pre-release.
+- `CREDITS.md` itemizes the provenance of the wallpaper that ships (one, `backgrounds/01-orbital-astronaut.png`);
+  `docs/NOTICE.md` covers attribution and the limits of a pre-release.
 
 ### Tests
 

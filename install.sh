@@ -396,7 +396,13 @@ checks() {
   for d in "$REPO"/plugins/*/; do
     id="$(basename "$d")"
     if [[ $id == orbital.ui ]]; then
-      [[ -f $d/OrbitalTokens.qml && -f $d/OrbitalI18n.qml && -f $d/I18n.js ]] || problem "the package is incomplete: plugins/$id/OrbitalTokens.qml, OrbitalI18n.qml or I18n.js is missing"
+      # OrbitalIcons is registered as a singleton in qmldir, so a missing file or a
+      # missing qmldir line ships a package that installs cleanly and then fails to
+      # load in the shell. Check both here rather than at runtime.
+      for f in OrbitalTokens.qml OrbitalI18n.qml OrbitalIcons.qml I18n.js qmldir; do
+        [[ -f $d/$f ]] || problem "the package is incomplete: plugins/$id/$f is missing"
+      done
+      grep -q '^singleton OrbitalIcons ' "$d/qmldir" || problem "plugins/$id/qmldir does not register OrbitalIcons as a singleton"
     elif [[ ! -f $d/manifest.json ]]; then
       problem "the package is incomplete: plugins/$id/manifest.json is missing"
     fi
