@@ -18,6 +18,7 @@ white, gray and black, or any hex).
 | [`orbital.appearance`](plugins/orbital.appearance/) | Color picker window (+ `orbital-accent.py`) | `install.sh` |
 | [`orbital.worldclock`](plugins/orbital.worldclock/) | World clock, alarms, timer | `install.sh` |
 | [`orbital.crash`](plugins/orbital.crash/) | "Process crashed" toast -> themed modal -> *Diagnose with AI* | `install.sh` |
+| [`orbital.lockscreen`](plugins/orbital.lockscreen/) | Lock screen designs with a picker to preview and switch between them. Fork of `SirJul1337/omarchy-lock-explorer` | `install.sh` |
 | [`orbital.keyboard`](plugins/orbital.keyboard/) | Tray widget: flag of the active layout (only with 2+ layouts); click for a dropdown to switch. Alt+Shift also cycles, with `--full` | `install.sh --bar-widgets` |
 | [`orbital.floating-bar`](plugins/orbital.floating-bar/) | The bar: Omarchy's bar floating off the edge, rounded corners. Fork of `charlieras262/floating-bar` | `install.sh` (default bar) |
 | [`orbital.bar`](plugins/orbital.bar/) | Alternative bar with dock, workspace pills and system controls built in | `install.sh` (pick with `omarchy plugin enable orbital.bar`) |

@@ -9,6 +9,14 @@ All notable changes to the Orbital theme. The theme is still **pre-release**; v0
 - The account panel resolves themed system icons from XDG icon directories, including symbolic variants, with a visible fallback when an icon name is missing.
 - `orbital.workspaces` previews each open window in its on-screen position, labels it with the application icon, shows app names on hover, and tracks live resizes.
 - `orbital.ui` adds `OrbitalIcon`, a reusable icon component tinted with the selected accent colour, with an option to preserve the source colours.
+- `orbital.workspaces` reads window geometry and workspace membership from a live `hyprctl clients -j` poll instead of
+  Hyprland's toplevel cache, which goes stale on resize because Hyprland emits no resize event for it.
+- `install.sh` now asserts that every plugin's `entryPoints` target exists exactly once on disk. Omarchy's shell resolves
+  those paths, not the installer, so a wrong path or a stale duplicate copy previously passed the whole test suite and
+  only failed on screen.
+- `orbital.lockscreen` is now bundled: a fork of `SirJul1337/omarchy-lock-explorer` (MIT), previously installed by hand
+  and unknown to the installer, which therefore neither copied nor removed it. Orbital's changes are the plugin id/name
+  and showing the real display name on the lock screen. See `docs/NOTICE.md`.
 
 ## v0.1.0 — 2026-09-26
 

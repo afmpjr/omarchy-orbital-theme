@@ -91,7 +91,7 @@ grep -q 'kb_layout = "br,us"' "$KB" && grep -q 'Shift_L", next_layout, { release
 [[ $(grep -c 'hypr.orbital-keyboard' "$HOME/.config/hypr/hyprland.lua") == 1 ]] || bad "keyboard hook twice"
 "$REPO/install.sh" --full --no-restart --keyboard-layouts br,us >/dev/null
 [[ $(grep -c 'hypr.orbital-keyboard' "$HOME/.config/hypr/hyprland.lua") == 1 ]] || bad "keyboard hook not idempotent"; ok "keyboard hook idempotent"
-for id in orbital.launcher orbital.dock orbital.account orbital.appearance orbital.worldclock orbital.crash orbital.ui orbital.clock orbital.workspaces orbital.divider orbital.floating-bar orbital.bar; do
+for id in orbital.launcher orbital.dock orbital.account orbital.appearance orbital.worldclock orbital.crash orbital.ui orbital.clock orbital.workspaces orbital.divider orbital.floating-bar orbital.bar orbital.lockscreen; do
   [[ -d $HOME/.config/omarchy/plugins/$id ]] || bad "plugin $id missing"
 done; ok "plugins installed (both bars present, only .bar.id is ever loaded)"
 # The schema is Omarchy's, not ours: ask the real CLI, so a manifest that this Omarchy would
@@ -123,6 +123,16 @@ for d in "$REPO"/plugins/*/; do
     [[ $n == 1 ]] || bad "$id: $stem exists in $n copies (entryPoint is $rel) - stale duplicate"
   done < <(jq -r '.entryPoints // {} | to_entries[].value' "$d/manifest.json")
 done; ok "every entryPoints target exists exactly once on disk"
+# Every bundled third-party fork must keep its upstream license text in the plugin folder, and be named in
+# docs/NOTICE.md. Adding a fork without attribution is the failure mode this guards.
+for id in orbital.dock orbital.floating-bar orbital.keyboard orbital.lockscreen; do
+  ls "$REPO/plugins/$id"/LICENSE* >/dev/null 2>&1 || bad "$id is a bundled fork but ships no upstream LICENSE text"
+  grep -q "$id" "$REPO/docs/NOTICE.md" || bad "$id is a bundled fork but is not attributed in docs/NOTICE.md"
+done; ok "every bundled fork keeps its upstream LICENSE and is attributed in NOTICE.md"
+# A bundled plugin must not carry the fork repo's own git metadata.
+for d in "$REPO"/plugins/*/; do
+  [[ -e $d/.git ]] && bad "$(basename "$d") ships a nested .git directory"
+done; ok "no bundled plugin carries a nested .git directory"
 grep -q 'require("hypr.orbital")' "$HOME/.config/hypr/hyprland.lua" && [[ -f $HOME/.config/hypr/orbital.lua ]] || bad "hyprland hook"; ok "hyprland hook"
 "$REPO/install.sh" --no-restart >/dev/null
 [[ $(grep -c 'require("hypr.orbital")' "$HOME/.config/hypr/hyprland.lua") == 1 ]] || bad "hook not idempotent"; ok "idempotent hook"
