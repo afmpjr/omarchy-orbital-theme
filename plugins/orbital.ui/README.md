@@ -10,6 +10,15 @@ import "../orbital.ui" as OrbitalUi   // then OrbitalUi.OrbitalDialog {}
   three tones `neutral | primary | danger`. Ask `tk.tone(name, hovered)` for `{ text, fill, border }`.
 - `OrbitalDialog.qml` — modal dialog. Callers describe content (`title`, `glyph`, `tone`, `message`, `rows`, `buttons`)
   and react to `activated(id)` / `dismissed()`; they never style anything. Full property list in the file header.
+- `OrbitalIcons.qml` — singleton icon index over the XDG icon dirs. The theme's own set in `icons/` (freedesktop
+  names, shipped here) is scanned first and outscores everything, so Orbital glyphs always win over Adwaita's;
+  system sets stay as fallback, then `image-missing`.
+- `OrbitalIcon.qml` — `Image` + `MultiEffect` colorization to `Color.accent` (pass `preserveColors: true` to keep the
+  asset's own colors, e.g. legacy colored PNGs).
+- `icons/` — the Orbital glyph set. Contract: 24×24 `viewBox`, white (`#FFFFFF`) strokes/fills, 2px stroke, round
+  caps/joins. White because both render paths assume a light glyph: plain `Image` shows it as-is on dark surfaces,
+  and `OrbitalIcon` colorizes its luminance to the accent. Never ship a dark (`#2e3436`-style) glyph here — it would
+  be near-invisible untinted. `test-install.sh` asserts every required name exists exactly once on this contract.
 
 Rules: no hardcoded palette outside `OrbitalTokens` tones; no colors or radii in consumers; the dialog never closes
 itself or runs commands.

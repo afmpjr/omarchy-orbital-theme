@@ -11,13 +11,15 @@ pragma Singleton
 // scan).
 //
 // This is that scan, once, for every plugin that needs a themed system icon.
-// Two deliberate differences from the launcher/dock copies:
+// Three deliberate differences from the launcher/dock copies:
 //
 //   - it indexes the whole tree, not only */apps/* and */devices/*. The panel
 //     icons live in symbolic/actions, symbolic/status and symbolic/legacy,
 //     which the narrower scan never matched.
-//   - the theme's own directories come first, so a name the active theme ships
-//     wins over a copy left behind in AdwaitaLegacy.
+//   - the theme's own icon set (plugins/orbital.ui/icons/, shipped with the
+//     repo) is scanned first AND outscores everything, so an Orbital glyph
+//     always wins over the same freedesktop name in Adwaita/AdwaitaLegacy.
+//     The system sets stay as fallback for names the theme does not ship.
 //
 // Usage:
 //   import "../orbital.ui" as OrbitalUi
@@ -45,11 +47,13 @@ Item {
 
   readonly property bool ready: Object.keys(index).length > 0
 
-  // Directories in resolution order. The active theme first (from the icon
-  // theme's own setting), then the XDG data dirs, then the legacy set that still
-  // holds names the current themes dropped.
+  // Directories in resolution order. The theme's own icon set first (shipped
+  // with the repo, installed under the plugin dir), then the active theme,
+  // then the XDG data dirs, then the legacy set that still holds names the
+  // current themes dropped.
   readonly property var searchDirs: {
     var dirs = []
+    dirs.push(Quickshell.env("HOME") + "/.config/omarchy/plugins/orbital.ui/icons")
     var theme = Quickshell.env("QT_QPA_PLATFORMTHEME") || ""
     dirs.push(Quickshell.env("HOME") + "/.icons")
     dirs.push(Quickshell.env("HOME") + "/.local/share/icons")
@@ -82,9 +86,12 @@ Item {
   // AdwaitaLegacy's raster copies (they sort before the modern set) and the panel
   // ends up with blurry, unrelated-looking glyphs instead of the symbolic icons
   // every other Omarchy surface uses. Symbolic vector wins outright, then plain
-  // vector, then the largest raster.
+  // vector, then the largest raster. Above all of that, unconditionally: a glyph
+  // from the theme's own set. The bonus (not dir order) is what guarantees the
+  // win — find(1) order is never relied on for correctness.
   function score(path) {
     var s = 0
+    if (path.indexOf("/orbital.ui/icons/") !== -1) return 2000
     if (/-symbolic\.svg$/i.test(path)) return 1000
     if (/\.svg$/i.test(path)) s += 500
     var m = path.match(/\/(\d+)x\d+\//)

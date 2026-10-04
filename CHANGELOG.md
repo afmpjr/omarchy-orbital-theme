@@ -4,6 +4,25 @@ All notable changes to the Orbital theme. The theme is still **pre-release**; v0
 
 ## Unreleased
 
+- `orbital.bar` loads again: `Bar.qml` used `DockItem`/`DockModel` from `widgets/`, which only `widgets/qmldir`
+  declares, so the bar died with "DockItem is not a type" and the shell silently fell back to `omarchy.bar`.
+  `Bar.qml` now imports its own `widgets/` directory. The same failure also exposed a QML syntax error that made
+  the type unresolvable in the first place: `widgets/DockItem.qml` used bare `if`/`else` blocks as `Menu` children
+  for the conditional entries ("Fechar todas as janelas", "Desfixar"/"Fixar no dock") — replaced with `visible`
+  bindings, same behaviour. Verified live: `bar use orbital.bar` renders with dock pins, no fallback warning.
+- `orbital-accent.py` no longer crashes on the `preview-web/` tree: the installed theme deliberately excludes it
+  but the pristine baseline contains it, so every picker click died with `FileNotFoundError` after writing
+  `colors.toml` but before `theme refresh` — the selector silently did nothing. The tree is now skipped (like the
+  installer does) and destination dirs are created defensively; the test suite asserts the apply exit code.
+  The refresh also silently pushed nothing: the shell spawns the script without a login env, so `OMARCHY_PATH`
+  was unset and every `shell_ipc ... || true` failed hidden (files updated, bar unchanged). The script now exports
+  the same `/usr/share/omarchy` fallback the QML side uses — pink→blue round-trip verified live on the bar chip,
+  no shell restart needed.
+- The theme ships its own icon set (`plugins/orbital.ui/icons/`, 9 white 24×24 SVG glyphs): the account panel, its
+  settings gear and chevrons, and the dock's generic-app placeholder no longer depend on Adwaita's dark symbolic
+  assets, which rendered washed-out on Orbital's dark surfaces. The scanner gives the theme set absolute priority;
+  system icons stay as fallback. Also fixes a latent crash: `OrbitalIcon` called `OrbitalIcons.pick()`, which never
+  existed — it now uses `file()`.
 - `install.sh --windows-keys` adds an opt-in set of Windows-style shortcuts (`hypr/orbital-keys-windows.lua`); never part of `--full`,
   skipped when your config already has them, removed by `--uninstall`.
 - The account panel resolves themed system icons from XDG icon directories, including symbolic variants, with a visible fallback when an icon name is missing.

@@ -64,9 +64,15 @@ def apply(name, p):
         sys.exit("orbital-accent: theme not installed at %s (install it as 'orbital')." % THEME)
     for root, _, files in os.walk(BASE):
         rel = os.path.relpath(root, BASE)
+        if rel == "preview-web" or rel.startswith("preview-web" + os.sep):
+            continue  # install.sh deliberately excludes preview-web from the
+            # installed theme copy; regenerating it here used to crash the
+            # whole apply (FileNotFoundError) AFTER colors.toml was written
+            # but BEFORE `theme refresh` ran — the picker silently did nothing.
         for f in files:
             src = os.path.join(root, f)
             dst = os.path.join(THEME, rel, f)
+            os.makedirs(os.path.dirname(dst), exist_ok=True)
             try: t = open(src).read()
             except UnicodeDecodeError:  # binary (images): copy as is
                 shutil.copyfile(src, dst); continue
@@ -77,7 +83,13 @@ def apply(name, p):
     # the theme), which reads this value; also applied live below.
     border = "rgba(%02x%02x%02x44)" % rot(0x7C, 0xC8, 0xFF, p)
     json.dump({"name": name, "border": border}, open(STATE, "w"))
-    env = dict(os.environ, OMARCHY_THEME_SKIP_BACKGROUND="1")
+    # OMARCHY_PATH must be explicit: the shell spawns this script with
+    # `bash -c` (no login env), and without it every `shell_ipc ... || true`
+    # inside `omarchy theme refresh` fails silently — files and STATE updated,
+    # screen (bar included) unchanged, exit code still 0. Same fallback the
+    # QML side uses when the variable is absent.
+    env = dict(os.environ, OMARCHY_THEME_SKIP_BACKGROUND="1",
+               OMARCHY_PATH=os.environ.get("OMARCHY_PATH", "/usr/share/omarchy"))
     subprocess.run(["omarchy", "theme", "refresh"], env=env)
     subprocess.run(["hyprctl", "eval", 'hl.config({ general = { col = { active_border = "%s" } } })' % border],
                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)

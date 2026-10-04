@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <!-- Orbital gear: ring + hub + 8 rim teeth. Teeth are explicit rects (not a
+       circle with rays) so the glyph never reads as a sun at 16-18px. -->
+  <circle cx="12" cy="12" r="6" />
+  <circle cx="12" cy="12" r="2.2" />
+  <g>
+    <rect x="10.9" y="2.6" width="2.2" height="3.4" rx="1" />
+    <rect x="10.9" y="2.6" width="2.2" height="3.4" rx="1" transform="rotate(45 12 12)" />
+    <rect x="10.9" y="2.6" width="2.2" height="3.4" rx="1" transform="rotate(90 12 12)" />
+    <rect x="10.9" y="2.6" width="2.2" height="3.4" rx="1" transform="rotate(135 12 12)" />
+    <rect x="10.9" y="2.6" width="2.2" height="3.4" rx="1" transform="rotate(180 12 12)" />
+    <rect x="10.9" y="2.6" width="2.2" height="3.4" rx="1" transform="rotate(225 12 12)" />
+    <rect x="10.9" y="2.6" width="2.2" height="3.4" rx="1" transform="rotate(270 12 12)" />
+    <rect x="10.9" y="2.6" width="2.2" height="3.4" rx="1" transform="rotate(315 12 12)" />
+  </g>
+</svg>

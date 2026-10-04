@@ -4,6 +4,11 @@ import QtQuick
 import QtQuick.Controls
 import qs.Commons
 import qs.Ui
+// Types owned by this plugin (DockItem, DockModel, ...) live in widgets/ and
+// are declared in widgets/qmldir. Bar.qml sits at the plugin root, which does
+// not see them unqualified: without this import the bar fails to load with
+// "DockItem is not a type" and the shell falls back to omarchy.bar.
+import "widgets/" as Widgets
 
 PanelWindow {
     id: root
@@ -182,7 +187,7 @@ PanelWindow {
                             Item {
                                 id: dockSectionRoot
                                 property var bar: root
-                                property var dockModel: DockModel
+                                property var dockModel: Widgets.DockModel
 
                                 width: implicitWidth
                                 height: 44
@@ -190,7 +195,7 @@ PanelWindow {
                                 Repeater {
                                     id: dockRepeater
                                     model: dockSectionRoot.dockModel.items
-                                    delegate: DockItem {
+                                    delegate: Widgets.DockItem {
                                         required property var modelData
                                         bar: dockSectionRoot.bar
                                         dockModel: dockSectionRoot.dockModel

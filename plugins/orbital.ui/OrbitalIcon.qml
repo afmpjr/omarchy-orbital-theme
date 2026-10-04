@@ -42,7 +42,9 @@ Item {
 
   // Prefer a real path from the icon index over the themed name, and fall back to
   // the colored legacy raster only if no SVG exists for the name at all.
-  readonly property string _resolved: OrbitalIcons.pick(name, preserveColors)
+  // (Was OrbitalIcons.pick(name, preserveColors): pick() never existed on the
+  // singleton, so instantiating this component threw. file() is the real API.)
+  readonly property string _resolved: OrbitalIcons.file(name)
 
   Image {
     id: base

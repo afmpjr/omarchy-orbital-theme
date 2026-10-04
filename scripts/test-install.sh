@@ -123,6 +123,17 @@ for d in "$REPO"/plugins/*/; do
     [[ $n == 1 ]] || bad "$id: $stem exists in $n copies (entryPoint is $rel) - stale duplicate"
   done < <(jq -r '.entryPoints // {} | to_entries[].value' "$d/manifest.json")
 done; ok "every entryPoints target exists exactly once on disk"
+# The theme ships its own icon set (plugins/orbital.ui/icons/): the scanner gives
+# it absolute priority, so a missing or malformed file silently changes what the
+# user sees. Every name the account panel and the dock fallback ask for must exist
+# here as a well-formed 24x24 SVG -- exactly once, like entryPoints above.
+for name in emblem-system-symbolic preferences-desktop-appearance-symbolic preferences-desktop-keyboard-shortcuts-symbolic pan-end-symbolic system-lock-screen-symbolic media-playback-pause-symbolic system-reboot-symbolic system-shutdown-symbolic application-x-executable-symbolic; do
+  f="$REPO/plugins/orbital.ui/icons/$name.svg"
+  [[ -f $f ]] || bad "theme icon missing: icons/$name.svg"
+  [[ $(find "$REPO/plugins/orbital.ui/icons" -name "$name.svg" -type f | wc -l) == 1 ]] || bad "theme icon $name.svg exists more than once"
+  head -c 4 "$f" | grep -q '<svg' || bad "theme icon $name.svg is not an SVG"
+  grep -q 'viewBox="0 0 24 24"' "$f" || bad "theme icon $name.svg is not on the 24x24 contract"
+done; ok "theme icon set complete (9 names) and on the 24x24 contract"
 # Every bundled third-party fork must keep its upstream license text in the plugin folder, and be named in
 # docs/NOTICE.md. Adding a fork without attribution is the failure mode this guards.
 for id in orbital.dock orbital.floating-bar orbital.keyboard orbital.lockscreen; do
@@ -162,10 +173,10 @@ grep -q '^accent = "#39A9FF"' "$HOME/.local/state/omarchy/orbital-accent-base/co
 
 ACC="$HOME/.config/omarchy/plugins/orbital.appearance/orbital-accent.py"
 T_DIR="$HOME/.config/omarchy/themes/orbital"
-python3 "$ACC" purple; grep -q '^accent = "#9539FF"' "$T_DIR/colors.toml" || bad "purple accent"
+python3 "$ACC" purple || bad "purple apply crashed (exit code hid by the grep below before)"; grep -q '^accent = "#9539FF"' "$T_DIR/colors.toml" || bad "purple accent"
 [[ $(grep -m1 '^background' "$T_DIR/shell.toml") != *0A1422* ]] || bad "glass not recolored"; ok "purple recolors accent and glass"
 grep -q '"border": "rgba(' "$HOME/.local/state/omarchy/orbital-accent.json" || bad "border state"; ok "border color state written"
-python3 "$ACC" blue
+python3 "$ACC" blue || bad "blue apply crashed"
 diff -r -q "$HOME/.local/state/omarchy/orbital-accent-base" "$T_DIR" 2>&1 | grep -v "^Only in" && bad "blue not identical" || ok "blue regenerates identical"
 
 rm -rf "$HOME/.local/state/omarchy/orbital-accent-base"

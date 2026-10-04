@@ -124,36 +124,34 @@ Item {
             onTriggered: dockModel.launchApp(modelData.appId)
         }
 
-        if (modelData.running) {
-            MenuItem {
-                text: "Fechar todas as janelas"
-                onTriggered: {
-                    if (Hyprland && Hyprland.toplevels) {
-                        var toplevels = Hyprland.toplevels
-                        for (var i = 0; i < toplevels.length; i++) {
-                            var t = toplevels[i]
-                            if ((t.appId || t.class || "").toLowerCase() === modelData.appId.toLowerCase()) {
-                                Hyprland.message("dispatch closewindow address:" + t.address)
-                            }
+        MenuItem {
+            visible: modelData.running
+            text: "Fechar todas as janelas"
+            onTriggered: {
+                if (Hyprland && Hyprland.toplevels) {
+                    var toplevels = Hyprland.toplevels
+                    for (var i = 0; i < toplevels.length; i++) {
+                        var t = toplevels[i]
+                        if ((t.appId || t.class || "").toLowerCase() === modelData.appId.toLowerCase()) {
+                            Hyprland.message("dispatch closewindow address:" + t.address)
                         }
                     }
                 }
             }
         }
 
-        if (modelData.pinned) {
-            MenuItem {
-                text: "Desfixar"
-                onTriggered: {
-                    var idx = root.dockModel._pinnedApps.findIndex(function(p) { return p.appId === modelData.appId })
-                    if (idx >= 0) root.dockModel.unpinApp(idx)
-                }
+        MenuItem {
+            visible: modelData.pinned
+            text: "Desfixar"
+            onTriggered: {
+                var idx = root.dockModel._pinnedApps.findIndex(function(p) { return p.appId === modelData.appId })
+                if (idx >= 0) root.dockModel.unpinApp(idx)
             }
-        } else {
-            MenuItem {
-                text: "Fixar no dock"
-                onTriggered: root.dockModel.pinApp(modelData.appId)
-            }
+        }
+        MenuItem {
+            visible: !modelData.pinned
+            text: "Fixar no dock"
+            onTriggered: root.dockModel.pinApp(modelData.appId)
         }
     }
 
