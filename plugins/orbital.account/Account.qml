@@ -94,6 +94,34 @@ Item {
     Util.execDetached(command)
   }
 
+  // Global widget lock (row below; enforced by the floating bar). Missing file
+  // (or anything but "0") reads as locked — the safe default, watched live so
+  // no restart is needed. Callable headlessly too (omarchy-shell shell call
+  // orbital.account toggleWidgetsLock); the testbed VM has no working mouse.
+  // Locked until the file answers (safe default; missing file reads locked).
+  property bool widgetsLocked: true
+  FileView {
+    id: widgetsLockFile
+    path: Quickshell.env("HOME") + "/.local/state/omarchy/orbital-widgets-lock"
+    printErrors: false
+    onLoaded: root.widgetsLocked = text().trim() !== "0"
+    onLoadFailed: root.widgetsLocked = true
+  }
+
+  function toggleWidgetsLock() {
+    Util.execDetached(Quickshell.env("HOME") + "/.config/omarchy/plugins/orbital.account/orbital-widgets-lock --toggle")
+    // The file may not have existed when this panel loaded (FileView cannot
+    // watch a path that is not there yet), so re-read after the script lands.
+    widgetsLockRefresh.restart()
+  }
+
+  Timer {
+    id: widgetsLockRefresh
+    interval: 600
+    repeat: false
+    onTriggered: widgetsLockFile.reload()
+  }
+
   // Only try the picture when the file exists (a missing one logs a warning per open).
   FileView {
     id: avatarFile
@@ -359,6 +387,13 @@ Item {
           label: tr("Keyboard Shortcuts")
           iconName: "preferences-desktop-keyboard-shortcuts-symbolic"
           onActivated: root.run("omarchy-menu-keybindings")
+        }
+
+        LinkRow {
+          label: root.widgetsLocked ? tr("Unlock widgets") : tr("Lock widgets")
+          iconName: "widget-lock-symbolic"
+          showChevron: false
+          onActivated: root.toggleWidgetsLock()
         }
 
         Item {

@@ -4,6 +4,12 @@ All notable changes to the Orbital theme. The theme is still **pre-release**; v0
 
 ## Unreleased
 
+- Bars start **locked** against accidental widget rearranging (the floating bar moves any widget past a 4px
+  drag with no undo): the account panel has a "Lock/Unlock widgets" row backed by the `orbital-widgets-lock`
+  companion script and `~/.local/state/omarchy/orbital-widgets-lock` state (missing = locked). The lock only
+  gates widget rearranging — clicks and workspace chip drag-to-swap keep working, because a press that starts
+  on a chip is yielded to the widget (new `claimsPress` hook) instead of grabbed by the bar. Installer creates
+  the locked state, uninstall removes it, suite asserts both plus rollback.
 - `orbital.workspaces` chips are draggable: drop one chip onto another to **swap the two workspaces' windows**,
   with the dragged chip's own pixels as the ghost and the accent border on the drop target (releasing elsewhere
   cancels; clicks still switch workspaces). The move sequence lives in the companion script

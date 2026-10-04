@@ -79,6 +79,7 @@ grep -q "orbital-bindings" "$HOME/.config/hypr/hyprland.lua" || bad "bindings ho
 grep -q "orbital-gestures" "$HOME/.config/hypr/hyprland.lua" && grep -q "hl.gesture" "$HOME/.config/hypr/orbital-gestures.lua" || bad "gesture hook"; ok "4-finger swipe hooked"
 [[ $(grep -c 'orbital-gestures' "$HOME/.config/hypr/hyprland.lua") == 1 ]] || bad "gesture require duplicated"
 jq -e '.pinned | map(.entry) | index("com.mitchellh.ghostty")' "$HOME/.local/state/omarchy/orbital-dock.json" >/dev/null || bad "dock pins"; ok "default dock pins from installed apps"
+[[ $(cat "$HOME/.local/state/omarchy/orbital-widgets-lock" 2>/dev/null) == 1 ]] || bad "widget lock not created locked"; ok "bars start locked"
 "$REPO/install.sh" --full --no-restart >/dev/null
 [[ $(jq -c '.bar.layout.right | map(.id) | map(select(. == "orbital.clock")) | length' "$SJ") == 1 ]] || bad "full not idempotent"; ok "full is idempotent"
 [[ $(grep -c 'ctrl+enter=unbind' "$GC") == 1 ]] || bad "ghostty block duplicated"; ok "Ghostty fix idempotent"
@@ -130,18 +131,21 @@ sw="$REPO/plugins/orbital.workspaces/orbital-workspace-swap"
 [[ -x $sw ]] || bad "orbital-workspace-swap missing or not executable"
 python3 -m py_compile "$sw" 2>/dev/null || bad "orbital-workspace-swap does not parse"
 grep -q "hl.dsp.window.move" "$sw" || bad "orbital-workspace-swap lost its Hyprland 0.56 move call"
+wl="$REPO/plugins/orbital.account/orbital-widgets-lock"
+[[ -x $wl ]] || bad "orbital-widgets-lock missing or not executable"
+bash -n "$wl" || bad "orbital-widgets-lock does not parse"
 ok "plugin companion scripts ship executable and parse"
 # The theme ships its own icon set (plugins/orbital.ui/icons/): the scanner gives
 # it absolute priority, so a missing or malformed file silently changes what the
 # user sees. Every name the account panel and the dock fallback ask for must exist
 # here as a well-formed 24x24 SVG -- exactly once, like entryPoints above.
-for name in emblem-system-symbolic preferences-desktop-appearance-symbolic preferences-desktop-keyboard-shortcuts-symbolic pan-end-symbolic system-lock-screen-symbolic media-playback-pause-symbolic system-reboot-symbolic system-shutdown-symbolic application-x-executable-symbolic; do
+for name in emblem-system-symbolic preferences-desktop-appearance-symbolic preferences-desktop-keyboard-shortcuts-symbolic pan-end-symbolic system-lock-screen-symbolic media-playback-pause-symbolic system-reboot-symbolic system-shutdown-symbolic application-x-executable-symbolic widget-lock-symbolic; do
   f="$REPO/plugins/orbital.ui/icons/$name.svg"
   [[ -f $f ]] || bad "theme icon missing: icons/$name.svg"
   [[ $(find "$REPO/plugins/orbital.ui/icons" -name "$name.svg" -type f | wc -l) == 1 ]] || bad "theme icon $name.svg exists more than once"
   head -c 4 "$f" | grep -q '<svg' || bad "theme icon $name.svg is not an SVG"
   grep -q 'viewBox="0 0 24 24"' "$f" || bad "theme icon $name.svg is not on the 24x24 contract"
-done; ok "theme icon set complete (9 names) and on the 24x24 contract"
+done; ok "theme icon set complete (10 names) and on the 24x24 contract"
 # Every bundled third-party fork must keep its upstream license text in the plugin folder, and be named in
 # docs/NOTICE.md. Adding a fork without attribution is the failure mode this guards.
 for id in orbital.dock orbital.floating-bar orbital.keyboard orbital.lockscreen; do
@@ -231,6 +235,7 @@ rollback_case() { # label fail-at-point
   [[ ! -f $HOME/.config/systemd/user/omarchy-crash-watch.service.d/orbital.conf ]] || bad "$label: the crash drop-in was left behind"
   [[ ! -d $HOME/.local/state/omarchy/orbital-accent-base ]] || bad "$label: the accent baseline was left behind"
   [[ ! -f $HOME/.local/state/omarchy/orbital-dock.json ]] || bad "$label: dock pins were left behind"
+  [[ ! -f $HOME/.local/state/omarchy/orbital-widgets-lock ]] || bad "$label: the widget lock was left behind"
   export HOME="$SAVED_HOME"
 }
 rollback_case validate validate

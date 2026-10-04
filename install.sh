@@ -718,9 +718,24 @@ windows_keys_setup() {
   fi
 }
 
+# Widget lock: bars start locked so widgets cannot be rearranged by accident;
+# the account panel row toggles it. Only created when missing (never overwrite
+# a user's choice). Rollback-safe through ensure_dir's snapshot, and uninstall
+# removes the file so a fresh install starts locked again.
+widgets_lock_setup() {
+  local lock="$HOME/.local/state/omarchy/orbital-widgets-lock"
+  [[ -f $lock ]] && return 0
+  say "Widget lock: bars start locked (unlock in the account panel to rearrange)"
+  (( DRY )) && return 0
+  ensure_dir "$(dirname "$lock")" || { problem "could not create $(dirname "$lock")"; return 1; }
+  snapshot "$lock"
+  echo 1 > "$lock" || { problem "could not write the widget lock to $lock"; return 1; }
+}
+
 apply_extras() {
   if (( FULL )); then full_setup || return 1; elif (( TERM_FIX )); then terminal_shortcuts || return 1; fi
   windows_keys_setup || return 1
+  widgets_lock_setup || return 1
   (( DRY )) || hyprctl reload >/dev/null 2>&1 || warn "'hyprctl reload' did not answer; the new glass/borders load on the next Hyprland reload"
 }
 

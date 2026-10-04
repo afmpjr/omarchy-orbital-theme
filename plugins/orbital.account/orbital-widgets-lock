@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+# orbital-widgets-lock — global lock against accidental bar widget rearranges.
+#   orbital-widgets-lock            print locked|unlocked
+#   orbital-widgets-lock --toggle | --lock | --unlock
+#
+# State file: ~/.local/state/omarchy/orbital-widgets-lock, containing "0" when
+# unlocked. A missing file (or anything but "0") means LOCKED — the safe
+# default, so fresh installs need no setup and uninstalls need no cleanup.
+# The floating bar watches the file live; no shell restart needed.
+# The lock only gates widget rearranging. Chip drag-to-swap keeps working.
+set -uo pipefail
+FILE="$HOME/.local/state/omarchy/orbital-widgets-lock"
+state() { [[ -f $FILE && $(cat "$FILE" 2>/dev/null) == "0" ]] && echo unlocked || echo locked; }
+case "${1:-}" in
+  ""|-h|--help) state ;;
+  --toggle) mkdir -p "$(dirname "$FILE")"; if [[ $(state) == locked ]]; then echo 0 > "$FILE"; else echo 1 > "$FILE"; fi; state ;;
+  --lock) mkdir -p "$(dirname "$FILE")"; echo 1 > "$FILE"; state ;;
+  --unlock) mkdir -p "$(dirname "$FILE")"; echo 0 > "$FILE"; state ;;
+  *) echo "usage: orbital-widgets-lock [--toggle|--lock|--unlock]" >&2; exit 2 ;;
+esac

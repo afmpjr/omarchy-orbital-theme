@@ -177,6 +177,23 @@ Item {
   property var clickTargets: []
   property var moduleSlots: []
 
+  // Global widget lock, toggled by the account panel row ("Lock widgets").
+  // Missing file (or anything but "0") reads as locked — the safe default, so
+  // fresh installs are protected and uninstalls need no cleanup. Watched live:
+  // locking/unlocking takes effect without a shell restart. The lock only
+  // gates widget rearranging below; widget clicks and chip drag-to-swap keep
+  // working while locked.
+  // Locked until the file answers (safe default; missing file reads locked).
+  // Watched live: locking/unlocking takes effect without a shell restart.
+  property bool widgetsLocked: true
+  FileView {
+    id: widgetsLockFile
+    path: Quickshell.env("HOME") + "/.local/state/omarchy/orbital-widgets-lock"
+    printErrors: false
+    onLoaded: root.widgetsLocked = text().trim() !== "0"
+    onLoadFailed: root.widgetsLocked = true
+  }
+
   function registerClickTarget(target) {
     if (!target || clickTargets.indexOf(target) !== -1) return
     var next = clickTargets.slice()
@@ -1833,10 +1850,34 @@ Item {
         pressedX = mouse.x
         pressedY = mouse.y
         root.clearBarDrag()
+        // Locked: never grab — the press falls through to the widget, so clicks
+        // and widget-internal drags (workspace chip swap) keep working.
+        if (root.widgetsLocked) {
+          mouse.accepted = false
+          return
+        }
+        // A press that starts on widget-interactive content (e.g. a workspace
+        // chip) belongs to that widget's own gesture, never to rearranging:
+        // decline so the widget below receives press, moves and release.
+        // Widgets without a claimsPress hook keep the old grab-everything.
+        var item = slot.activeItem
+        if (item && typeof item.claimsPress === "function") {
+          try {
+            var p = item.mapFromItem(slot, mouse.x, mouse.y)
+            if (item.claimsPress(p.x, p.y)) {
+              mouse.accepted = false
+              return
+            }
+          } catch (e) {
+            console.warn("slot press hook failed, grabbing for the bar:", e)
+          }
+        }
       }
 
       onPositionChanged: function(mouse) {
-        if (!canReorder || !(mouse.buttons & Qt.LeftButton)) return
+        // Locked (or not reorderable): behave like plain bar surface — the
+        // press below still reaches the widget for clicks, but no drag starts.
+        if (!canReorder || root.widgetsLocked || !(mouse.buttons & Qt.LeftButton)) return
 
         var distance = Math.abs(mouse.x - pressedX) + Math.abs(mouse.y - pressedY)
         if (distance >= dragThreshold) {
