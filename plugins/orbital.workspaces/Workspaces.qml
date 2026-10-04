@@ -235,6 +235,95 @@ BarWidget {
     return result
   }
 
+  // ------------------------------------------------------- drag-to-swap
+  // Press a chip and it focuses, exactly as before — then keep moving past
+  // dragThreshold and the chip's own pixels lift off as a ghost that follows
+  // the cursor along the bar strip, while the chip under the cursor lights up
+  // as the drop target. Releasing swaps the two workspaces' windows through
+  // Hyprland IPC; releasing anywhere else cancels. Plain clicks are untouched.
+  //
+  // The drag overlay below sits above WidgetButton (which therefore never sees
+  // the left button) and replicates its press/tooltip contract one-to-one, plus
+  // press-move-release for drag-to-swap. Right/middle clicks still fall through.
+  // The drop handler delegates to swapWorkspaces, which shells out to the
+  // companion script — that is also how the drop path is verified headlessly,
+  // since the testbed VM has no working mouse (bar widgets are not reachable
+  // through `shell call`, only panels/overlays are).
+  readonly property real dragThreshold: 8
+  property int dragSourceId: -1
+  property int dropTargetId: -1
+  property bool dragging: false
+  property var dragPressPos: null
+
+  function swapWorkspaces(arg) {
+    // One flexible argument (the shell IPC passes a single string): "2 4",
+    // "2,4", "[2, 4]", or an [a, b] array from the drop handler below.
+    var a = -1, b = -1
+    if (arg !== undefined && arg !== null) {
+      if (typeof arg === "object") {
+        if (Array.isArray(arg) && arg.length >= 2) { a = Number(arg[0]); b = Number(arg[1]) }
+        else { a = Number(arg.a); b = Number(arg.b) }
+      } else {
+        var m = String(arg).match(/(-?\d+)[^\d-]+(-?\d+)/)
+        if (m) { a = Number(m[1]); b = Number(m[2]) }
+      }
+    }
+    if (!(a > 0) || !(b > 0) || a === b) return
+    // The move sequence itself lives in the companion script so it stays
+    // testable headlessly (the testbed VM has no working mouse); the script
+    // re-validates and no-ops when there is nothing to swap.
+    if (root.bar) {
+      root.bar.run(Quickshell.env("HOME")
+        + "/.config/omarchy/plugins/orbital.workspaces/orbital-workspace-swap "
+        + a + " " + b)
+    }
+  }
+
+  function updateDropTarget(rx, ry) {
+    var target = root.pressTargetAt(rx, ry)
+    root.dropTargetId = (target === root.dragSourceId) ? -1 : target
+  }
+
+  // Chip hit-test in widget-root coordinates. Shared by the drop tracker above
+  // and by claimsPress below; returns the workspace id under the point or -1.
+  function pressTargetAt(rx, ry) {
+    for (var i = 0; i < wsRepeater.count; i++) {
+      var it = wsRepeater.itemAt(i)
+      if (!it) continue
+      var p = it.mapFromItem(root, rx, ry)
+      if (p.x >= 0 && p.y >= 0 && p.x < it.width && p.y < it.height) return it.modelData
+    }
+    return -1
+  }
+
+  // Asked by the bar's slot drag handler before it grabs a press: a press that
+  // starts on a chip belongs to chip drag-to-swap, never to widget rearranging.
+  // Widgets without this hook keep the old behavior (press grabs for the bar).
+  function claimsPress(rx, ry) {
+    return root.pressTargetAt(rx, ry) !== -1
+  }
+
+  function endDrag(commit) {
+    if (commit && root.dropTargetId > 0) root.swapWorkspaces([root.dragSourceId, root.dropTargetId])
+    root.dragging = false
+    root.dragSourceId = -1
+    root.dropTargetId = -1
+    root.dragPressPos = null
+    dragGhost.visible = false
+  }
+
+  // The drag ghost: the dragged chip's own pixels, floating above the bar
+  // strip. Stays inside the bar window (which clips anything outside it), so
+  // it slides along the strip rather than following the cursor off-bar.
+  Image {
+    id: dragGhost
+    visible: false
+    z: 1000
+    smooth: true
+    asynchronous: false
+    fillMode: Image.PreserveAspectFit
+  }
+
   // ----------------------------------------------------------------- layout
   readonly property real trailingGap: root.vertical ? 0 : Style.spaceReal(1.5)
 
@@ -250,6 +339,7 @@ BarWidget {
     rowSpacing: root.vertical ? Style.space(2) : 0
 
     Repeater {
+      id: wsRepeater
       model: root.workspaceIds()
 
       Item {
@@ -286,6 +376,8 @@ BarWidget {
           width: root.chipW
           height: root.chipH
           radius: root.chipRadius
+          // Dimmed while it is being dragged (its pixels travel as the ghost).
+          opacity: (root.dragging && root.dragSourceId === wsItem.modelData) ? 0.35 : 1
 
           // Background: a translucent tint of the foreground colour, not a
           // flat Color.background fill — the bar's own background usually
@@ -299,9 +391,10 @@ BarWidget {
 
           // Always-visible border so chips stay legible as separate tiles —
           // this is what stops a two-window (tiled) workspace from reading
-          // as two unrelated workspace buttons. Accent + thicker when focused.
-          border.width: wsItem.focused ? 2 : 1
-          border.color: wsItem.focused
+          // as two unrelated workspace buttons. Accent + thicker when focused
+          // or when hovered as a drop target mid-drag.
+          border.width: (wsItem.focused || root.dropTargetId === wsItem.modelData) ? 2 : 1
+          border.color: (wsItem.focused || root.dropTargetId === wsItem.modelData)
             ? Color.accent
             : Qt.rgba(button.foreground.r, button.foreground.g, button.foreground.b, 0.32)
 
@@ -410,6 +503,64 @@ BarWidget {
               font.pixelSize: Math.max(7, Style.font.bodySmall - 3)
               font.bold: wsItem.focused
             }
+          }
+        }
+
+        // Drag overlay: above WidgetButton (which never sees the left button)
+        // and replicating its press/tooltip contract one-to-one, plus
+        // press-move-release for drag-to-swap. Right/middle clicks fall through.
+        MouseArea {
+          id: dragArea
+          anchors.fill: parent
+          acceptedButtons: Qt.LeftButton
+          hoverEnabled: true
+          cursorShape: Qt.PointingHandCursor
+          onEntered: {
+            if (root.bar) root.bar.showTooltip(button, button.tooltipText)
+          }
+          onExited: {
+            if (root.bar) root.bar.hideTooltip(button)
+          }
+          onPressed: function(mouse) {
+            if (root.dragging) return
+            root.focusWorkspace(wsItem.modelData)
+            root.dragPressPos = { x: mouse.x, y: mouse.y }
+            root.dragSourceId = wsItem.modelData
+          }
+          onPositionChanged: function(mouse) {
+            if (root.dragSourceId !== wsItem.modelData || root.dragPressPos === null) return
+            var dx = mouse.x - root.dragPressPos.x
+            var dy = mouse.y - root.dragPressPos.y
+            if (!root.dragging) {
+              if (Math.sqrt(dx * dx + dy * dy) < root.dragThreshold) return
+              root.dragging = true
+              dragGhost.width = chip.width
+              dragGhost.height = chip.height
+              chip.grabToImage(function(result) {
+                if (root.dragging && root.dragSourceId === wsItem.modelData && result && result.url) {
+                  dragGhost.source = result.url
+                  dragGhost.visible = true
+                }
+              })
+            }
+            var rp = dragArea.mapToItem(root, mouse.x, mouse.y)
+            if (root.vertical) {
+              dragGhost.x = grid.x + (grid.width - dragGhost.width) / 2
+              dragGhost.y = Math.max(grid.y, Math.min(rp.y - dragGhost.height / 2, grid.y + grid.height - dragGhost.height))
+            } else {
+              dragGhost.x = Math.max(grid.x, Math.min(rp.x - dragGhost.width / 2, grid.x + grid.width - dragGhost.width))
+              dragGhost.y = grid.y + (grid.height - dragGhost.height) / 2
+            }
+            root.updateDropTarget(rp.x, rp.y)
+          }
+          onReleased: function(mouse) {
+            if (root.dragging && root.dragSourceId === wsItem.modelData) root.endDrag(true)
+            else if (root.dragSourceId === wsItem.modelData) root.dragSourceId = -1
+            root.dragPressPos = null
+          }
+          onCanceled: {
+            root.dragPressPos = null
+            if (root.dragSourceId === wsItem.modelData) root.endDrag(false)
           }
         }
       }

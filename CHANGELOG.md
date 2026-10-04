@@ -4,6 +4,10 @@ All notable changes to the Orbital theme. The theme is still **pre-release**; v0
 
 ## Unreleased
 
+- `orbital.workspaces` chips are draggable: drop one chip onto another to **swap the two workspaces' windows**,
+  with the dragged chip's own pixels as the ghost and the accent border on the drop target (releasing elsewhere
+  cancels; clicks still switch workspaces). The move sequence lives in the companion script
+  `orbital-workspace-swap` (via a scratch workspace) so the drop path stays testable without a mouse.
 - `orbital.bar` loads again: `Bar.qml` used `DockItem`/`DockModel` from `widgets/`, which only `widgets/qmldir`
   declares, so the bar died with "DockItem is not a type" and the shell silently fell back to `omarchy.bar`.
   `Bar.qml` now imports its own `widgets/` directory. The same failure also exposed a QML syntax error that made

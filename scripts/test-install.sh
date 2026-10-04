@@ -123,6 +123,14 @@ for d in "$REPO"/plugins/*/; do
     [[ $n == 1 ]] || bad "$id: $stem exists in $n copies (entryPoint is $rel) - stale duplicate"
   done < <(jq -r '.entryPoints // {} | to_entries[].value' "$d/manifest.json")
 done; ok "every entryPoints target exists exactly once on disk"
+# Companion scripts a plugin shells out to must ship executable and parse: a dead
+# drop handler only fails on the user's screen (the orbital.bar DockItem outage
+# taught us that). orbital-workspace-swap is invoked by path from Workspaces.qml.
+sw="$REPO/plugins/orbital.workspaces/orbital-workspace-swap"
+[[ -x $sw ]] || bad "orbital-workspace-swap missing or not executable"
+python3 -m py_compile "$sw" 2>/dev/null || bad "orbital-workspace-swap does not parse"
+grep -q "hl.dsp.window.move" "$sw" || bad "orbital-workspace-swap lost its Hyprland 0.56 move call"
+ok "plugin companion scripts ship executable and parse"
 # The theme ships its own icon set (plugins/orbital.ui/icons/): the scanner gives
 # it absolute priority, so a missing or malformed file silently changes what the
 # user sees. Every name the account panel and the dock fallback ask for must exist

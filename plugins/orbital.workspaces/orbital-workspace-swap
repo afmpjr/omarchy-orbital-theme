@@ -1,0 +1,85 @@
+#!/usr/bin/env python3
+"""orbital-workspace-swap — trade every window of workspace A with workspace B.
+
+    orbital-workspace-swap 2 4
+
+Used by orbital.workspaces' drag-to-swap drop handler (which validates first and
+only passes positive, distinct ids). Also directly testable headlessly — the
+testbed VM has no working mouse, so the drag gesture itself is verified by eye.
+
+Moves go through a scratch workspace (B -> temp, A -> B, temp -> A) so neither
+side is ever merged into the other. No-ops (same id, both empty, no scratch
+room) exit 0 silently: a drop that cannot swap simply does nothing.
+"""
+
+import json
+import subprocess
+import sys
+
+
+def clients():
+    out = subprocess.run(
+        ["hyprctl", "clients", "-j"], capture_output=True, text=True, check=True
+    )
+    data = json.loads(out.stdout)
+    return data if isinstance(data, list) else []
+
+
+def visible(c):
+    if not isinstance(c, dict):
+        return False
+    if c.get("hidden"):
+        return False
+    if c.get("mapped") is False:
+        return False
+    size = c.get("size") or [0, 0]
+    return len(size) >= 2 and size[0] > 0 and size[1] > 0
+
+
+def move(addr, ws):
+    # Hyprland 0.56 speaks Lua on `hyprctl dispatch`: the classic
+    # `movetoworkspace <ws>,address:<addr>` string is a parse error there.
+    # The window is selected with `window = "address:<addr>"` (same convention
+    # as omarchy-hyprland-window-pop); without it — or with a bare address —
+    # the call silently acts on the FOCUSED window instead. Verified live: do
+    # not "simplify" this away.
+    subprocess.run(
+        ["hyprctl", "dispatch",
+         'hl.dsp.window.move({ window = "address:%s", workspace = "%d" })' % (addr, ws)],
+        check=True,
+    )
+
+
+def main(a, b):
+    if a <= 0 or b <= 0 or a == b:
+        return 0
+    all_clients = clients()
+    addrs_a = [c["address"] for c in all_clients
+               if visible(c) and c.get("workspace", {}).get("id") == a and c.get("address")]
+    addrs_b = [c["address"] for c in all_clients
+               if visible(c) and c.get("workspace", {}).get("id") == b and c.get("address")]
+    if not addrs_a and not addrs_b:
+        return 0
+    occupied = {c.get("workspace", {}).get("id") for c in all_clients}
+    temp = next((i for i in range(1, 11) if i != a and i != b and i not in occupied), 0)
+    if temp <= 0:
+        return 0
+    for addr in addrs_b:
+        move(addr, temp)
+    for addr in addrs_a:
+        move(addr, b)
+    for addr in addrs_b:
+        move(addr, a)
+    return 0
+
+
+if __name__ == "__main__":
+    if len(sys.argv) != 3:
+        print("usage: orbital-workspace-swap <ws-a> <ws-b>", file=sys.stderr)
+        sys.exit(2)
+    try:
+        ws_a, ws_b = int(sys.argv[1]), int(sys.argv[2])
+    except ValueError:
+        print("usage: orbital-workspace-swap <ws-a> <ws-b>", file=sys.stderr)
+        sys.exit(2)
+    sys.exit(main(ws_a, ws_b))

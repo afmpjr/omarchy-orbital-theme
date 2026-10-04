@@ -14,6 +14,11 @@ Numbered workspace previews for the bar. Occupied workspaces show proportionally
 - Window geometry and workspace membership both come from that poll, so previews track resize, move and
   close instantly — Hyprland emits no resize event for the toplevel cache to refresh from.
 - Gaps adapt when the bar is vertical (`trailingGap` collapses), so the chips do not double the spacing on a side edge.
+- Drag a chip onto another chip to **swap the two workspaces' windows**: the dragged chip lifts off as a
+  ghost of its own pixels and the drop target gets the accent border; releasing anywhere else cancels.
+  Clicks still switch workspaces exactly as before. The move sequence runs through the companion script
+  `orbital-workspace-swap <ws-a> <ws-b>` (via a scratch workspace, so neither side ever merges into the
+  other), which is also how the drop path is tested headlessly: `orbital-workspace-swap 2 4`.
 
 ## Attribution
 
