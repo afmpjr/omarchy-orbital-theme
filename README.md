@@ -158,7 +158,7 @@ SUPER+S) and `--no-alt-shift` (Alt+Shift layout switching; it also fires after e
 | `--fix-terminal-shortcuts` | Free Ctrl+Enter in Ghostty (also part of `--full`) |
 | `--refresh-theme` | Overwrite the theme copy in `themes/orbital` (old copy saved first; the accent goes back to blue) |
 | `--theme-dir DIR` | Keep the theme copy in DIR and link `themes/orbital` to it (asked for in a terminal, default kept) |
-| `--dry-run`, `--no-restart`, `--uninstall` | Preview, skip the shell restart, or remove what was installed |
+| `--dry-run`, `--no-restart`, `--uninstall` | Preview, skip the shell restart, or fully uninstall (theme choice + `shell.json` restore included) |
 
 **Already have a setup?** The installer adopts what it finds instead of adding a second copy: glass rules, a launcher key, gaps or a
 gesture already in your Hyprland config (dotfiles symlinks are followed, and never replaced) are left alone, and an

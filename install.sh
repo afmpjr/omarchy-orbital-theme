@@ -32,6 +32,7 @@ PLUGINS="$CFG/omarchy/plugins"
 BACKUPS="$CFG/omarchy/plugin-backups"
 BASE="$HOME/.local/state/omarchy/orbital-accent-base"
 THEME_DIR="$CFG/omarchy/themes/orbital"
+STATE="$HOME/.local/state/omarchy/orbital-install.json"
 HYPR="$CFG/hypr"
 DROPIN="$CFG/systemd/user/omarchy-crash-watch.service.d"
 SJ="$CFG/omarchy/shell.json"
@@ -162,6 +163,94 @@ reconcile_hypr_requires() {
   echo "    (that part of the theme is off; re-run install.sh to get it back)"
 }
 
+# Remember enough for a future --uninstall to leave nothing behind: the theme
+# active before Orbital (this script never switches themes itself) and the
+# shell.json backup this run made, if any. Written only on success, so a failed
+# install never leaves a state file behind (no rollback entry needed).
+record_install_state() {
+  local theme="" bak=""
+  (( DRY )) && return 0
+  theme="$(omarchy theme current 2>/dev/null | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' || true)"
+  [[ -f $SJ.bak-orbital-$STAMP ]] && bak="$SJ.bak-orbital-$STAMP"
+  ensure_dir "$(dirname "$STATE")" || { warn "could not create $(dirname "$STATE"); --uninstall will ask instead of defaulting"; return 0; }
+  jq -n --arg theme "$theme" --arg bak "$bak" '{theme: $theme, shell_backup: $bak}' > "$STATE" \
+    || warn "could not record the install state; --uninstall will ask instead of defaulting"
+}
+
+default_theme() { # $1 = recorded theme: it, or Tokyo Night when there is none
+  if [[ -n ${1:-} ]]; then printf '%s\n' "$1"; else printf 'Tokyo Night\n'; fi
+}
+
+text_prompt_choice() { # $1 = recorded default; stdout: the chosen theme (never empty)
+  local recorded="$1" def="" choice="" i
+  local -a themes=()
+  while IFS= read -r line; do
+    line="$(sed 's/^[[:space:]]*//;s/[[:space:]]*$//' <<<"$line")"
+    [[ -n $line && ${line,,} != orbital ]] && themes+=("$line")
+  done < <(omarchy theme list 2>/dev/null)
+  if (( ${#themes[@]} == 0 )); then default_theme "$recorded"; return 0; fi
+  def="$recorded"
+  { [[ -n $def ]] && printf '%s\n' "${themes[@]}" | grep -qxF "$def"; } || def=""
+  [[ -n $def ]] || def="$(printf '%s\n' "${themes[@]}" | grep -xF "Tokyo Night" || true)"
+  [[ -n $def ]] || def="${themes[0]}"
+  say "Pick the theme to keep (Orbital is being removed):"
+  for i in "${!themes[@]}"; do
+    if [[ ${themes[$i]} == "$def" ]]; then echo "    $((i + 1))) ${themes[$i]}  <-- default (Enter keeps it)";
+    else echo "    $((i + 1))) ${themes[$i]}"; fi
+  done
+  while true; do
+    read -r -p "Theme number [$def]: " choice || { printf '%s\n' "$def"; return 0; }
+    [[ -z $choice ]] && { printf '%s\n' "$def"; return 0; }
+    if [[ $choice =~ ^[0-9]+$ ]] && (( choice >= 1 && choice <= ${#themes[@]} )); then
+      printf '%s\n' "${themes[$((choice - 1))]}"; return 0
+    fi
+    echo "Pick 1-${#themes[@]} (Enter keeps $def)."
+  done
+}
+
+choose_replacement_theme() { # stdout: theme name (possibly empty = nothing to replace)
+  local recorded="" cur=""
+  recorded="$(jq -r '.theme // ""' "$STATE" 2>/dev/null || true)"
+  # 1. the visual picker, when a human is present to see it
+  if [[ -t 0 && -t 1 ]] && (( ! DRY )) && [[ ${ORBITAL_INSTALL_NO_WAIT:-} != 1 ]] \
+    && command -v omarchy-theme-switcher >/dev/null 2>&1; then
+    say "Pick the theme to keep (visual switcher; Esc falls back to a text list)"
+    omarchy-theme-switcher >/dev/null 2>&1 || true
+    cur="$(omarchy theme current 2>/dev/null | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' || true)"
+    if [[ -n $cur && ${cur,,} != orbital ]]; then printf '%s\n' "$cur"; return 0; fi
+  fi
+  # 2. numbered text list (pipe-friendly; EOF answers the default)
+  if [[ ${ORBITAL_INSTALL_NO_WAIT:-} != 1 ]]; then
+    text_prompt_choice "$recorded" && return 0
+  fi
+  # 3. silent default for scripts and suites
+  default_theme "$recorded"
+}
+
+restore_shell_json() {
+  local bak="" sj="$SJ" ans=""
+  bak="$(jq -r '.shell_backup // ""' "$STATE" 2>/dev/null || true)"
+  [[ -f $bak ]] || bak=""
+  if [[ -z $bak ]]; then
+    bak="$(grep -L orbital "$sj".bak-orbital-* 2>/dev/null | sort | head -1 || true)"
+  fi
+  if [[ -z $bak ]]; then
+    say "shell.json is not reverted automatically; restore a backup: $CFG/omarchy/shell.json.bak-orbital-*"
+    return 0
+  fi
+  cp "$sj" "$sj.pre-uninstall-$STAMP" 2>/dev/null || true
+  if [[ -t 0 ]] && (( ! DRY )) && [[ ${ORBITAL_INSTALL_NO_WAIT:-} != 1 ]]; then
+    read -r -p "Restore shell.json from $bak? [Y/n] " ans || ans=""
+    if [[ $ans =~ ^[Nn] ]]; then
+      say "shell.json left as is (yours is saved at $sj.pre-uninstall-$STAMP)"
+      return 0
+    fi
+  fi
+  if (( DRY )); then echo "    [dry-run] restore shell.json from $bak"; return 0; fi
+  cp "$bak" "$sj" && say "shell.json restored from $bak (previous saved at $sj.pre-uninstall-$STAMP)" \
+    || warn "could not restore shell.json from $bak; do it by hand"
+}
+
 uninstall() {
   say "Removing Orbital plugins, Hyprland hook and crash drop-in"
   for id in "${OVERLAYS[@]}" "${LIBS[@]}" "${BAR_IDS[@]}" "${EXTRA_WIDGETS[@]}" "${WIDGETS[@]%%:*}" "${LOCKSCREEN[@]}"; do
@@ -183,13 +272,40 @@ uninstall() {
     echo "    Keeping $HYPR/orbital-keyboard.lua (yours, not generated by this installer)"
   fi
   run rm -f "$DROPIN/orbital.conf"
+  run rm -f "$HOME/.local/state/omarchy/orbital-widgets-lock"
+  # Complete removal: switch themes, drop the Orbital copy, put shell.json back.
+  if [[ -d $THEME_DIR ]] || omarchy theme list 2>/dev/null | grep -qi '^orbital$'; then
+    local replacement=""
+    replacement="$(choose_replacement_theme)"
+    if [[ -n $replacement ]]; then
+      if (( DRY )); then echo "    [dry-run] omarchy theme set $replacement";
+      else omarchy theme set "$replacement" >/dev/null 2>&1 \
+        || warn "could not switch to '$replacement'; set a theme by hand after this"; fi
+    fi
+    if (( DRY )); then echo "    [dry-run] omarchy theme remove orbital";
+    else
+      omarchy theme remove orbital >/dev/null 2>&1 || true
+      [[ ! -d $THEME_DIR ]] || rm -rf "$THEME_DIR" 2>/dev/null || true
+    fi
+  fi
+  run rm -f "$STATE"
+  # The running shell keeps Orbital's config in memory and would rewrite
+  # shell.json from it on exit, so it goes down before the restore lands and
+  # comes back exactly once, on the restored config.
+  if (( ! DRY )); then
+    stop_shell
+    restore_shell_json || true
+  fi
   (( DRY )) || hyprctl reload >/dev/null 2>&1 || true
-  say "shell.json is not reverted automatically; restore a backup: $CFG/omarchy/shell.json.bak-orbital-*"
+  if (( ! DRY )); then
+    restart_shell_wait
+  else
+    echo "    [dry-run] restart the shell"
+  fi
   systemctl --user daemon-reload 2>/dev/null || true
-  say "Done. The theme itself: omarchy theme remove orbital. Baseline kept in $BASE."
+  say "Done. Orbital is fully uninstalled."
 }
 
-if (( UNINSTALL )); then DONE=1; uninstall; exit 0; fi
 
 desktop_id() { # first installed .desktop among candidates
   local c; for c in "$@"; do
@@ -846,6 +962,9 @@ if (( ${#WARNINGS[@]} )) && ! (( DRY )); then
   for d in "${WARNINGS[@]}"; do echo "    $d"; done
 fi
 
+# Uninstall runs from here so every helper above is defined.
+if (( UNINSTALL )); then DONE=1; uninstall; exit 0; fi
+
 SNAP="$(mktemp -d)"
 trap on_exit EXIT
 
@@ -866,6 +985,7 @@ if (( ! ok )); then
 fi
 
 DONE=1
+record_install_state || true
 if (( ${#WARNINGS[@]} )); then
   say "Installed, with warnings (nothing is broken by these):"
   for d in "${WARNINGS[@]}"; do echo "    $d"; done

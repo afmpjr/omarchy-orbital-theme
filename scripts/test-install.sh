@@ -32,6 +32,10 @@ case "$1 $2" in
                                    else $rest[0:$idx] + [$o] + $rest[$idx:] end)
           end' "$HOME/.config/omarchy/shell.json" > "$HOME/.sj.new" && mv "$HOME/.sj.new" "$HOME/.config/omarchy/shell.json" ;;
   "plugin add") mkdir -p "$HOME/.config/omarchy/plugins/jankeesvw.notification-center"; echo jankeesvw.notification-center >> "$HOME/enabled.txt" ;;
+  "theme list") printf '%s\n' "Tokyo Night" "Catppuccin" "Orbital" ;;
+  "theme current") echo "Tokyo Night" ;;
+  "theme set") echo "$3" >> "$HOME/theme-set.txt" ;;
+  "theme remove") rm -rf "$HOME/.config/omarchy/themes/$3" ;;
   # A bar widget counts as enabled when it is in the bar layout: that is how the real shell decides.
   "plugin list")
     { cat "$HOME/enabled.txt" 2>/dev/null
@@ -79,6 +83,7 @@ grep -q "orbital-bindings" "$HOME/.config/hypr/hyprland.lua" || bad "bindings ho
 grep -q "orbital-gestures" "$HOME/.config/hypr/hyprland.lua" && grep -q "hl.gesture" "$HOME/.config/hypr/orbital-gestures.lua" || bad "gesture hook"; ok "4-finger swipe hooked"
 [[ $(grep -c 'orbital-gestures' "$HOME/.config/hypr/hyprland.lua") == 1 ]] || bad "gesture require duplicated"
 jq -e '.pinned | map(.entry) | index("com.mitchellh.ghostty")' "$HOME/.local/state/omarchy/orbital-dock.json" >/dev/null || bad "dock pins"; ok "default dock pins from installed apps"
+jq -e '.theme == "Tokyo Night"' "$HOME/.local/state/omarchy/orbital-install.json" >/dev/null || bad "install state not recorded"; ok "install state recorded for a complete uninstall"
 [[ $(cat "$HOME/.local/state/omarchy/orbital-widgets-lock" 2>/dev/null) == 1 ]] || bad "widget lock not created locked"; ok "bars start locked"
 "$REPO/install.sh" --full --no-restart >/dev/null
 [[ $(jq -c '.bar.layout.right | map(.id) | map(select(. == "orbital.clock")) | length' "$SJ") == 1 ]] || bad "full not idempotent"; ok "full is idempotent"
@@ -196,6 +201,13 @@ out="$(python3 "$ACC" red 2>&1 || true)"
 [[ $out == *"pristine theme copy missing"* ]] && ok "missing baseline fails loudly" || bad "silent failure"
 "$REPO/install.sh" --uninstall >/dev/null
 ! grep -q 'orbital-shortcuts' "$GC" || bad "ghostty block not removed"; ok "uninstall removes the Ghostty block"
+cp /usr/share/omarchy/config/omarchy/shell.json "$HOME/.config/omarchy/shell.json.bak-orbital-20000101T000000"
+"$REPO/install.sh" --uninstall >/dev/null
+[[ ! -d $HOME/.config/omarchy/themes/orbital ]] || bad "uninstall left the theme copy"; ok "uninstall removes the theme"
+grep -qx "Tokyo Night" "$HOME/theme-set.txt" || bad "uninstall did not switch to the recorded theme"; ok "uninstall switches to the pre-Orbital theme"
+cmp -s "$HOME/.config/omarchy/shell.json" "$HOME/.config/omarchy/shell.json.bak-orbital-20000101T000000" || bad "uninstall did not restore shell.json"; ok "uninstall restores shell.json"
+[[ ! -e $HOME/.local/state/omarchy/orbital-install.json ]] || bad "uninstall left the install state"; ok "uninstall removes the install state"
+[[ ! -e $HOME/.local/state/omarchy/orbital-widgets-lock ]] || bad "uninstall left the widget lock (a stale unlock would open the next install)"; ok "uninstall removes the widget lock"
 [[ ! -d $HOME/.config/omarchy/plugins/orbital.dock && ! -d $HOME/.config/omarchy/plugins/orbital.bar && ! -d $HOME/.config/omarchy/plugins/orbital.floating-bar && ! -f $HOME/.config/hypr/orbital.lua ]] || bad "uninstall"
 ! grep -q 'hypr.orbital' "$HOME/.config/hypr/hyprland.lua" || bad "hook not removed"; ok "uninstall clean"# ---- --dry-run must describe the work without doing any of it ---------------------------------
 SAVED_HOME="$HOME"

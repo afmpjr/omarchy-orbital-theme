@@ -4,6 +4,11 @@ All notable changes to the Orbital theme. The theme is still **pre-release**; v0
 
 ## Unreleased
 
+- `--uninstall` is now complete: it offers the visual theme switcher when a human is present (numbered text
+  list otherwise, silent recorded-or-Tokyo-Night default for scripts), switches themes, removes the Orbital
+  copy, restores `shell.json` from the pre-install backup (asking first, with a safety backup of the current
+  file), and restarts the shell once. Install records the prior theme and backup path for this; suite covers
+  switch, removal, restore and rollback.
 - Bars start **locked** against accidental widget rearranging (the floating bar moves any widget past a 4px
   drag with no undo): the account panel has a "Lock/Unlock widgets" row backed by the `orbital-widgets-lock`
   companion script and `~/.local/state/omarchy/orbital-widgets-lock` state (missing = locked). The lock only
