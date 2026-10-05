@@ -4,6 +4,10 @@ All notable changes to the Orbital theme. The theme is still **pre-release**; v0
 
 ## Unreleased
 
+- New `orbital.settings` setup center (the official graphical setup; the bash TUI stays parked): sidebar with
+  10 sections, live previews (accent swatches apply live, wallpaper thumbnails, data-driven bar mock),
+  staged choices and one **Apply all** (single applier script, one Hyprland reload + one shell restart).
+  Opens after install, from the account Appearance row (now a shortcut here) and from an apps-menu entry.
 - `--uninstall` is now complete: it offers the visual theme switcher when a human is present (numbered text
   list otherwise, silent recorded-or-Tokyo-Night default for scripts), switches themes, removes the Orbital
   copy, restores `shell.json` from the pre-install backup (asking first, with a safety backup of the current

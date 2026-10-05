@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "id": "orbital.settings",
+  "name": "Orbital Settings",
+  "version": "1.0.0",
+  "author": "afmpjr",
+  "description": "Orbital setup center: sidebar settings with live previews, staged choices and one apply-all.",
+  "kinds": [
+    "overlay"
+  ],
+  "entryPoints": {
+    "overlay": "Settings.qml"
+  },
+  "license": "MIT"
+}

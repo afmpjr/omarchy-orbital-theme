@@ -1,0 +1,8 @@
+[Desktop Entry]
+Name=Orbital Settings
+Comment=Setup center for the Orbital theme
+Exec=omarchy-shell shell toggle orbital.settings
+Type=Application
+Terminal=false
+Categories=Settings;
+NoDisplay=false

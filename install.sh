@@ -39,7 +39,7 @@ SJ="$CFG/omarchy/shell.json"
 MARK='require("hypr.orbital") -- orbital'
 STAMP="$(date +%Y%m%dT%H%M%S)"
 
-OVERLAYS=(orbital.launcher orbital.account orbital.appearance orbital.worldclock orbital.crash)
+OVERLAYS=(orbital.launcher orbital.account orbital.appearance orbital.worldclock orbital.crash orbital.settings)
 LIBS=(orbital.ui)
 WIDGETS=("orbital.dock:left" "orbital.workspaces:center" "orbital.keyboard:right" "orbital.clock:right")
 EXTRA_WIDGETS=(orbital.divider)
@@ -273,6 +273,7 @@ uninstall() {
   fi
   run rm -f "$DROPIN/orbital.conf"
   run rm -f "$HOME/.local/state/omarchy/orbital-widgets-lock"
+  run rm -f "$HOME/.local/share/applications/orbital-settings.desktop"
   # Complete removal: switch themes, drop the Orbital copy, put shell.json back.
   if [[ -d $THEME_DIR ]] || omarchy theme list 2>/dev/null | grep -qi '^orbital$'; then
     local replacement=""
@@ -852,10 +853,21 @@ widgets_lock_setup() {
   echo 1 > "$lock" || { problem "could not write the widget lock to $lock"; return 1; }
 }
 
+# Apps-menu entry that opens Orbital Settings (a shell panel needs a launcher).
+install_settings_desktop() {
+  local dst="$HOME/.local/share/applications/orbital-settings.desktop"
+  [[ -f $dst ]] && return 0
+  (( DRY )) && return 0
+  ensure_dir "$(dirname "$dst")" || { problem "could not create $(dirname "$dst")"; return 1; }
+  snapshot "$dst"
+  cp "$REPO/orbital-settings.desktop" "$dst" || { problem "could not install the settings menu entry"; return 1; }
+}
+
 apply_extras() {
   if (( FULL )); then full_setup || return 1; elif (( TERM_FIX )); then terminal_shortcuts || return 1; fi
   windows_keys_setup || return 1
   widgets_lock_setup || return 1
+  install_settings_desktop || return 1
   (( DRY )) || hyprctl reload >/dev/null 2>&1 || warn "'hyprctl reload' did not answer; the new glass/borders load on the next Hyprland reload"
 }
 
@@ -1001,4 +1013,8 @@ if (( RESTART )) && (( ! DRY )); then
   fi
 fi
 say "Now apply the theme: omarchy theme set orbital"
+if [[ -t 0 && -t 1 ]] && (( ! DRY )) && [[ ${ORBITAL_INSTALL_NO_WAIT:-} != 1 ]] && [[ -n ${WAYLAND_DISPLAY:-} ]]; then
+  say "Opening Orbital Settings to confirm and apply everything at once"
+  omarchy-shell shell summon orbital.settings '{}' >/dev/null 2>&1 || true
+fi
 echo "    Optional: set your avatar with  ~/.config/omarchy/plugins/orbital.account/orbital-avatar <image>"

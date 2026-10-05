@@ -85,6 +85,7 @@ grep -q "orbital-gestures" "$HOME/.config/hypr/hyprland.lua" && grep -q "hl.gest
 jq -e '.pinned | map(.entry) | index("com.mitchellh.ghostty")' "$HOME/.local/state/omarchy/orbital-dock.json" >/dev/null || bad "dock pins"; ok "default dock pins from installed apps"
 jq -e '.theme == "Tokyo Night"' "$HOME/.local/state/omarchy/orbital-install.json" >/dev/null || bad "install state not recorded"; ok "install state recorded for a complete uninstall"
 [[ $(cat "$HOME/.local/state/omarchy/orbital-widgets-lock" 2>/dev/null) == 1 ]] || bad "widget lock not created locked"; ok "bars start locked"
+[[ -f $HOME/.local/share/applications/orbital-settings.desktop ]] || bad "settings menu entry missing"; ok "settings menu entry installed"
 "$REPO/install.sh" --full --no-restart >/dev/null
 [[ $(jq -c '.bar.layout.right | map(.id) | map(select(. == "orbital.clock")) | length' "$SJ") == 1 ]] || bad "full not idempotent"; ok "full is idempotent"
 [[ $(grep -c 'ctrl+enter=unbind' "$GC") == 1 ]] || bad "ghostty block duplicated"; ok "Ghostty fix idempotent"
@@ -97,7 +98,7 @@ grep -q 'kb_layout = "br,us"' "$KB" && grep -q 'Shift_L", next_layout, { release
 [[ $(grep -c 'hypr.orbital-keyboard' "$HOME/.config/hypr/hyprland.lua") == 1 ]] || bad "keyboard hook twice"
 "$REPO/install.sh" --full --no-restart --keyboard-layouts br,us >/dev/null
 [[ $(grep -c 'hypr.orbital-keyboard' "$HOME/.config/hypr/hyprland.lua") == 1 ]] || bad "keyboard hook not idempotent"; ok "keyboard hook idempotent"
-for id in orbital.launcher orbital.dock orbital.account orbital.appearance orbital.worldclock orbital.crash orbital.ui orbital.clock orbital.workspaces orbital.divider orbital.floating-bar orbital.bar orbital.lockscreen; do
+for id in orbital.launcher orbital.dock orbital.account orbital.appearance orbital.worldclock orbital.crash orbital.ui orbital.clock orbital.workspaces orbital.divider orbital.floating-bar orbital.bar orbital.lockscreen orbital.settings; do
   [[ -d $HOME/.config/omarchy/plugins/$id ]] || bad "plugin $id missing"
 done; ok "plugins installed (both bars present, only .bar.id is ever loaded)"
 # The schema is Omarchy's, not ours: ask the real CLI, so a manifest that this Omarchy would
@@ -208,6 +209,7 @@ grep -qx "Tokyo Night" "$HOME/theme-set.txt" || bad "uninstall did not switch to
 cmp -s "$HOME/.config/omarchy/shell.json" "$HOME/.config/omarchy/shell.json.bak-orbital-20000101T000000" || bad "uninstall did not restore shell.json"; ok "uninstall restores shell.json"
 [[ ! -e $HOME/.local/state/omarchy/orbital-install.json ]] || bad "uninstall left the install state"; ok "uninstall removes the install state"
 [[ ! -e $HOME/.local/state/omarchy/orbital-widgets-lock ]] || bad "uninstall left the widget lock (a stale unlock would open the next install)"; ok "uninstall removes the widget lock"
+[[ ! -e $HOME/.local/share/applications/orbital-settings.desktop ]] || bad "uninstall left the settings menu entry"; ok "uninstall removes the settings menu entry"
 [[ ! -d $HOME/.config/omarchy/plugins/orbital.dock && ! -d $HOME/.config/omarchy/plugins/orbital.bar && ! -d $HOME/.config/omarchy/plugins/orbital.floating-bar && ! -f $HOME/.config/hypr/orbital.lua ]] || bad "uninstall"
 ! grep -q 'hypr.orbital' "$HOME/.config/hypr/hyprland.lua" || bad "hook not removed"; ok "uninstall clean"# ---- --dry-run must describe the work without doing any of it ---------------------------------
 SAVED_HOME="$HOME"
@@ -248,6 +250,7 @@ rollback_case() { # label fail-at-point
   [[ ! -d $HOME/.local/state/omarchy/orbital-accent-base ]] || bad "$label: the accent baseline was left behind"
   [[ ! -f $HOME/.local/state/omarchy/orbital-dock.json ]] || bad "$label: dock pins were left behind"
   [[ ! -f $HOME/.local/state/omarchy/orbital-widgets-lock ]] || bad "$label: the widget lock was left behind"
+  [[ ! -f $HOME/.local/share/applications/orbital-settings.desktop ]] || bad "$label: the settings menu entry was left behind"
   export HOME="$SAVED_HOME"
 }
 rollback_case validate validate

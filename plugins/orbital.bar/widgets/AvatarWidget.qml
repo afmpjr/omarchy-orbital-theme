@@ -81,7 +81,7 @@ Item {
         transformOrigin: Menu.TopLeft
 
         MenuItem {
-            text: "Configurações"
+            text: "Settings"
             icon.name: "preferences-system"
             onTriggered: {
                 menuOpen = false

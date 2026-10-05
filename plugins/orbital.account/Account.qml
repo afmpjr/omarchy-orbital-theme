@@ -380,7 +380,7 @@ Item {
         LinkRow {
           label: tr("Appearance")
           iconName: "preferences-desktop-appearance-symbolic"
-          onActivated: { root.close(); Util.execDetached("omarchy-shell shell toggle orbital.appearance '{}'") }
+          onActivated: { root.close(); Util.execDetached("omarchy-shell shell summon orbital.settings '{}'") }
         }
 
         LinkRow {

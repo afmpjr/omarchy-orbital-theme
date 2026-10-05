@@ -36,6 +36,7 @@ screen launcher     "omarchy-shell shell toggle orbital.launcher '{}'" orbital-l
 screen account      "omarchy-shell shell toggle orbital.account '{}'" orbital-account
 screen appearance   "omarchy-shell shell toggle orbital.appearance '{}'" orbital-appearance
 screen worldclock   "omarchy-shell shell toggle orbital.worldclock '{}'" orbital-worldclock
+screen settings     "omarchy-shell shell toggle orbital.settings '{}'" orbital-settings
 screen calendar     "omarchy-shell shell toggle orbital.clock '{}'" omarchy-keyboard-panel
 screen keyboard     "omarchy-shell shell toggle orbital.keyboard '{}'" omarchy-keyboard-panel
 PAYLOAD='{"pid":"4242","comm":"demo-app","exe":"/usr/bin/demo-app","signal":"SIGSEGV","title":"Process crashed","dismiss":"Dismiss","diagnose":"Diagnose with AI","rows":[{"label":"Process","value":"demo-app (PID 4242)"},{"label":"Binary","value":"/usr/bin/demo-app"},{"label":"Signal","value":"Segmentation fault (SIGSEGV)","crash":true}]}'
