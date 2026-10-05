@@ -193,10 +193,10 @@ text_prompt_choice() { # $1 = recorded default; stdout: the chosen theme (never 
   { [[ -n $def ]] && printf '%s\n' "${themes[@]}" | grep -qxF "$def"; } || def=""
   [[ -n $def ]] || def="$(printf '%s\n' "${themes[@]}" | grep -xF "Tokyo Night" || true)"
   [[ -n $def ]] || def="${themes[0]}"
-  say "Pick the theme to keep (Orbital is being removed):"
+  say "Pick the theme to keep (Orbital is being removed):" >&2
   for i in "${!themes[@]}"; do
-    if [[ ${themes[$i]} == "$def" ]]; then echo "    $((i + 1))) ${themes[$i]}  <-- default (Enter keeps it)";
-    else echo "    $((i + 1))) ${themes[$i]}"; fi
+    if [[ ${themes[$i]} == "$def" ]]; then echo "    $((i + 1))) ${themes[$i]}  <-- default (Enter keeps it)" >&2;
+    else echo "    $((i + 1))) ${themes[$i]}" >&2; fi
   done
   while true; do
     read -r -p "Theme number [$def]: " choice || { printf '%s\n' "$def"; return 0; }
@@ -204,7 +204,7 @@ text_prompt_choice() { # $1 = recorded default; stdout: the chosen theme (never 
     if [[ $choice =~ ^[0-9]+$ ]] && (( choice >= 1 && choice <= ${#themes[@]} )); then
       printf '%s\n' "${themes[$((choice - 1))]}"; return 0
     fi
-    echo "Pick 1-${#themes[@]} (Enter keeps $def)."
+    echo "Pick 1-${#themes[@]} (Enter keeps $def)." >&2
   done
 }
 
@@ -214,7 +214,7 @@ choose_replacement_theme() { # stdout: theme name (possibly empty = nothing to r
   # 1. the visual picker, when a human is present to see it
   if [[ -t 0 && -t 1 ]] && (( ! DRY )) && [[ ${ORBITAL_INSTALL_NO_WAIT:-} != 1 ]] \
     && command -v omarchy-theme-switcher >/dev/null 2>&1; then
-    say "Pick the theme to keep (visual switcher; Esc falls back to a text list)"
+    say "Pick the theme to keep (visual switcher; Esc falls back to a text list)" >&2
     omarchy-theme-switcher >/dev/null 2>&1 || true
     cur="$(omarchy theme current 2>/dev/null | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' || true)"
     if [[ -n $cur && ${cur,,} != orbital ]]; then printf '%s\n' "$cur"; return 0; fi
@@ -303,6 +303,10 @@ uninstall() {
     echo "    [dry-run] restart the shell"
   fi
   systemctl --user daemon-reload 2>/dev/null || true
+  if (( ${#WARNINGS[@]} )); then
+    echo "    with warnings (check these):"
+    for w in "${WARNINGS[@]}"; do echo "    ! $w"; done
+  fi
   say "Done. Orbital is fully uninstalled."
 }
 
