@@ -359,7 +359,8 @@ BarWidget {
       console.warn("orbital.dock: could not read state from", root.statePath, "-", error)
       return
     }
-    var list = (data && data.pinned && data.pinned.length !== undefined) ? data.pinned : []
+    if (!data || !Array.isArray(data.pinned)) return
+    var list = data.pinned
     var out = []
     var seen = ({})
     for (var i = 0; i < list.length; i++) {
@@ -369,7 +370,7 @@ BarWidget {
       seen[key] = true
       out.push({ key: key, entry: String(item.entry || key) })
     }
-    if (out.length > 0) root.pinned = out
+    root.pinned = out
   }
 
   function saveState() {
