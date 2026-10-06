@@ -4,7 +4,7 @@ A dark, glassy Omarchy theme inspired by Earth seen from orbit: floating taskbar
 world clock, a themed crash dialog, and a **color picker that recolors the accent *and* the glass tint** (18 colors, including
 white, gray and black, or any hex).
 
-> Status: **pre-release (v0.2.0).** Developed on one machine (Omarchy 4.0.4, 1366x768 at scale 1) and checked on a clean VM. See *Known limits*.
+> Status: **v0.2.0.** Developed on one machine (Omarchy 4.0.4, 1366x768 at scale 1) and checked on a clean VM. See *Known limits*.
 
 ## What is in the box
 

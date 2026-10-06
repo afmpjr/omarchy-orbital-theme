@@ -1,8 +1,8 @@
 # Changelog
 
-All notable changes to the Orbital theme. The theme is still **pre-release**; v0.1.0 is the first tag, and the entries describe the current state rather than a sequence of versions.
+All notable changes to the Orbital theme.
 
-## Unreleased
+## v0.2.0 — 2026-10-06
 
 - New `orbital.settings` setup center (the official graphical setup; the bash TUI stays parked): sidebar with
   10 sections, live previews (accent swatches apply live, wallpaper thumbnails, data-driven bar mock),
