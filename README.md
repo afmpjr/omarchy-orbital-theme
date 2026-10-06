@@ -12,14 +12,14 @@ white, gray and black, or any hex).
 |------|--------------|--------------|
 | Theme (repo root) | `colors.toml`, `shell.toml` (menu / popups / notifications glass tokens), terminals, GTK, btop, ... | `omarchy theme install` |
 | [`orbital.launcher`](plugins/orbital.launcher/) | App drawer: search, categories, Recommended, per-app context menu (pin, move to category, uninstall) | `install.sh` |
-| [`orbital.dock`](plugins/orbital.dock/) | Dock (bar widget): pinned + running apps, context menu | `install.sh --bar-widgets` |
-| [`orbital.clock`](plugins/orbital.clock/), [`orbital.workspaces`](plugins/orbital.workspaces/), [`orbital.divider`](plugins/orbital.divider/) | Calendar popup with real reminders and weather, workspace previews with application icons, hairline divider (bar widgets) | `install.sh --bar-widgets` |
+| [`orbital.dock`](plugins/orbital.dock/) | Dock (bar widget): pinned + running apps, context menu | `install.sh` wizard |
+| [`orbital.clock`](plugins/orbital.clock/), [`orbital.workspaces`](plugins/orbital.workspaces/), [`orbital.divider`](plugins/orbital.divider/) | Calendar popup with real reminders and weather, workspace previews with application icons, hairline divider (bar widgets) | `install.sh` wizard |
 | [`orbital.account`](plugins/orbital.account/) | Profile card, links, power actions | `install.sh` |
 | [`orbital.appearance`](plugins/orbital.appearance/) | Color picker window (+ `orbital-accent.py`) | `install.sh` |
 | [`orbital.worldclock`](plugins/orbital.worldclock/) | World clock, alarms, timer | `install.sh` |
 | [`orbital.crash`](plugins/orbital.crash/) | "Process crashed" toast -> themed modal -> *Diagnose with AI* | `install.sh` |
 | [`orbital.lockscreen`](plugins/orbital.lockscreen/) | Lock screen designs with a picker to preview and switch between them. Fork of `SirJul1337/omarchy-lock-explorer` | `install.sh` |
-| [`orbital.keyboard`](plugins/orbital.keyboard/) | Tray widget: flag of the active layout (only with 2+ layouts); click for a dropdown to switch. Alt+Shift also cycles, with `--full` | `install.sh --bar-widgets` |
+| [`orbital.keyboard`](plugins/orbital.keyboard/) | Tray widget: flag of the active layout (only with 2+ layouts); click for a dropdown to switch. Alt+Shift also cycles, with the full desktop profile | `install.sh` wizard |
 | [`orbital.floating-bar`](plugins/orbital.floating-bar/) | The bar: Omarchy's bar floating off the edge, rounded corners. Fork of `charlieras262/floating-bar` | `install.sh` (default bar) |
 | [`orbital.bar`](plugins/orbital.bar/) | Alternative bar with dock, workspace pills and system controls built in | `install.sh` (pick with `omarchy plugin enable orbital.bar`) |
 | [`orbital.ui`](plugins/orbital.ui/) | Shared UI contract (tokens + dialog); library, not a plugin | `install.sh` |
@@ -42,13 +42,20 @@ themes), and plugins are added with `omarchy plugin add`, one repository each. `
 ## Install
 
 ```bash
-omarchy theme install https://github.com/afmpjr/omarchy-orbital-theme   # the theme lands as "orbital"
-cd ~/.config/omarchy/themes/orbital
-./install.sh --bar-widgets        # plugins + widgets, Hyprland part, crash dialog, color-picker baseline
-omarchy theme set orbital
+curl -fsSL https://raw.githubusercontent.com/afmpjr/omarchy-orbital-theme/main/download_cli.sh | bash
 ```
 
-**All or nothing.** The theme is applied only if the whole install works. Before touching anything the installer checks
+This downloads a small bootstrap and starts the wizard directly from the terminal; there is no need to clone the
+repository or install the theme first. The bootstrap downloads the source to a temporary directory, runs the installer
+with the terminal attached, then removes the temporary copy. It requires `curl`, `tar`, and an interactive terminal.
+
+The wizard follows Omarchy's Gum-based prompts. It walks through the install profile, bar, optional features,
+keyboard layouts and theme files. A checklist marks completed choices; the final screen lets you choose separately
+whether to activate Orbital after installation. Nothing is changed before that confirmation. During installation each
+successful phase gets a check mark, and a failure rolls the transaction back.
+
+**All or nothing.** Installation completes only if every install phase works; activation is a separate final choice.
+Before touching anything the installer checks
 everything it can check (package complete, every manifest accepted by your Omarchy, `shell.json` valid, every directory
 writable, shell answering) and lists *all* the problems it found; then it applies the changes with a snapshot of
 everything it replaces, and finally reads the real state back — every plugin enabled, the bar in use, the widgets in
@@ -57,7 +64,8 @@ and tells you what failed**; your shell is only restarted when everything is in 
 something (a missing `curl` for the weather, a notification bell that could not be fetched) is reported as a warning
 instead, and never blocks the install.
 
-`--bar-widgets` is the flag that puts the widgets in your bar. It **appends** Orbital's to the sections your bar already
+The recommended wizard default installs the Orbital bar and widgets. The bar step can instead keep your current bar
+and add the widgets, or leave the bar unchanged. When adding widgets, the installer **appends** Orbital's to the sections your bar already
 uses — the dock on the left, the workspaces in the middle, the keyboard flag, the hairline divider and the clock/calendar
 on the right — and switches the bar itself to Orbital's floating one (rounded corners, a gap off the edge). It does
 **not** move your bar or change its position.
@@ -73,12 +81,12 @@ omarchy plugin enable omarchy.workspaces --section left    # back to the stock w
 omarchy plugin enable omarchy.clock --section center        # back to the stock clock
 ```
 
-`./install.sh --full` reproduces the author's whole desktop instead (bar at the bottom, widget layout, **Super**+**S**
-launcher, gaps, text size 10, Alt+Shift layout switching, dock pins); it backs up `shell.json` first.
+The **Full desktop** wizard profile reproduces the author's whole desktop instead (bar at the bottom, widget layout,
+**Super**+**S** launcher, gaps, text size 10, Alt+Shift layout switching, dock pins); it backs up `shell.json` first.
 
-`install.sh` never edits `shell.json` by hand (it uses `omarchy plugin enable`), backs up what it replaces outside the plugins
-folder, and is idempotent. `--dry-run` shows what it would do; `--uninstall` removes everything it added.
-Without `--bar-widgets` your bar layout is left alone.
+`install.sh` never edits `shell.json` by hand (it uses Omarchy's commands), backs up what it replaces outside the plugins
+folder, and is idempotent. `--dry-run` shows what it would do; `--uninstall` removes everything it added. The wizard's
+defaults follow the recommended install path, so pressing Enter through the prompts selects it.
 
 ## Check it worked
 
@@ -99,11 +107,19 @@ installing or editing a plugin, run `omarchy restart shell` — the QML cache on
 
 ```bash
 omarchy theme update                                    # re-pulls every user-installed git theme
-cd ~/.config/omarchy/themes/orbital && ./install.sh --bar-widgets
+cd ~/.config/omarchy/themes/orbital && ./install.sh
 ```
 
-`install.sh` is idempotent: it re-applies what is missing and leaves what you changed alone. Add `--full` if you use it,
-or `--uninstall` first for a clean slate.
+`install.sh` is idempotent: it re-applies what is missing and leaves what you changed alone. Choose **Full desktop** in
+the wizard for the expanded setup, or run `./install.sh --uninstall` first for a clean slate.
+
+For an existing theme checkout, the equivalent manual sequence remains available:
+
+```bash
+omarchy theme install https://github.com/afmpjr/omarchy-orbital-theme
+cd ~/.config/omarchy/themes/orbital && ./install.sh --bar-widgets
+omarchy theme set orbital
+```
 
 ## If the install fails
 

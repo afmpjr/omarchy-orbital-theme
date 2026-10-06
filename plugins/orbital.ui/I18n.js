@@ -4,6 +4,7 @@
 var pt = {
   // Account
   "Appearance": "Aparência", "Keyboard Shortcuts": "Atalhos de teclado", "Lock": "Bloquear", "Sleep": "Suspender",
+  "Lock widgets": "Bloquear widgets", "Unlock widgets": "Desbloquear widgets",
   "Restart": "Reiniciar", "Shut Down": "Desligar",
   // Appearance
   "Theme color — accent and glass tint": "Cor do tema — destaque e tom do vidro", "Applying…": "Aplicando…",
