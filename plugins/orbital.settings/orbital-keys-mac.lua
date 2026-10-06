@@ -3,20 +3,21 @@
 
 local app_shortcuts = {
   { "A", "A" }, { "C", "C" }, { "X", "X" }, { "V", "V" },
-  { "Z", "Z" }, { "SHIFT + Z", "Z" }, { "S", "S" }, { "O", "O" },
-  { "N", "N" }, { "W", "W" }, { "Q", "Q" }, { "F", "F" },
-  { "P", "P" }, { "R", "R" }, { "L", "L" }, { "I", "I" },
+  { "Z", "Z", "CTRL" }, { "SHIFT + Z", "Z", "CTRL + SHIFT" },
+  { "S", "S", "CTRL" }, { "O", "O", "CTRL" },
+  { "N", "N", "CTRL" }, { "W", "W", "CTRL" }, { "Q", "Q", "CTRL" }, { "F", "F", "CTRL" },
+  { "P", "P", "CTRL" }, { "R", "R", "CTRL" }, { "L", "L", "CTRL" }, { "I", "I", "CTRL" },
 }
 
-local function bind_app_shortcut(chord, key)
+local function bind_app_shortcut(chord, key, mods)
   hl.unbind("SUPER + " .. chord)
   hl.bind("SUPER + " .. chord, function()
-    hl.dispatch(hl.dsp.send_shortcut({ mods = "CTRL", key = key }))
+    hl.dispatch(hl.dsp.send_shortcut({ mods = mods, key = key }))
   end)
 end
 
 for _, shortcut in ipairs(app_shortcuts) do
-  bind_app_shortcut(shortcut[1], shortcut[2])
+  bind_app_shortcut(shortcut[1], shortcut[2], shortcut[3] or "CTRL")
 end
 
 -- Keep Omarchy actions available on a secondary chord while their usual keys

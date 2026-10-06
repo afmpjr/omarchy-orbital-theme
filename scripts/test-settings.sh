@@ -66,6 +66,7 @@ ok "wallpaper and avatar apply without shell restart"
 change shortcuts mac
 grep -q 'hypr.orbital-keys-mac' "$HYPR/hyprland.lua"
 grep -q 'send_shortcut' "$HYPR/orbital-keys-mac.lua"
+grep -q 'CTRL + SHIFT' "$HYPR/orbital-keys-mac.lua"
 change shortcuts windows
 grep -q 'hypr.orbital-keys-windows' "$HYPR/hyprland.lua"
 [[ ! -e "$HYPR/orbital-keys-mac.lua" ]]
