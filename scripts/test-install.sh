@@ -362,4 +362,20 @@ printf 'require("default.hypr.omarchy")\nrequire("default.hypr.toggles")\n' > "$
 export HOME="$SAVED_HOME"
 ok "--windows-keys is opt-in, idempotent and removed by --uninstall"
 
+# The guided flow runs only with a terminal. A Gum stub selects each displayed default so this
+# exercises the real wizard and install transaction without driving an interactive user session.
+export HOME="$T/wizard"; rm -rf "$HOME"; mkdir -p "$HOME/.config/omarchy" "$HOME/.config/hypr"
+cp /usr/share/omarchy/config/omarchy/shell.json "$HOME/.config/omarchy/shell.json"
+printf 'require("default.hypr.omarchy")\n' > "$HOME/.config/hypr/hyprland.lua"
+cp "$REPO/scripts/test-gum-defaults.sh" "$T/bin/gum"
+chmod +x "$T/bin/gum"
+command -v script >/dev/null || bad "pseudo-terminal utility 'script' is required for the wizard test"
+env -u ORBITAL_INSTALL_NO_WAIT script -qec "bash '$REPO/install.sh' --no-restart" /dev/null >"$HOME/wizard.log" 2>&1 \
+  || { cat "$HOME/wizard.log"; bad "guided install with Gum defaults failed"; }
+[[ $(jq -r .bar.id "$HOME/.config/omarchy/shell.json") == orbital.floating-bar ]] || bad "wizard did not apply the default Orbital bar"
+[[ ! -f $HOME/theme-set.txt ]] || bad "wizard's default activated the theme without consent"
+grep -q 'Installer.*complete\|Installation complete\|Installed' "$HOME/wizard.log" || bad "wizard install did not reach completion"
+export ORBITAL_INSTALL_NO_WAIT=1 HOME="$SAVED_HOME"
+ok "guided wizard uses defaults in a TTY and keeps theme activation separate"
+
 echo "ALL PASSED"

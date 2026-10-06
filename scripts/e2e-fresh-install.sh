@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
 # Fresh-install check on a clean Omarchy VM (project: omarchy-testbed).
 #
-# Follows the README "Install" block verbatim, from the PUBLIC GitHub URL instead of this working
-# tree, so it also proves the published repo is complete (nothing important left uncommitted or
-# gitignored) and that the documented path works on an account that has never seen the theme.
+# Follows the README's public bootstrap from a clean Omarchy VM. Set ORBITAL_REF to the branch or
+# tag under test; the wizard's Gum prompts are stubbed to accept their configured defaults.
 #   scripts/e2e-fresh-install.sh [out.png]
 #
 # For the --full variant and the bar/menu walkthrough, see scripts/e2e-testbed.sh.
@@ -12,7 +11,9 @@ REPO="$(cd "$(dirname "$0")/.." && pwd)"
 # The VM harness lives in a separate repository; point TESTBED at its scripts/tb.
 TB="${TESTBED:-$HOME/.local/share/omarchy-testbed}/scripts/tb"
 [[ -x $TB ]] || { echo "Set TESTBED to an omarchy-testbed checkout (expected $TB to be executable)." >&2; exit 1; }
-URL="${ORBITAL_REPO_URL:-https://github.com/afmpjr/omarchy-orbital-theme}"
+REF="${ORBITAL_REF:-main}"
+BOOTSTRAP_URL="https://raw.githubusercontent.com/afmpjr/omarchy-orbital-theme/$REF/download_cli.sh"
+GUM_STUB_URL="https://raw.githubusercontent.com/afmpjr/omarchy-orbital-theme/$REF/scripts/test-gum-defaults.sh"
 OUT="${1:-/tmp/e2e-fresh.png}"
 ok() { echo "ok   - $1"; }
 bad() { echo "FAIL - $1"; exit 1; }
@@ -35,31 +36,27 @@ until "$TB" ssh "$ENVSET; omarchy plugin list" >/dev/null 2>&1; do sleep 5; done
 PRE="$("$TB" ssh "$ENVSET; ls -1 ~/.config/omarchy/themes ~/.config/omarchy/plugins 2>/dev/null | grep -i orbital; cat ~/.local/state/omarchy/current/theme.name 2>/dev/null" | tr -d '\r' | tr '\n' ' ')"
 [[ $PRE != *orbital* ]] || { echo "FAIL: this account already has Orbital in it: $PRE"; exit 1; }
 ok "clean account: no Orbital theme, plugin or active theme (default was: $PRE)"
+THEME_BEFORE="$($TB ssh "$ENVSET; cat ~/.local/state/omarchy/current/theme.name 2>/dev/null || true" | tr -d '\r')"
 
-# ---- README "Install", verbatim ----
-readme_says "omarchy theme install $URL"
-"$TB" ssh "$ENVSET; omarchy theme install $URL" 2>&1 | tail -2
-readme_says "./install.sh --bar-widgets"
-"$TB" ssh "$ENVSET; cd ~/.config/omarchy/themes/orbital && ./install.sh --bar-widgets" 2>&1 | tail -12
+# ---- README public bootstrap; run Gum defaults through a pseudo-terminal ----
+readme_says "curl -fsSL https://raw.githubusercontent.com/afmpjr/omarchy-orbital-theme/main/download_cli.sh | bash"
+readme_says "Install and keep current theme"
+"$TB" ssh "$ENVSET; mkdir -p /tmp/orbital-gum; curl -fsSL '$GUM_STUB_URL' -o /tmp/orbital-gum/gum; chmod +x /tmp/orbital-gum/gum; PATH=/tmp/orbital-gum:\$PATH ORBITAL_REF='$REF' BOOTSTRAP_URL='$BOOTSTRAP_URL' script -qefc 'curl -fsSL \$BOOTSTRAP_URL | bash' /dev/null" 2>&1 | tail -20
+THEME_AFTER_INSTALL="$($TB ssh "$ENVSET; cat ~/.local/state/omarchy/current/theme.name 2>/dev/null || true" | tr -d '\r')"
+[[ $THEME_AFTER_INSTALL == "$THEME_BEFORE" ]] || bad "the wizard activated Orbital without consent (theme=$THEME_AFTER_INSTALL)"
+ok "bootstrap installed Orbital while preserving the active theme"
 readme_says "omarchy theme set orbital"
 "$TB" ssh "$ENVSET; omarchy theme set orbital" 2>&1 | tail -2
 sleep 8
 
 # shellcheck disable=SC2088
 GT='~/.config/omarchy/themes/orbital'   # single quotes: the tilde must be expanded by the guest, not here
-# The clone has to be the published repo, whole and clean.
-"$TB" ssh "$ENVSET; cd $GT && git rev-parse --short HEAD && git status --porcelain" > /tmp/e2e-fresh-git 2>&1
-HEAD_SHA="$(head -1 /tmp/e2e-fresh-git)"; DIRTY="$(tail -n +2 /tmp/e2e-fresh-git | tr -d '[:space:]')"
-[[ -n $HEAD_SHA && $HEAD_SHA != fatal* ]] || bad "theme dir is not a git clone of $URL"
-[[ -z $DIRTY ]] || bad "published repo has uncommitted/missing files: $DIRTY"
-ok "cloned from the public URL at $HEAD_SHA, working tree clean"
-for f in CREDITS.md LICENSE README.md install.sh .omarchy-theme.yml; do
+for f in CREDITS.md LICENSE README.md .omarchy-theme.yml; do
   "$TB" ssh "$ENVSET; test -f $GT/$f" || bad "$f missing from the published repo"
 done
-"$TB" ssh "$ENVSET; test -x $GT/install.sh" || bad "install.sh lost its exec bit in the clone"
 N="$("$TB" ssh "$ENVSET; ls -1 $GT/backgrounds | wc -l")"
 [[ $N == 1 ]] || bad "expected 1 wallpaper in the published repo, found $N"
-ok "published repo is complete (docs, license, executable installer, $N wallpaper)"
+ok "theme files were installed (docs, license and $N wallpaper)"
 
 # Theme applied.
 THEME="$("$TB" ssh "$ENVSET; cat ~/.local/state/omarchy/current/theme.name")"
@@ -120,7 +117,7 @@ ok "every installed manifest passes 'omarchy plugin validate'"
 # All or nothing, on the real system: a failure in the middle has to put back exactly what was
 # there. Here there IS a working install, so the rollback must restore it, not delete it.
 SJ_BEFORE="$("$TB" ssh "$ENVSET; md5sum < ~/.config/omarchy/shell.json" | cut -d' ' -f1)"
-ROLL="$("$TB" ssh "$ENVSET; cd $GT && ORBITAL_FAIL_AT=widgets ./install.sh --bar-widgets --no-restart" 2>&1)" && bad "the installer said it succeeded even though a step was forced to fail" || true
+ROLL="$("$TB" ssh "$ENVSET; mkdir -p /tmp/orbital-fail-source; curl -fsSL 'https://github.com/afmpjr/omarchy-orbital-theme/archive/$REF.tar.gz' | tar -xz --strip-components=1 -C /tmp/orbital-fail-source; cd /tmp/orbital-fail-source && ORBITAL_FAIL_AT=widgets ./install.sh --bar-widgets --no-restart" 2>&1)" && bad "the installer said it succeeded even though a step was forced to fail" || true
 grep -qi 'nothing was applied' <<<"$ROLL" || bad "a failed install did not say that nothing was applied"
 SJ_AFTER="$("$TB" ssh "$ENVSET; md5sum < ~/.config/omarchy/shell.json" | cut -d' ' -f1)"
 [[ $SJ_BEFORE == "$SJ_AFTER" ]] || bad "a failed re-install changed shell.json ($SJ_BEFORE -> $SJ_AFTER)"

@@ -2,7 +2,7 @@
 # Orbital installer: theme companions that `omarchy theme install` cannot ship.
 #
 #   omarchy theme install https://github.com/afmpjr/omarchy-orbital-theme   # the theme itself
-#   ./install.sh [--full] [--keyboard-layouts us,br] [--bar-widgets] [--no-restart] [--dry-run]      # plugins + Hyprland glass
+#   ./install.sh [options]   # guided Omarchy wizard; Enter accepts defaults and Esc goes back
 #   ./install.sh --uninstall
 #
 #   --full  also reproduces the author's desktop: Orbital floating bar (bottom, half-size gap),
@@ -47,7 +47,7 @@ EXTRA_WIDGETS=(orbital.divider)
 LOCKSCREEN=(orbital.lockscreen)
 BAR_IDS=(orbital.floating-bar orbital.bar)
 
-DRY=0 RESTART=1 BAR=0 UNINSTALL=0 FULL=0 KBLAYOUTS='' LAUNCHER_KEY=1 ALT_SHIFT=1 GESTURES=1 KEEP_BAR=0 WINDOWS_KEYS=0 REFRESH_THEME=0 THEME_TARGET='' TERM_FIX=0
+DRY=0 RESTART=1 BAR=0 UNINSTALL=0 FULL=0 KBLAYOUTS='' LAUNCHER_KEY=1 ALT_SHIFT=1 GESTURES=1 KEEP_BAR=0 WINDOWS_KEYS=0 REFRESH_THEME=0 THEME_TARGET='' TERM_FIX=0 ACTIVATE_THEME=0
 while (( $# )); do
   a=$1; shift
   case $a in
@@ -65,6 +65,165 @@ done
 say() { echo "==> $*"; }
 nap() { [[ ${ORBITAL_INSTALL_NO_WAIT:-} == 1 ]] || sleep "$1"; }  # tests skip the waits
 run() { if (( DRY )); then echo "    [dry-run] $*"; else "$@"; fi; }
+
+wizard_header() {
+  local active=$1 i marker
+  local -a labels=("Install profile" "Bar" "Extras" "Keyboard" "Theme files" "Review")
+  printf 'Orbital installer\n'
+  for i in "${!labels[@]}"; do
+    if (( i < active )); then marker='[✓]'
+    elif (( i == active )); then marker='[>]'
+    else marker='[ ]'; fi
+    printf '%s %s\n' "$marker" "${labels[$i]}"
+  done
+  printf '\nStep %d of %d · Enter continues · Esc goes back\n' "$((active + 1))" "${#labels[@]}"
+}
+
+wizard_select() {
+  local header=$1 selected=$2; shift 2
+  gum choose --height 8 --header "$header" --selected "$selected" "$@"
+}
+
+guided_setup() {
+  local step=0 choice status default_profile layout_default selected
+  local -a selected_args=()
+  local -a full_options=('Super+S launcher' 'Alt+Shift layout switching' '4-finger workspace gestures' 'Free Ctrl+Enter in Ghostty')
+  local -a standard_options=('Windows-style shortcuts' 'Free Ctrl+Enter in Ghostty')
+
+  if ! command -v gum >/dev/null 2>&1; then
+    echo "This guided installer needs gum (included with Omarchy)." >&2
+    return 1
+  fi
+
+  while (( step < 6 )); do
+    local header
+    header="$(wizard_header "$step")"
+    case $step in
+      0)
+        default_profile='Standard (Orbital bar and widgets)'
+        (( FULL )) && default_profile='Full desktop'
+        choice="$(wizard_select "$header" "$default_profile" \
+          'Standard (Orbital bar and widgets)' 'Full desktop')" && status=0 || status=$?
+        if (( status != 0 )); then (( step > 0 )) && ((step--)) || return 130; continue; fi
+        if [[ $choice == 'Full desktop' ]]; then FULL=1; BAR=1
+        else FULL=0; BAR=1; fi
+        ;;
+      1)
+        if (( FULL )); then
+          choice="$(wizard_select "$header" 'Use Orbital floating bar' \
+            'Use Orbital floating bar' 'Keep my current bar')" && status=0 || status=$?
+        if (( status != 0 )); then ((step--)); continue; fi
+          if [[ $choice == 'Keep my current bar' ]]; then KEEP_BAR=1; else KEEP_BAR=0; fi
+          BAR=1
+        else
+          default_profile='Install Orbital bar and widgets'
+          (( KEEP_BAR )) && default_profile='Keep current bar and add Orbital widgets'
+          (( ! BAR && KEEP_BAR )) && default_profile='Keep current bar and skip widgets'
+          choice="$(wizard_select "$header" "$default_profile" \
+            'Install Orbital bar and widgets' 'Keep current bar and add Orbital widgets' 'Keep current bar and skip widgets')" && status=0 || status=$?
+        if (( status != 0 )); then ((step--)); continue; fi
+          case $choice in
+            'Install Orbital bar and widgets') BAR=1; KEEP_BAR=0 ;;
+            'Keep current bar and add Orbital widgets') BAR=1; KEEP_BAR=1 ;;
+            *) BAR=0; KEEP_BAR=1 ;;
+          esac
+        fi
+        ;;
+      2)
+        if (( FULL )); then
+          selected=''
+          (( LAUNCHER_KEY )) && selected+="${selected:+,}Super+S launcher"
+          (( ALT_SHIFT )) && selected+="${selected:+,}Alt+Shift layout switching"
+          (( GESTURES )) && selected+="${selected:+,}4-finger workspace gestures"
+          (( TERM_FIX )) && selected+="${selected:+,}Free Ctrl+Enter in Ghostty"
+          selected_args=(); [[ -n $selected ]] && selected_args=(--selected "$selected")
+          choice="$(gum choose --no-limit --height 8 --header "$header" "${selected_args[@]}" "${full_options[@]}")" && status=0 || status=$?
+        if (( status != 0 )); then ((step--)); continue; fi
+          grep -qxF 'Super+S launcher' <<<"$choice"; LAUNCHER_KEY=$?
+          grep -qxF 'Alt+Shift layout switching' <<<"$choice"; ALT_SHIFT=$?
+          grep -qxF '4-finger workspace gestures' <<<"$choice"; GESTURES=$?
+          grep -qxF 'Free Ctrl+Enter in Ghostty' <<<"$choice"; TERM_FIX=$?
+          (( LAUNCHER_KEY == 0 )) && LAUNCHER_KEY=1 || LAUNCHER_KEY=0
+          (( ALT_SHIFT == 0 )) && ALT_SHIFT=1 || ALT_SHIFT=0
+          (( GESTURES == 0 )) && GESTURES=1 || GESTURES=0
+          (( TERM_FIX == 0 )) && TERM_FIX=1 || TERM_FIX=0
+        else
+          selected=''
+          (( WINDOWS_KEYS )) && selected='Windows-style shortcuts'
+          (( TERM_FIX )) && selected+="${selected:+,}Free Ctrl+Enter in Ghostty"
+          selected_args=(); [[ -n $selected ]] && selected_args=(--selected "$selected")
+          choice="$(gum choose --no-limit --height 6 --header "$header" "${selected_args[@]}" "${standard_options[@]}")" && status=0 || status=$?
+        if (( status != 0 )); then ((step--)); continue; fi
+          grep -qxF 'Windows-style shortcuts' <<<"$choice"; WINDOWS_KEYS=$?
+          grep -qxF 'Free Ctrl+Enter in Ghostty' <<<"$choice"; TERM_FIX=$?
+          (( WINDOWS_KEYS == 0 )) && WINDOWS_KEYS=1 || WINDOWS_KEYS=0
+          (( TERM_FIX == 0 )) && TERM_FIX=1 || TERM_FIX=0
+        fi
+        ;;
+      3)
+        if (( FULL && ALT_SHIFT )); then
+          layout_default="$KBLAYOUTS"
+          if [[ -z $layout_default && -f $HYPR/input.lua ]]; then
+            layout_default="$(grep -E '^[[:space:]]*kb_layout[[:space:]]*=' "$HYPR/input.lua" | head -1 | sed -E 's/.*=[[:space:]]*"([^"]*)".*/\1/' || true)"
+          fi
+          [[ -n $layout_default ]] || layout_default=us
+          KBLAYOUTS="$(gum input --header "$header" --prompt 'Keyboard layouts> ' --value "$layout_default" --placeholder 'us,br')" && status=0 || status=$?
+        if (( status != 0 )); then ((step--)); continue; fi
+        fi
+        ;;
+      4)
+        if [[ -n $THEME_TARGET ]]; then layout_default=$THEME_TARGET
+        else layout_default=$THEME_DIR; fi
+        choice="$(wizard_select "$header" 'Keep existing theme files' 'Keep existing theme files' 'Refresh existing theme files')" && status=0 || status=$?
+        if (( status != 0 )); then ((step--)); continue; fi
+        (( REFRESH_THEME=0 )); [[ $choice == 'Refresh existing theme files' ]] && REFRESH_THEME=1
+        THEME_TARGET="$(gum input --header 'Theme file location · Enter keeps the default · Esc goes back' --prompt 'Path> ' --value "$layout_default")" && status=0 || status=$?
+        if (( status != 0 )); then ((step--)); continue; fi
+        THEME_TARGET="${THEME_TARGET/#\~/$HOME}"
+        ;;
+      5)
+        local profile_text bar_text extras_text
+        if (( FULL )); then profile_text='Full desktop'; else profile_text='Standard'; fi
+        if (( KEEP_BAR )); then bar_text='Keep current bar'; elif (( BAR )); then bar_text='Orbital floating bar and widgets'; else bar_text='No bar changes'; fi
+        extras_text=''
+        (( WINDOWS_KEYS )) && extras_text+='Windows shortcuts, '
+        (( TERM_FIX )) && extras_text+='Ghostty Ctrl+Enter, '
+        (( FULL && LAUNCHER_KEY )) && extras_text+='Super+S, '
+        (( FULL && ALT_SHIFT )) && extras_text+='Alt+Shift keyboard switching, '
+        (( FULL && GESTURES )) && extras_text+='workspace gestures, '
+        extras_text="${extras_text%, }"; [[ -n $extras_text ]] || extras_text='None'
+        gum style --border rounded --padding '1 2' --border-foreground 212 \
+          "Profile: $profile_text" "Bar: $bar_text" "Extras: $extras_text" \
+          "Theme files: $THEME_TARGET" "Refresh: $([[ $REFRESH_THEME == 1 ]] && echo yes || echo no)" \
+          'Choose separately whether Orbital should become the active theme'
+        default_activation='Install and keep current theme'
+        (( ACTIVATE_THEME )) && default_activation='Install and activate Orbital'
+        choice="$(wizard_select "$header" "$default_activation" \
+          'Install and activate Orbital' 'Install and keep current theme' 'Go back and edit')" && status=0 || status=$?
+        if (( status != 0 )); then ((step--)); continue; fi
+        case $choice in
+          'Install and activate Orbital') ACTIVATE_THEME=1; return 0 ;;
+          'Install and keep current theme') ACTIVATE_THEME=0; return 0 ;;
+          *) ((step--)); continue ;;
+        esac
+        ;;
+    esac
+    ((step++))
+  done
+}
+
+run_install_phase() {
+  local title=$1 function=$2 index=$3 total=$4
+  say "Step $index/$total: $title"
+  if "$function"; then
+    if [[ -t 1 ]] && command -v gum >/dev/null 2>&1; then gum style --foreground 42 "  ✓ $title complete"
+    else printf '  [✓] %s complete\n' "$title"; fi
+  else
+    if [[ -t 1 ]] && command -v gum >/dev/null 2>&1; then gum style --foreground 196 "  ✗ $title failed"
+    else printf '  [!] %s failed\n' "$title"; fi
+    return 1
+  fi
+}
 # Does your own Hyprland config (every .lua except Orbital'"'"'s own files) already have a live line matching this
 # ERE? Used to adopt what you already have instead of loading a second copy of it.
 user_hypr_has() {
@@ -951,6 +1110,14 @@ verify_all() {
 # ---------------------------------------------------------------------------------------------
 # Run it.
 # ---------------------------------------------------------------------------------------------
+if [[ -t 0 && -t 1 ]] && (( ! DRY && ! UNINSTALL )) && [[ ${ORBITAL_INSTALL_NO_WAIT:-} != 1 ]]; then
+  guided_setup || {
+    status=$?
+    if (( status == 130 )); then echo 'Installer cancelled; nothing was changed.'; exit 0; fi
+    exit "$status"
+  }
+fi
+
 choose_theme_dir
 if ! checks; then
   DONE=1   # nothing was touched; the exit handler must not try to roll back
@@ -986,15 +1153,20 @@ SNAP="$(mktemp -d)"
 trap on_exit EXIT
 
 ok=1
-apply_plugins    || ok=0
-(( ok )) && { apply_baseline || ok=0; }
-(( ok )) && { apply_theme_copy || ok=0; }
-(( ok )) && { apply_hypr      || ok=0; }
-(( ok )) && { apply_dropin    || ok=0; }
-(( ok )) && { apply_shell_json || ok=0; }
-(( ok )) && { apply_enable    || ok=0; }
-(( ok )) && { apply_extras    || ok=0; }
-if (( ok )) && ! verify_all; then ok=0; fi
+if (( ! DRY )); then
+  if [[ -t 1 ]] && command -v gum >/dev/null 2>&1; then gum style --foreground 42 '[✓] Preparation checks passed'
+  else printf '[✓] Preparation checks passed\n'; fi
+fi
+phase=1; phases=9
+run_install_phase 'Install plugins' apply_plugins "$phase" "$phases" || ok=0
+(( ok )) && { ((phase++)); run_install_phase 'Create the colour baseline' apply_baseline "$phase" "$phases" || ok=0; }
+(( ok )) && { ((phase++)); run_install_phase 'Copy theme files' apply_theme_copy "$phase" "$phases" || ok=0; }
+(( ok )) && { ((phase++)); run_install_phase 'Install Hyprland settings' apply_hypr "$phase" "$phases" || ok=0; }
+(( ok )) && { ((phase++)); run_install_phase 'Install crash handling' apply_dropin "$phase" "$phases" || ok=0; }
+(( ok )) && { ((phase++)); run_install_phase 'Configure the Omarchy shell' apply_shell_json "$phase" "$phases" || ok=0; }
+(( ok )) && { ((phase++)); run_install_phase 'Enable plugins and arrange widgets' apply_enable "$phase" "$phases" || ok=0; }
+(( ok )) && { ((phase++)); run_install_phase 'Apply desktop extras' apply_extras "$phase" "$phases" || ok=0; }
+if (( ok )); then ((phase++)); run_install_phase 'Verify installation' verify_all "$phase" "$phases" || ok=0; fi
 
 if (( ! ok )); then
   report_failure
@@ -1013,9 +1185,17 @@ if (( RESTART )) && (( ! DRY )); then
     echo "    The shell did not restart; run 'omarchy restart shell' to see the theme." >&2
   fi
 fi
-say "Now apply the theme: omarchy theme set orbital"
+if (( ACTIVATE_THEME )) && (( ! DRY )); then
+  say 'Activating Orbital theme'
+  if ! omarchy theme set orbital; then
+    echo "    Installation succeeded, but activation failed. Run 'omarchy theme set orbital' to activate it later." >&2
+  fi
+else
+  say 'Orbital is installed; the current theme remains active.'
+  say 'To activate it later, run: omarchy theme set orbital'
+fi
 if [[ -t 0 && -t 1 ]] && (( ! DRY )) && [[ ${ORBITAL_INSTALL_NO_WAIT:-} != 1 ]] && [[ -n ${WAYLAND_DISPLAY:-} ]]; then
-  say "Opening Orbital Settings to confirm and apply everything at once"
+  say "Opening Orbital Settings"
   omarchy-shell shell summon orbital.settings '{}' >/dev/null 2>&1 || true
 fi
 echo "    Optional: set your avatar with  ~/.config/omarchy/plugins/orbital.account/orbital-avatar <image>"
