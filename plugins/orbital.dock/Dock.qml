@@ -195,7 +195,7 @@ BarWidget {
   // lowercased app id windows are grouped by (see keyFor). Seeded with
   // this machine's real, installed apps on first run only; after that
   // the file is the only source of truth (see loadState below).
-  property var pinned: [
+  readonly property var defaultPins: [
     { key: "google-chrome", entry: "google-chrome" },
     { key: "code", entry: "code" },
     { key: "com.mitchellh.ghostty", entry: "com.mitchellh.ghostty" },
@@ -204,6 +204,7 @@ BarWidget {
     { key: "whatsapp", entry: "WhatsApp" },
     { key: "chatgpt", entry: "chatgpt" }
   ]
+  property var pinned: defaultPins
 
   function pinIndex(key) {
     for (var i = 0; i < root.pinned.length; i++) {
@@ -358,7 +359,8 @@ BarWidget {
       console.warn("orbital.dock: could not read state from", root.statePath, "-", error)
       return
     }
-    var list = (data && data.pinned && data.pinned.length !== undefined) ? data.pinned : []
+    if (!data || !Array.isArray(data.pinned)) return
+    var list = data.pinned
     var out = []
     var seen = ({})
     for (var i = 0; i < list.length; i++) {
@@ -368,7 +370,7 @@ BarWidget {
       seen[key] = true
       out.push({ key: key, entry: String(item.entry || key) })
     }
-    if (out.length > 0) root.pinned = out
+    root.pinned = out
   }
 
   function saveState() {
@@ -389,7 +391,10 @@ BarWidget {
       root.loadState(text())
       root.stateAnswered = true
     }
-    onLoadFailed: root.stateAnswered = true
+    onLoadFailed: {
+      root.pinned = root.defaultPins
+      root.stateAnswered = true
+    }
     onSaveFailed: function(error) {
       console.warn("orbital.dock: could not write state to", root.statePath, "-", error)
     }
@@ -464,7 +469,8 @@ BarWidget {
         id: avatarFile
         path: Quickshell.env("HOME") + "/.config/omarchy/avatar.png"
         printErrors: false
-        watchChanges: false
+        watchChanges: true
+        onFileChanged: reload()
       }
 
       // Circular masking (layer.effect + MultiEffect) rendered this

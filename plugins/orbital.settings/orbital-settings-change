@@ -1,0 +1,112 @@
+#!/usr/bin/env bash
+# Apply one Orbital Settings choice immediately without restarting Quickshell.
+set -euo pipefail
+
+key=${1:?setting name is required}
+value=${2-}
+home=${HOME:?HOME is required}
+plugins="$home/.config/omarchy/plugins"
+hypr="$home/.config/hypr"
+
+fail() { echo "orbital-settings-change: $*" >&2; exit 1; }
+ensure_loader() {
+  local module=$1
+  grep -qF "require(\"hypr.$module\")" "$hypr/hyprland.lua" 2>/dev/null ||
+    printf 'require("hypr.%s") -- orbital\n' "$module" >> "$hypr/hyprland.lua"
+}
+reload_hypr() { hyprctl reload >/dev/null || fail "Hyprland reload failed"; }
+
+case "$key" in
+  accent)
+    [[ $value =~ ^(blue|indigo|purple|lilac|magenta|pink|rose|red|orange|amber|lime|green|mint|teal|cyan|white|gray|black|#[0-9A-Fa-f]{6})$ ]] || fail "invalid accent"
+    python3 "$plugins/orbital.appearance/orbital-accent.py" "$value" >/dev/null
+    ;;
+  bar)
+    [[ $value =~ ^(orbital\.floating-bar|orbital\.bar)$ ]] || fail "invalid bar"
+    omarchy bar use "$value" >/dev/null
+    ;;
+  bar-position)
+    [[ $value =~ ^(top|bottom|left|right)$ ]] || fail "invalid bar position"
+    omarchy bar position "$value" >/dev/null
+    ;;
+  transparency)
+    [[ $value =~ ^(true|false)$ ]] || fail "invalid transparency value"
+    omarchy bar transparent "$value" >/dev/null
+    ;;
+  divider)
+    if [[ $value == true ]]; then
+      omarchy plugin enable orbital.divider --section right >/dev/null
+    elif [[ $value == false ]]; then
+      omarchy plugin disable orbital.divider >/dev/null
+    else
+      fail "invalid divider value"
+    fi
+    ;;
+  widget-lock)
+    case "$value" in
+      true) "$plugins/orbital.account/orbital-widgets-lock" --lock >/dev/null ;;
+      false) "$plugins/orbital.account/orbital-widgets-lock" --unlock >/dev/null ;;
+      *) fail "invalid widget lock value" ;;
+    esac
+    ;;
+  keyboard)
+    [[ $value =~ ^(us|us,br|br,us)$ ]] || fail "invalid keyboard layout"
+    mkdir -p "$hypr"
+    printf '%s\n' \
+      '-- Orbital keyboard layout and Alt+Shift switching.' \
+      "hl.config({ input = { kb_layout = \"$value\", kb_options = \"compose:caps,shift:both_capslock_cancel\" } })" \
+      'local next_layout = hl.dsp.exec_cmd("hyprctl switchxkblayout all next")' \
+      'hl.bind("ALT + SHIFT + Shift_L", next_layout, { release = true })' \
+      'hl.bind("ALT + SHIFT + Alt_L", next_layout, { release = true })' > "$hypr/orbital-keyboard.lua"
+    ensure_loader orbital-keyboard
+    reload_hypr
+    ;;
+  wallpaper)
+    [[ -z $value || -f $value ]] || fail "wallpaper file does not exist"
+    [[ -z $value ]] || omarchy theme bg set "$value" >/dev/null
+    ;;
+  avatar)
+    case "$value" in
+      keep) ;;
+      github) "$plugins/orbital.account/orbital-avatar" --github --no-restart >/dev/null ;;
+      clear) "$plugins/orbital.account/orbital-avatar" --reset --no-restart >/dev/null ;;
+      file:*)
+        path=${value#file:}
+        [[ -f $path ]] || fail "avatar file does not exist"
+        "$plugins/orbital.account/orbital-avatar" "$path" --no-restart >/dev/null
+        ;;
+      *) fail "invalid avatar selection" ;;
+    esac
+    ;;
+  gaps)
+    [[ $value =~ ^(8,12|4,4|0,0)$ ]] || fail "invalid window gaps"
+    mkdir -p "$hypr"
+    printf -- '-- Orbital window gaps, managed by orbital.settings.\nhl.config({ general = { gaps_in = %s, gaps_out = %s } })\n' \
+      "${value%,*}" "${value#*,}" > "$hypr/orbital-gaps.lua"
+    ensure_loader orbital-gaps
+    reload_hypr
+    ;;
+  shortcuts)
+    [[ $value =~ ^(default|mac|windows)$ ]] || fail "invalid shortcut style"
+    mkdir -p "$hypr"
+    temp=$(mktemp "$hypr/.hyprland.lua.XXXXXX")
+    if [[ -f $hypr/hyprland.lua ]]; then
+      grep -vE '^[[:space:]]*require\("hypr\.orbital-keys-(mac|windows)"\)' \
+        "$hypr/hyprland.lua" > "$temp" || [[ $? == 1 ]] || fail "could not update Hyprland config"
+    fi
+    mv "$temp" "$hypr/hyprland.lua"
+    rm -f "$hypr/orbital-keys-mac.lua" "$hypr/orbital-keys-windows.lua"
+    if [[ $value != default ]]; then
+      cp "$plugins/orbital.settings/orbital-keys-$value.lua" "$hypr/orbital-keys-$value.lua"
+      printf 'require("hypr.orbital-keys-%s") -- orbital\n' "$value" >> "$hypr/hyprland.lua"
+    fi
+    reload_hypr
+    ;;
+  reset-pins)
+    [[ $value == true ]] || fail "reset-pins accepts only true"
+    rm -f "$home/.local/state/omarchy/orbital-dock.json"
+    ;;
+  *) fail "unknown setting: $key" ;;
+esac
+
+echo "$key saved and applied."

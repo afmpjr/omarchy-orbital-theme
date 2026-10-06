@@ -129,6 +129,17 @@ def main():
     hyprland = read_text(CONFIG / "hypr/hyprland.lua")
     lock_file = STATE / "orbital-widgets-lock"
     lock_text = read_text(lock_file).strip()
+    windows_keys = any(
+        line.lstrip().startswith('require("hypr.orbital-keys-windows"')
+        for line in hyprland.splitlines()
+    )
+    mac_keys = any(
+        line.lstrip().startswith('require("hypr.orbital-keys-mac"')
+        for line in hyprland.splitlines()
+    )
+    if windows_keys and mac_keys:
+        raise RuntimeError("Both shortcut profiles are enabled")
+    shortcut_style = "mac" if mac_keys else "windows" if windows_keys else "default"
 
     print(json.dumps({
         "accent": accent,
@@ -141,10 +152,8 @@ def main():
         "keyboard": layout_value(),
         "wallpaper": wallpaper_value(),
         "gaps": gaps,
-        "windowsKeys": any(
-            line.lstrip().startswith('require("hypr.orbital-keys-windows"')
-            for line in hyprland.splitlines()
-        ),
+        "windowsKeys": windows_keys,
+        "shortcutStyle": shortcut_style,
     }))
 
 
