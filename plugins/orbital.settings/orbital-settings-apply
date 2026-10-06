@@ -5,33 +5,35 @@
 #     <gaps> <windows-keys> <reset-pins>
 # Booleans are the strings "true"/"false"; wallpaper/avatar-path may be empty.
 # Every step tolerates failure (warns, keeps going); Hyprland reloads and the
-# shell restarts exactly once at the end. Exit 0 unless usage is wrong.
+# shell restarts exactly once at the end. Exit non-zero if any step fails.
 set -uo pipefail
 ACCENT="${1:?}"; BAR="${2:?}"; BARPOS="${3:?}"; TRANS="$4"; DIV="$5"; LOCK="$6"
 LAYOUTS="${7:?}"; WALLPAPER="$8"; AVATAR_MODE="$9"; AVATAR_PATH="${10:-}"
 GAPS="${11:?}"; WINKEYS="${12:?}"; RESETPINS="${13:?}"
 PLUGINS="$HOME/.config/omarchy/plugins"
 HYPR="$HOME/.config/hypr"
+FAILURES=()
 say() { echo "==> $*"; }
+warn() { echo "warning: $*"; FAILURES+=("$*"); }
 
 say "Orbital theme..."
-  omarchy theme set orbital >/dev/null 2>&1 || echo "theme set failed"
+omarchy theme set orbital >/dev/null 2>&1 || warn "theme set failed"
 
 say "Accent $ACCENT..."
-python3 "$PLUGINS/orbital.appearance/orbital-accent.py" "$ACCENT" >/dev/null 2>&1 || echo "accent failed"
+python3 "$PLUGINS/orbital.appearance/orbital-accent.py" "$ACCENT" >/dev/null 2>&1 || warn "accent failed"
 
 say "Bar $BAR ($BARPOS)..."
-omarchy bar use "$BAR" >/dev/null 2>&1 || echo "bar use failed"
-omarchy bar position "$BARPOS" >/dev/null 2>&1 || echo "bar position failed"
-if [[ $TRANS == true ]]; then omarchy bar transparent true >/dev/null 2>&1 || echo "transparent failed";
-else omarchy bar transparent false >/dev/null 2>&1 || echo "transparent failed"; fi
-if [[ $DIV == true ]]; then omarchy plugin enable orbital.divider --section right >/dev/null 2>&1 || echo "divider failed";
-else omarchy plugin disable orbital.divider >/dev/null 2>&1 || true; fi
-if [[ $LOCK == true ]]; then "$PLUGINS/orbital.account/orbital-widgets-lock" --lock >/dev/null 2>&1 || true;
-else "$PLUGINS/orbital.account/orbital-widgets-lock" --unlock >/dev/null 2>&1 || true; fi
+omarchy bar use "$BAR" >/dev/null 2>&1 || warn "bar use failed"
+omarchy bar position "$BARPOS" >/dev/null 2>&1 || warn "bar position failed"
+if [[ $TRANS == true ]]; then omarchy bar transparent true >/dev/null 2>&1 || warn "transparency failed";
+else omarchy bar transparent false >/dev/null 2>&1 || warn "transparency failed"; fi
+if [[ $DIV == true ]]; then omarchy plugin enable orbital.divider --section right >/dev/null 2>&1 || warn "divider enable failed";
+else omarchy plugin disable orbital.divider >/dev/null 2>&1 || warn "divider disable failed"; fi
+if [[ $LOCK == true ]]; then "$PLUGINS/orbital.account/orbital-widgets-lock" --lock >/dev/null 2>&1 || warn "widget lock failed";
+else "$PLUGINS/orbital.account/orbital-widgets-lock" --unlock >/dev/null 2>&1 || warn "widget unlock failed"; fi
 
 say "Keyboard ($LAYOUTS)..."
-mkdir -p "$HYPR"
+mkdir -p "$HYPR" || warn "Hyprland config directory creation failed"
 cat > "$HYPR/orbital-keyboard.lua" << LUA
 -- Orbital keyboard: layouts + Alt+Shift switching (managed by orbital-settings).
 hl.config({ input = { kb_layout = "$LAYOUTS", kb_options = "compose:caps,shift:both_capslock_cancel" } })
@@ -39,45 +41,65 @@ local next_layout = hl.dsp.exec_cmd("hyprctl switchxkblayout all next")
 hl.bind("ALT + SHIFT + Shift_L", next_layout, { release = true })
 hl.bind("ALT + SHIFT + Alt_L", next_layout, { release = true })
 LUA
-grep -qF 'hypr.orbital-keyboard' "$HYPR/hyprland.lua" 2>/dev/null || \
-  printf 'require("hypr.orbital-keyboard") -- orbital\n' >> "$HYPR/hyprland.lua"
+[[ $? -eq 0 ]] || warn "keyboard settings write failed"
+if ! grep -qF 'hypr.orbital-keyboard' "$HYPR/hyprland.lua" 2>/dev/null; then
+  printf 'require("hypr.orbital-keyboard") -- orbital\n' >> "$HYPR/hyprland.lua" || warn "keyboard loader write failed"
+fi
 
-if [[ -n $WALLPAPER && -f $WALLPAPER ]]; then
-  say "Wallpaper..."
-  omarchy theme bg set "$WALLPAPER" >/dev/null 2>&1 || echo "wallpaper failed"
+if [[ -n $WALLPAPER ]]; then
+  if [[ -f $WALLPAPER ]]; then
+    say "Wallpaper..."
+    omarchy theme bg set "$WALLPAPER" >/dev/null 2>&1 || warn "wallpaper failed"
+  else
+    warn "wallpaper file does not exist"
+  fi
 fi
 
 case "$AVATAR_MODE" in
-  github) say "GitHub avatar..."; "$PLUGINS/orbital.account/orbital-avatar" --github --no-restart >/dev/null 2>&1 || echo "avatar failed" ;;
-  clear) say "Removing avatar..."; "$PLUGINS/orbital.account/orbital-avatar" --reset --no-restart >/dev/null 2>&1 || true ;;
-  file) if [[ -f $AVATAR_PATH ]]; then say "Avatar..."; "$PLUGINS/orbital.account/orbital-avatar" "$AVATAR_PATH" --no-restart >/dev/null 2>&1 || echo "avatar failed"; fi ;;
+  github) say "GitHub avatar..."; "$PLUGINS/orbital.account/orbital-avatar" --github --no-restart >/dev/null 2>&1 || warn "GitHub avatar failed" ;;
+  clear) say "Removing avatar..."; "$PLUGINS/orbital.account/orbital-avatar" --reset --no-restart >/dev/null 2>&1 || warn "avatar removal failed" ;;
+  file) if [[ -f $AVATAR_PATH ]]; then say "Avatar..."; "$PLUGINS/orbital.account/orbital-avatar" "$AVATAR_PATH" --no-restart >/dev/null 2>&1 || warn "avatar update failed"; else warn "avatar file does not exist"; fi ;;
 esac
 
 say "Gaps ($GAPS)..."
 gin="${GAPS%%,*}"; gout="${GAPS##*,}"
 printf -- '-- Orbital window gaps (managed by orbital-settings).\nhl.config({ general = { gaps_in = %s, gaps_out = %s } })\n' "$gin" "$gout" > "$HYPR/orbital-gaps.lua"
-grep -qF 'hypr.orbital-gaps' "$HYPR/hyprland.lua" 2>/dev/null || \
-  printf 'require("hypr.orbital-gaps") -- orbital\n' >> "$HYPR/hyprland.lua"
+[[ $? -eq 0 ]] || warn "window gaps write failed"
+if ! grep -qF 'hypr.orbital-gaps' "$HYPR/hyprland.lua" 2>/dev/null; then
+  printf 'require("hypr.orbital-gaps") -- orbital\n' >> "$HYPR/hyprland.lua" || warn "window gaps loader write failed"
+fi
 
 if [[ $WINKEYS == true ]]; then
   say "Windows keys..."
-  wksrc=""; for c in "$HOME/omarchy-orbital-theme/hypr/orbital-keys-windows.lua"; do [[ -f $c ]] && wksrc="$c" && break; done
-  if [[ -n $wksrc ]]; then
-    cp "$wksrc" "$HYPR/orbital-keys-windows.lua" 2>/dev/null || echo "windows-keys copy failed"
-    grep -qF 'hypr.orbital-keys-windows' "$HYPR/hyprland.lua" 2>/dev/null || \
-      printf 'require("hypr.orbital-keys-windows") -- orbital\n' >> "$HYPR/hyprland.lua"
-  else echo "windows-keys lua not found (reinstall with --windows-keys)"; fi
+  wksrc="$PLUGINS/orbital.settings/orbital-keys-windows.lua"
+  if [[ -f $wksrc ]]; then
+    if cp "$wksrc" "$HYPR/orbital-keys-windows.lua" 2>/dev/null; then
+      if ! grep -qF 'hypr.orbital-keys-windows' "$HYPR/hyprland.lua" 2>/dev/null; then
+        printf 'require("hypr.orbital-keys-windows") -- orbital\n' >> "$HYPR/hyprland.lua" || warn "Windows keys loader write failed"
+      fi
+    else
+      warn "Windows keys copy failed"
+    fi
+  else warn "Windows keys source file not found"; fi
 else
-  [[ -f $HYPR/orbital-keys-windows.lua ]] && rm -f "$HYPR/orbital-keys-windows.lua"
-  grep -v 'hypr.orbital-keys-windows' "$HYPR/hyprland.lua" > /tmp/hl.$$ 2>/dev/null && cat /tmp/hl.$$ > "$HYPR/hyprland.lua"; rm -f /tmp/hl.$$
+  [[ ! -f $HYPR/orbital-keys-windows.lua ]] || rm -f "$HYPR/orbital-keys-windows.lua" || warn "Windows keys file removal failed"
+  if grep -qF 'hypr.orbital-keys-windows' "$HYPR/hyprland.lua" 2>/dev/null; then
+    grep -v 'hypr.orbital-keys-windows' "$HYPR/hyprland.lua" > /tmp/hl.$$ &&
+      cat /tmp/hl.$$ > "$HYPR/hyprland.lua" || warn "Windows keys loader removal failed"
+    rm -f /tmp/hl.$$
+  fi
 fi
 
 if [[ $RESETPINS == true ]]; then
   say "Default dock pins..."
-  rm -f "$HOME/.local/state/omarchy/orbital-dock.json"
+  rm -f "$HOME/.local/state/omarchy/orbital-dock.json" || warn "dock pins reset failed"
 fi
 
 say "Reloading (once)..."
-hyprctl reload >/dev/null 2>&1 || echo "hypr reload failed"
-omarchy restart shell >/dev/null 2>&1 || echo "shell restart failed"
+hyprctl reload >/dev/null 2>&1 || warn "Hyprland reload failed"
+omarchy restart shell >/dev/null 2>&1 || warn "shell restart failed"
+if (( ${#FAILURES[@]} )); then
+  say "Some changes failed: ${FAILURES[*]}"
+  exit 1
+fi
 say "All applied."
