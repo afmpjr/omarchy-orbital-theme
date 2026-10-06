@@ -29,6 +29,10 @@ for name in ("SideRow", "OptionRow", "SwatchButton", "ThumbButton"):
 
 require("function moveKeyboardFocus(current, forward)" in source and "nextItemInFocusChain(forward)" in source,
         "arrow navigation follows the visible focus chain")
+require("function moveGridFocus(current, repeater, index, columns, count, key)" in source
+        and "root.moveGridFocus(swBtn, itemRepeater, itemIndex, 9" in component("SwatchButton")
+        and "root.moveGridFocus(thBtn, itemRepeater, itemIndex, 4" in component("ThumbButton"),
+        "arrows follow the rows and columns in colour and wallpaper grids")
 require("function focusSection(index)" in source and "Qt.Key_Up" in component("SideRow")
         and "Qt.Key_Down" in component("SideRow"), "Up and Down navigate settings sections")
 require("activeFocusOnTab: true" in source[source.index("id: hexInput"):source.index("onEditingFinished: root.applyCustomHex")],

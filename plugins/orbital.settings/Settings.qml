@@ -105,6 +105,23 @@ Item {
     }
   }
 
+  function moveGridFocus(current, repeater, index, columns, count, key) {
+    if (count <= 0) return
+    var row = Math.floor(index / columns)
+    var column = index % columns
+    var nextRow = row
+    var nextColumn = column
+    if (key === Qt.Key_Left) nextColumn = Math.max(0, column - 1)
+    else if (key === Qt.Key_Right) nextColumn = Math.min(columns - 1, column + 1)
+    else if (key === Qt.Key_Up) nextRow = Math.max(0, row - 1)
+    else if (key === Qt.Key_Down) nextRow = Math.min(Math.ceil(count / columns) - 1, row + 1)
+    var rowLength = Math.min(columns, count - nextRow * columns)
+    var nextIndex = nextRow * columns + Math.min(nextColumn, rowLength - 1)
+    if (nextIndex === index) return
+    var target = repeater.itemAt(nextIndex)
+    if (target && target.visible && target.enabled) target.forceActiveFocus()
+  }
+
   function loadSettings() {
     root.settingsLoaded = false
     root.settingsOutput = ""
@@ -446,6 +463,8 @@ Item {
     id: swBtn
     required property string swName
     required property color swColor
+    property int itemIndex: -1
+    property var itemRepeater
     readonly property bool keyboardTarget: true
     signal activated()
     activeFocusOnTab: true
@@ -461,7 +480,7 @@ Item {
         root.close()
         event.accepted = true
       } else if ([Qt.Key_Up, Qt.Key_Down, Qt.Key_Left, Qt.Key_Right].indexOf(event.key) >= 0) {
-        root.moveKeyboardFocus(swBtn, event.key === Qt.Key_Down || event.key === Qt.Key_Right)
+        root.moveGridFocus(swBtn, itemRepeater, itemIndex, 9, root.swatches.length, event.key)
         event.accepted = true
       } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter || event.key === Qt.Key_Space) {
         swBtn.activated()
@@ -488,6 +507,8 @@ Item {
     id: thBtn
     required property string filePath
     property bool selected: false
+    property int itemIndex: -1
+    property var itemRepeater
     readonly property bool keyboardTarget: true
     signal activated()
     activeFocusOnTab: true
@@ -503,7 +524,7 @@ Item {
         root.close()
         event.accepted = true
       } else if ([Qt.Key_Up, Qt.Key_Down, Qt.Key_Left, Qt.Key_Right].indexOf(event.key) >= 0) {
-        root.moveKeyboardFocus(thBtn, event.key === Qt.Key_Down || event.key === Qt.Key_Right)
+        root.moveGridFocus(thBtn, itemRepeater, itemIndex, 4, root.wallpapers.length, event.key)
         event.accepted = true
       } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter || event.key === Qt.Key_Space) {
         thBtn.activated()
@@ -687,11 +708,15 @@ Item {
                   columnSpacing: Style.space(8)
                   rowSpacing: Style.space(8)
                   Repeater {
+                    id: swatchRepeater
                     model: root.swatches
                     SwatchButton {
                       required property var modelData
+                      required property int index
                       swName: modelData.name
                       swColor: modelData.color
+                      itemIndex: index
+                      itemRepeater: swatchRepeater
                       onActivated: root.applyAccentLive(swName)
                     }
                   }
@@ -833,10 +858,14 @@ Item {
                   columnSpacing: Style.space(8)
                   rowSpacing: Style.space(8)
                   Repeater {
+                    id: wallpaperRepeater
                     model: root.wallpapers
                     ThumbButton {
                       required property var modelData
+                      required property int index
                       filePath: String(modelData)
+                      itemIndex: index
+                      itemRepeater: wallpaperRepeater
                       selected: root.pWallpaper === String(modelData)
                       onActivated: root.setPreference("wallpaper", String(modelData))
                     }
