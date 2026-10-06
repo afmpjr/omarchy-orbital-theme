@@ -18,6 +18,8 @@ matters (swatches, wallpaper thumbs, bar mock).
   and then reloads Hyprland + restarts the shell exactly once. Two exceptions
   stay live, like everywhere else they appear: accent swatches and the widgets
   lock switch.
+- Opening the panel reads the current Omarchy and Hyprland settings first, so
+  applying one choice preserves existing values in the other sections.
 - Summon accepts `{"section": "<id>"}` to open on a specific tab.
 
 ## Attribution

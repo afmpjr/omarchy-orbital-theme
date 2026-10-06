@@ -1,0 +1,156 @@
+#!/usr/bin/env python3
+"""Print the current Orbital settings as one JSON object for Settings.qml."""
+import json
+import os
+import re
+import subprocess
+import sys
+from pathlib import Path
+
+
+HOME = Path(os.environ["HOME"])
+CONFIG = HOME / ".config"
+STATE = HOME / ".local/state/omarchy"
+PRESETS = {
+    "blue", "indigo", "purple", "lilac", "magenta", "pink", "rose", "red",
+    "orange", "amber", "lime", "green", "mint", "teal", "cyan", "white",
+    "gray", "black",
+}
+
+
+def read_text(path):
+    try:
+        return path.read_text()
+    except OSError:
+        return ""
+
+
+def option_int(name):
+    result = subprocess.run(
+        ["hyprctl", "getoption", name, "-j"], capture_output=True, text=True,
+        check=False,
+    )
+    if result.returncode == 0:
+        try:
+            value = json.loads(result.stdout)
+            for key in ("int", "value"):
+                if isinstance(value.get(key), int):
+                    return value[key]
+        except (json.JSONDecodeError, AttributeError):
+            pass
+    raise RuntimeError(f"Could not read Hyprland option {name}")
+
+
+def layout_value():
+    text = read_text(CONFIG / "hypr/orbital-keyboard.lua")
+    match = re.search(r'kb_layout\s*=\s*["\']([^"\']+)', text)
+    if match:
+        return match.group(1)
+    result = subprocess.run(
+        ["hyprctl", "getoption", "input:kb_layout", "-j"],
+        capture_output=True, text=True, check=False,
+    )
+    if result.returncode == 0:
+        try:
+            value = json.loads(result.stdout)
+            for key in ("str", "value"):
+                if isinstance(value.get(key), str) and value[key]:
+                    return value[key]
+        except (json.JSONDecodeError, AttributeError):
+            pass
+    raise RuntimeError("Could not read the current keyboard layout")
+
+
+def accent_value():
+    try:
+        name = json.loads((STATE / "orbital-accent.json").read_text()).get("name", "")
+    except (OSError, json.JSONDecodeError, AttributeError):
+        name = ""
+    if name in PRESETS:
+        return name, ""
+    if isinstance(name, str) and re.fullmatch(r"#[0-9a-fA-F]{6}", name):
+        return "", name[1:].upper()
+
+    colors = read_text(CONFIG / "omarchy/themes/orbital/colors.toml")
+    match = re.search(r'^\s*accent\s*=\s*"(#[0-9a-fA-F]{6})"', colors, re.M)
+    if match:
+        return "", match.group(1)[1:].upper()
+    return "blue", ""
+
+
+def has_id(value, wanted):
+    if isinstance(value, dict):
+        return value.get("id") == wanted or any(has_id(child, wanted) for child in value.values())
+    if isinstance(value, list):
+        return any(has_id(child, wanted) for child in value)
+    return False
+
+
+def wallpaper_value():
+    current = STATE / "current/background"
+    try:
+        target = current.resolve(strict=True)
+    except OSError:
+        return ""
+    roots = [CONFIG / "omarchy/themes/orbital/backgrounds", HOME / "Pictures"]
+    for root in roots:
+        if not root.is_dir():
+            continue
+        for candidate in sorted(root.glob("*")):
+            paths = [candidate] if candidate.is_file() else sorted(candidate.glob("*"))
+            for path in paths:
+                if path.suffix.lower() in {".jpg", ".jpeg", ".png", ".webp"}:
+                    try:
+                        if path.resolve(strict=True) == target:
+                            return str(path)
+                    except OSError:
+                        pass
+    return ""
+
+
+def main():
+    shell = json.loads((CONFIG / "omarchy/shell.json").read_text())
+    bar = shell["bar"]
+    if not isinstance(bar.get("id"), str) or not bar["id"]:
+        raise RuntimeError("Could not read the current bar")
+    if bar.get("position") not in {"top", "bottom", "left", "right"}:
+        raise RuntimeError("Could not read the current bar position")
+    layout = bar.get("layout", {})
+    gaps_file = read_text(CONFIG / "hypr/orbital-gaps.lua")
+    gaps_match = re.search(
+        r"gaps_in\s*=\s*(-?\d+)\s*,\s*gaps_out\s*=\s*(-?\d+)",
+        gaps_file,
+    )
+    gaps = (
+        f"{gaps_match.group(1)},{gaps_match.group(2)}" if gaps_match else
+        f"{option_int('general:gaps_in')},{option_int('general:gaps_out')}"
+    )
+    accent, custom = accent_value()
+    hyprland = read_text(CONFIG / "hypr/hyprland.lua")
+    lock_file = STATE / "orbital-widgets-lock"
+    lock_text = read_text(lock_file).strip()
+
+    print(json.dumps({
+        "accent": accent,
+        "accentCustom": custom,
+        "bar": bar["id"],
+        "barPos": bar.get("position", "bottom"),
+        "transparent": bar.get("transparent") is True,
+        "divider": has_id(layout, "orbital.divider"),
+        "locked": lock_text != "0",
+        "keyboard": layout_value(),
+        "wallpaper": wallpaper_value(),
+        "gaps": gaps,
+        "windowsKeys": any(
+            line.lstrip().startswith('require("hypr.orbital-keys-windows"')
+            for line in hyprland.splitlines()
+        ),
+    }))
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except (OSError, KeyError, TypeError, ValueError, RuntimeError) as error:
+        print(f"orbital-settings-state: {error}", file=sys.stderr)
+        raise SystemExit(1)

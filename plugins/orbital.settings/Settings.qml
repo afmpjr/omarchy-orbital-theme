@@ -19,6 +19,8 @@ Item {
   id: root
 
   property bool opened: false
+  property bool settingsLoaded: false
+  property string settingsOutput: ""
   property int sectionIndex: 0
   property string statusText: ""
 
@@ -71,7 +73,7 @@ Item {
 
   function open(payloadJson) {
     root.opened = true
-    root.statusText = ""
+    root.loadSettings()
     lockFile.reload()
     try {
       var p = JSON.parse(payloadJson || "{}")
@@ -84,6 +86,14 @@ Item {
   }
   function close() { root.opened = false }
   function toggle(payloadJson) { if (root.opened) root.close(); else root.open(payloadJson) }
+
+  function loadSettings() {
+    root.settingsLoaded = false
+    root.settingsOutput = ""
+    root.statusText = "Loading current settings..."
+    settingsProc.command = [installedPath("orbital.settings/orbital-settings-state")]
+    settingsProc.running = true
+  }
 
   FileView {
     id: lockFile
@@ -123,7 +133,44 @@ Item {
     onTriggered: lockFile.reload()
   }
 
+  Process {
+    id: settingsProc
+    stdout: SplitParser {
+      onRead: function(line) { root.settingsOutput += String(line || "") }
+    }
+    onExited: function(code) {
+      if (code !== 0) {
+        root.statusText = "Could not read current settings. Apply is disabled."
+        return
+      }
+      try {
+        var state = JSON.parse(root.settingsOutput)
+        if (!state || !state.bar || !state.barPos || !state.keyboard || !state.gaps)
+          throw new Error("Incomplete settings state")
+        root.pAccent = String(state.accent || "")
+        root.pAccentCustom = String(state.accentCustom || "")
+        root.pBar = String(state.bar)
+        root.pBarPos = String(state.barPos)
+        root.pTransparent = state.transparent === true
+        root.pDivider = state.divider === true
+        root.pLock = state.locked !== false
+        root.pKeyboard = String(state.keyboard)
+        root.pWallpaper = String(state.wallpaper || "")
+        root.pGaps = String(state.gaps)
+        root.pWindowsKeys = state.windowsKeys === true
+        root.pAvatarMode = "keep"
+        root.pAvatarPath = ""
+        root.pResetPins = false
+        root.settingsLoaded = true
+        root.statusText = ""
+      } catch (e) {
+        root.statusText = "Could not read current settings. Apply is disabled."
+      }
+    }
+  }
+
   function applyAll() {
+    if (!root.settingsLoaded || applyProc.running) return
     root.statusText = "Applying..."
     applyProc.command = [
       installedPath("orbital.settings/orbital-settings-apply"),
@@ -451,6 +498,7 @@ Item {
             width: Style.space(190)
             height: parent.height
             spacing: Style.space(2)
+            enabled: root.settingsLoaded && !applyProc.running
             Repeater {
               model: root.sections
               SideRow {
@@ -475,6 +523,7 @@ Item {
             id: contentArea
             width: parent.width - sidebar.width - 1 - parent.spacing * 2
             height: parent.height
+            enabled: root.settingsLoaded && !applyProc.running
 
             Item {
               anchors.fill: parent
@@ -520,6 +569,7 @@ Item {
                       id: hexInput
                       anchors.fill: parent
                       anchors.leftMargin: 8
+                      text: root.pAccentCustom
                       verticalAlignment: TextInput.AlignVCenter
                       maximumLength: 6
                       font.family: root.fontFamily
@@ -772,6 +822,7 @@ Item {
             radius: Style.space(8)
             anchors.verticalCenter: parent.verticalCenter
             color: Color.accent
+            opacity: root.settingsLoaded && !applyProc.running ? 1 : 0.45
             Text {
               anchors.centerIn: parent
               text: "Apply all"
@@ -785,6 +836,7 @@ Item {
               anchors.fill: parent
               hoverEnabled: true
               cursorShape: Qt.PointingHandCursor
+              enabled: root.settingsLoaded && !applyProc.running
               onClicked: root.applyAll()
             }
           }
