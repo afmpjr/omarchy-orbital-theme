@@ -7,13 +7,8 @@ import qs.Commons
 import qs.Ui
 import "../orbital.ui" as OrbitalUi
 
-// Orbital Settings: setup center with sidebar, live previews and staged
-// choices applied all at once. Same safe overlay shape as orbital.account.
-// Pending model: sections edit pending.* only; "Apply all" runs
-// orbital-settings-apply once (theme, accent, bar, widgets, keyboard,
-// wallpaper, avatar, transparency, gaps, extras), then reloads Hyprland and
-// restarts the shell once. Accent swatches and the lock switch stay live,
-// like everywhere else they appear.
+// Orbital Settings applies and persists each choice as it is selected.
+// Apply reloads Hyprland without restarting the shell or closing this panel.
 
 Item {
   id: root
@@ -23,6 +18,8 @@ Item {
   property string settingsOutput: ""
   property int sectionIndex: 0
   property string statusText: ""
+  property var changeQueue: []
+  property var activeChange: null
 
   property color background: Color.menu.background
   property color foreground: Color.menu.text
@@ -43,7 +40,7 @@ Item {
   property string pAvatarMode: "keep"
   property string pAvatarPath: ""
   property string pGaps: "8,12"
-  property bool pWindowsKeys: false
+  property string pShortcutStyle: "default"
   property bool pResetPins: false
 
   readonly property var sections: [
@@ -107,30 +104,60 @@ Item {
     return Quickshell.env("HOME") + "/.config/omarchy/plugins/" + rel
   }
 
+  function setPreference(key, value) {
+    if (!root.settingsLoaded) return
+    value = String(value)
+    switch (key) {
+      case "accent":
+        if (value.charAt(0) === "#") { root.pAccent = ""; root.pAccentCustom = value.slice(1).toUpperCase() }
+        else { root.pAccent = value; root.pAccentCustom = "" }
+        break
+      case "bar": root.pBar = value; break
+      case "bar-position": root.pBarPos = value; break
+      case "transparency": root.pTransparent = value === "true"; break
+      case "divider": root.pDivider = value === "true"; break
+      case "widget-lock": root.pLock = value === "true"; break
+      case "keyboard": root.pKeyboard = value; break
+      case "wallpaper": if (value.length > 0) root.pWallpaper = value; break
+      case "avatar":
+        if (value === "keep") { root.pAvatarMode = "keep"; root.pAvatarPath = "" }
+        else if (value === "github") root.pAvatarMode = "github"
+        else if (value === "clear") root.pAvatarMode = "clear"
+        else if (value.indexOf("file:") === 0) { root.pAvatarMode = "file"; root.pAvatarPath = value.slice(5) }
+        break
+      case "gaps": root.pGaps = value; break
+      case "shortcuts": root.pShortcutStyle = value; break
+      case "reset-pins": root.pResetPins = value === "true"; break
+    }
+    var queue = root.changeQueue.slice()
+    queue.push({ key: key, value: value })
+    root.changeQueue = queue
+    root.processNextChange()
+  }
+
+  function processNextChange() {
+    if (changeProc.running || root.changeQueue.length === 0) return
+    var queue = root.changeQueue.slice()
+    root.activeChange = queue.shift()
+    root.changeQueue = queue
+    changeProc.command = [installedPath("orbital.settings/orbital-settings-change"), root.activeChange.key, root.activeChange.value]
+    changeProc.running = true
+  }
+
   function applyAccentLive(name) {
-    root.pAccent = name
-    root.pAccentCustom = ""
-    Util.execDetached("python3 " + installedPath("orbital.appearance/orbital-accent.py") + " " + name)
-    root.statusText = "Accent " + name + " applied."
+    root.setPreference("accent", name)
   }
 
   function applyCustomHex(hex) {
-    if (!/^[0-9a-fA-F]{6}$/.test(hex)) { root.statusText = "Invalid hex (6 digits)."; return }
-    root.pAccentCustom = hex.toUpperCase()
-    Util.execDetached("python3 " + installedPath("orbital.appearance/orbital-accent.py") + " #" + hex)
-    root.statusText = "Accent #" + hex.toUpperCase() + " applied."
+    if (!/^[0-9a-fA-F]{6}$/.test(hex)) { root.statusText = "Enter six hexadecimal digits."; return }
+    root.setPreference("accent", "#" + hex)
   }
 
-  function toggleLockLive() {
-    Util.execDetached(installedPath("orbital.account/orbital-widgets-lock") + " --toggle")
-    lockRefresh.restart()
-  }
-
-  Timer {
-    id: lockRefresh
-    interval: 600
-    repeat: false
-    onTriggered: lockFile.reload()
+  function applyAll() {
+    if (!root.settingsLoaded || applyProc.running || changeProc.running || root.changeQueue.length > 0) return
+    root.statusText = "Applying..."
+    applyProc.command = [installedPath("orbital.settings/orbital-settings-apply")]
+    applyProc.running = true
   }
 
   Process {
@@ -157,31 +184,36 @@ Item {
         root.pKeyboard = String(state.keyboard)
         root.pWallpaper = String(state.wallpaper || "")
         root.pGaps = String(state.gaps)
-        root.pWindowsKeys = state.windowsKeys === true
+        root.pShortcutStyle = String(state.shortcutStyle || (state.windowsKeys ? "windows" : "default"))
         root.pAvatarMode = "keep"
         root.pAvatarPath = ""
         root.pResetPins = false
         root.settingsLoaded = true
-        root.statusText = ""
+        root.statusText = "Choices save and apply immediately."
       } catch (e) {
         root.statusText = "Could not read current settings. Apply is disabled."
       }
     }
   }
 
-  function applyAll() {
-    if (!root.settingsLoaded || applyProc.running) return
-    root.statusText = "Applying..."
-    applyProc.command = [
-      installedPath("orbital.settings/orbital-settings-apply"),
-      root.pAccentCustom.length > 0 ? ("#" + root.pAccentCustom) : root.pAccent,
-      root.pBar, root.pBarPos, root.pTransparent ? "true" : "false",
-      root.pDivider ? "true" : "false", root.pLock ? "true" : "false",
-      root.pKeyboard, root.pWallpaper, root.pAvatarMode, root.pAvatarPath,
-      root.pGaps, root.pWindowsKeys ? "true" : "false",
-      root.pResetPins ? "true" : "false"
-    ]
-    applyProc.running = true
+  Process {
+    id: changeProc
+    stdout: SplitParser {
+      onRead: function(line) { root.statusText = String(line || "").trim() }
+    }
+    stderr: SplitParser {
+      onRead: function(line) { root.statusText = String(line || "").trim() }
+    }
+    onExited: function(code) {
+      if (code === 0) {
+        if (root.activeChange && root.activeChange.key === "reset-pins") root.pResetPins = false
+      } else {
+        root.statusText = "Could not save that choice; restoring saved preferences."
+        if (root.changeQueue.length === 0) root.loadSettings()
+      }
+      root.activeChange = null
+      Qt.callLater(root.processNextChange)
+    }
   }
 
   Process {
@@ -193,7 +225,7 @@ Item {
       }
     }
     onExited: function(code) {
-      if (code !== 0 && root.statusText === "Applying...") root.statusText = "Failed (code " + code + ")."
+      root.statusText = code === 0 ? "Applied. Setup remains open." : "Apply failed (code " + code + ")."
     }
   }
 
@@ -498,7 +530,7 @@ Item {
             width: Style.space(190)
             height: parent.height
             spacing: Style.space(2)
-            enabled: root.settingsLoaded && !applyProc.running
+            enabled: root.settingsLoaded && !applyProc.running && !changeProc.running
             Repeater {
               model: root.sections
               SideRow {
@@ -523,7 +555,7 @@ Item {
             id: contentArea
             width: parent.width - sidebar.width - 1 - parent.spacing * 2
             height: parent.height
-            enabled: root.settingsLoaded && !applyProc.running
+            enabled: root.settingsLoaded && !applyProc.running && !changeProc.running
 
             Item {
               anchors.fill: parent
@@ -575,7 +607,7 @@ Item {
                       font.family: root.fontFamily
                       font.pixelSize: Style.font.bodySmall
                       color: root.foreground
-                      onAccepted: root.applyCustomHex(text)
+                      onEditingFinished: root.applyCustomHex(text)
                     }
                   }
                 }
@@ -594,13 +626,13 @@ Item {
                   label: "orbital.floating-bar"
                   sub: "Floating, the theme default"
                   selected: root.pBar === "orbital.floating-bar"
-                  onActivated: root.pBar = "orbital.floating-bar"
+                  onActivated: root.setPreference("bar", "orbital.floating-bar")
                 }
                 OptionRow {
                   label: "orbital.bar"
                   sub: "Full width, the alternative"
                   selected: root.pBar === "orbital.bar"
-                  onActivated: root.pBar = "orbital.bar"
+                  onActivated: root.setPreference("bar", "orbital.bar")
                 }
               }
             }
@@ -613,10 +645,10 @@ Item {
                 spacing: Style.space(8)
                 SectionTitle { label: "Bar position" }
                 BarMock {}
-                OptionRow { label: "Bottom"; selected: root.pBarPos === "bottom"; onActivated: root.pBarPos = "bottom" }
-                OptionRow { label: "Top"; selected: root.pBarPos === "top"; onActivated: root.pBarPos = "top" }
-                OptionRow { label: "Left"; selected: root.pBarPos === "left"; onActivated: root.pBarPos = "left" }
-                OptionRow { label: "Right"; selected: root.pBarPos === "right"; onActivated: root.pBarPos = "right" }
+                OptionRow { label: "Bottom"; selected: root.pBarPos === "bottom"; onActivated: root.setPreference("bar-position", "bottom") }
+                OptionRow { label: "Top"; selected: root.pBarPos === "top"; onActivated: root.setPreference("bar-position", "top") }
+                OptionRow { label: "Left"; selected: root.pBarPos === "left"; onActivated: root.setPreference("bar-position", "left") }
+                OptionRow { label: "Right"; selected: root.pBarPos === "right"; onActivated: root.setPreference("bar-position", "right") }
               }
             }
 
@@ -632,14 +664,14 @@ Item {
                   sub: "Locks bar rearranging (applies live)"
                   isSwitch: true
                   switchOn: root.pLock
-                  onActivated: root.toggleLockLive()
+                  onActivated: root.setPreference("widget-lock", root.pLock ? "false" : "true")
                 }
                 OptionRow {
                   label: "Divider on the bar"
                   sub: "Hairline between keyboard and clock"
                   isSwitch: true
                   switchOn: root.pDivider
-                  onActivated: root.pDivider = !root.pDivider
+                  onActivated: root.setPreference("divider", root.pDivider ? "false" : "true")
                 }
               }
             }
@@ -651,9 +683,9 @@ Item {
                 anchors.fill: parent
                 spacing: Style.space(8)
                 SectionTitle { label: "Keyboard" }
-                OptionRow { label: "us"; sub: "US only"; selected: root.pKeyboard === "us"; onActivated: root.pKeyboard = "us" }
-                OptionRow { label: "us,br"; sub: "Alt+Shift switches"; selected: root.pKeyboard === "us,br"; onActivated: root.pKeyboard = "us,br" }
-                OptionRow { label: "br,us"; sub: "BR default, Alt+Shift switches"; selected: root.pKeyboard === "br,us"; onActivated: root.pKeyboard = "br,us" }
+                OptionRow { label: "us"; sub: "US only"; selected: root.pKeyboard === "us"; onActivated: root.setPreference("keyboard", "us") }
+                OptionRow { label: "us,br"; sub: "US default; Alt+Shift switches"; selected: root.pKeyboard === "us,br"; onActivated: root.setPreference("keyboard", "us,br") }
+                OptionRow { label: "br,us"; sub: "BR default; Alt+Shift switches"; selected: root.pKeyboard === "br,us"; onActivated: root.setPreference("keyboard", "br,us") }
               }
             }
 
@@ -667,7 +699,7 @@ Item {
                 OptionRow {
                   label: "Keep current"
                   selected: root.pWallpaper.length === 0
-                  onActivated: root.pWallpaper = ""
+                  onActivated: root.setPreference("wallpaper", "")
                 }
                 Grid {
                   columns: 4
@@ -679,7 +711,7 @@ Item {
                       required property var modelData
                       filePath: String(modelData)
                       selected: root.pWallpaper === String(modelData)
-                      onActivated: root.pWallpaper = String(modelData)
+                      onActivated: root.setPreference("wallpaper", String(modelData))
                     }
                   }
                 }
@@ -693,10 +725,10 @@ Item {
                 anchors.fill: parent
                 spacing: Style.space(8)
                 SectionTitle { label: "Avatar" }
-                OptionRow { label: "Keep"; selected: root.pAvatarMode === "keep"; onActivated: root.pAvatarMode = "keep" }
-                OptionRow { label: "GitHub photo"; sub: "Needs gh auth login"; selected: root.pAvatarMode === "github"; onActivated: root.pAvatarMode = "github" }
-                OptionRow { label: "Remove avatar"; selected: root.pAvatarMode === "clear"; onActivated: root.pAvatarMode = "clear" }
-                OptionRow { label: "File..."; sub: root.pAvatarPath.length > 0 ? root.pAvatarPath : "Image path"; selected: root.pAvatarMode === "file"; onActivated: root.pAvatarMode = "file" }
+                OptionRow { label: "Keep"; selected: root.pAvatarMode === "keep"; onActivated: root.setPreference("avatar", "keep") }
+                OptionRow { label: "GitHub photo"; sub: "Needs gh auth login"; selected: root.pAvatarMode === "github"; onActivated: root.setPreference("avatar", "github") }
+                OptionRow { label: "Remove avatar"; selected: root.pAvatarMode === "clear"; onActivated: root.setPreference("avatar", "clear") }
+                OptionRow { label: "File..."; sub: root.pAvatarPath.length > 0 ? root.pAvatarPath : "Image path"; selected: root.pAvatarMode === "file"; onActivated: { root.pAvatarMode = "file"; avatarPathInput.forceActiveFocus() } }
                 Rectangle {
                   visible: root.pAvatarMode === "file"
                   width: parent.width
@@ -709,11 +741,15 @@ Item {
                     id: avatarPathInput
                     anchors.fill: parent
                     anchors.leftMargin: 8
+                    text: root.pAvatarPath
                     verticalAlignment: TextInput.AlignVCenter
                     font.family: root.fontFamily
                     font.pixelSize: Style.font.bodySmall
                     color: root.foreground
                     onTextChanged: root.pAvatarPath = text
+                    onEditingFinished: {
+                      if (text.length > 0) root.setPreference("avatar", "file:" + text)
+                    }
                   }
                 }
               }
@@ -731,7 +767,7 @@ Item {
                   label: "Transparent bar"
                   isSwitch: true
                   switchOn: root.pTransparent
-                  onActivated: root.pTransparent = !root.pTransparent
+                  onActivated: root.setPreference("transparency", root.pTransparent ? "false" : "true")
                 }
               }
             }
@@ -743,9 +779,9 @@ Item {
                 anchors.fill: parent
                 spacing: Style.space(8)
                 SectionTitle { label: "Window gaps" }
-                OptionRow { label: "Default"; sub: "8/12, the author's"; selected: root.pGaps === "8,12"; onActivated: root.pGaps = "8,12" }
-                OptionRow { label: "Compact"; sub: "4/4"; selected: root.pGaps === "4,4"; onActivated: root.pGaps = "4,4" }
-                OptionRow { label: "No gaps"; sub: "0, all tiled"; selected: root.pGaps === "0,0"; onActivated: root.pGaps = "0,0" }
+                OptionRow { label: "Default"; sub: "8/12, the author's"; selected: root.pGaps === "8,12"; onActivated: root.setPreference("gaps", "8,12") }
+                OptionRow { label: "Compact"; sub: "4/4"; selected: root.pGaps === "4,4"; onActivated: root.setPreference("gaps", "4,4") }
+                OptionRow { label: "No gaps"; sub: "0, all tiled"; selected: root.pGaps === "0,0"; onActivated: root.setPreference("gaps", "0,0") }
               }
             }
 
@@ -756,18 +792,15 @@ Item {
                 anchors.fill: parent
                 spacing: Style.space(8)
                 SectionTitle { label: "Extras" }
-                OptionRow {
-                  label: "Windows-style shortcuts"
-                  sub: "Super+R, Super+E and friends (opt-in)"
-                  isSwitch: true
-                  switchOn: root.pWindowsKeys
-                  onActivated: root.pWindowsKeys = !root.pWindowsKeys
-                }
+                SectionTitle { label: "Keyboard shortcut style" }
+                OptionRow { label: "Default"; sub: "Keep Omarchy shortcuts"; selected: root.pShortcutStyle === "default"; onActivated: root.setPreference("shortcuts", "default") }
+                OptionRow { label: "Mac-style"; sub: "⌘ uses Super; ⌥ uses Alt; app shortcuts use Ctrl"; selected: root.pShortcutStyle === "mac"; onActivated: root.setPreference("shortcuts", "mac") }
+                OptionRow { label: "Windows-style"; sub: "Super+R, Super+E and friends"; selected: root.pShortcutStyle === "windows"; onActivated: root.setPreference("shortcuts", "windows") }
                 OptionRow {
                   label: "Reset dock pins"
-                  sub: "Back to default pins on next apply"
+                  sub: "Reset the dock now"
                   selected: root.pResetPins
-                  onActivated: root.pResetPins = !root.pResetPins
+                  onActivated: root.setPreference("reset-pins", "true")
                 }
               }
             }
@@ -816,16 +849,16 @@ Item {
             }
           }
           Rectangle {
-            id: applyButton
+          id: applyButton
             width: 130
             height: Style.space(34)
             radius: Style.space(8)
             anchors.verticalCenter: parent.verticalCenter
             color: Color.accent
-            opacity: root.settingsLoaded && !applyProc.running ? 1 : 0.45
+            opacity: root.settingsLoaded && !applyProc.running && !changeProc.running && root.changeQueue.length === 0 ? 1 : 0.45
             Text {
               anchors.centerIn: parent
-              text: "Apply all"
+              text: "Apply"
               textFormat: Text.PlainText
               color: Color.background
               font.family: root.fontFamily
@@ -836,7 +869,7 @@ Item {
               anchors.fill: parent
               hoverEnabled: true
               cursorShape: Qt.PointingHandCursor
-              enabled: root.settingsLoaded && !applyProc.running
+              enabled: root.settingsLoaded && !applyProc.running && !changeProc.running && root.changeQueue.length === 0
               onClicked: root.applyAll()
             }
           }

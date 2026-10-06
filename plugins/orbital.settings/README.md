@@ -13,13 +13,14 @@ matters (swatches, wallpaper thumbs, bar mock).
 
 ## Details
 
-- Choices are staged as pending values; nothing touches the system until
-  **Apply all**, which runs `orbital-settings-apply` once with the whole set
-  and then reloads Hyprland + restarts the shell exactly once. Two exceptions
-  stay live, like everywhere else they appear: accent swatches and the widgets
-  lock switch.
-- Opening the panel reads the current Omarchy and Hyprland settings first, so
-  applying one choice preserves existing values in the other sections.
+- Every choice is saved and applied immediately. Bar configuration is picked
+  up by the running shell; Hyprland preferences reload the compositor config
+  without restarting Quickshell.
+- **Apply** reloads Hyprland and leaves Settings open.
+- Keyboard shortcut styles are mutually exclusive: Default, Mac-style
+  (Super/⌘ sends common Ctrl shortcuts to Linux apps; Alt remains Option), and
+  Windows-style.
+- The panel reads current Omarchy and Hyprland settings whenever it opens.
 - Summon accepts `{"section": "<id>"}` to open on a specific tab.
 
 ## Attribution
