@@ -55,6 +55,7 @@ while (( $# )); do
     --no-launcher-key) LAUNCHER_KEY=0 ;; --no-alt-shift) ALT_SHIFT=0 ;; --no-gestures) GESTURES=0 ;; --keep-bar) KEEP_BAR=1 ;; --windows-keys) WINDOWS_KEYS=1 ;; --refresh-theme) REFRESH_THEME=1 ;;
     --theme-dir) THEME_TARGET="${1:?--theme-dir needs a folder}"; shift ;; --fix-terminal-shortcuts) TERM_FIX=1 ;;
     --keyboard-layouts) KBLAYOUTS="${1:?--keyboard-layouts needs a list, e.g. us,br}"; shift ;; --uninstall) UNINSTALL=1 ;;
+    --setup) exec "$REPO/bin/orbital-setup" ;;
     # The header comment is the help text: print the block of '#' lines under the shebang.
     -h|--help) awk 'NR>1 && /^#/ { sub(/^# ?/, ""); print; next } NR>1 { exit }' "$0"; exit 0 ;;
     *) echo "unknown option: $a" >&2; exit 2 ;;

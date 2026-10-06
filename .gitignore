@@ -4,3 +4,5 @@ __pycache__/
 test-output/
 AI_HANDOFF.md
 AI_HANDOFF_ARCHIVE.md
+ai-memory/
+agent-logs/

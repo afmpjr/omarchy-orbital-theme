@@ -1,0 +1,251 @@
+#!/usr/bin/env bash
+# orbital-setup - dua-style TUI setup for the Orbital theme.
+# Install wizard (mirrors install.sh flags) and settings editor in one place.
+# Keys (dua-like): up/down or j/k to move, Enter to select, left/Esc to go
+# back, q to quit. Every leaf action reuses an already-tested path
+# (orbital-accent.py, omarchy bar/*, orbital-avatar, ...); actions that need
+# it set DIRTY so the shell restarts exactly once, on the way out.
+# Headless-safe: with no tty on stdin it prints usage and exits (never hangs),
+# which is also how scripts/test-setup.sh drives it (piped keystrokes).
+set -uo pipefail
+
+REPO="$(cd "$(dirname "$0")/.." && pwd)"
+PLUGINS="$HOME/.config/omarchy/plugins"
+ACC="$PLUGINS/orbital.appearance/orbital-accent.py"
+AVATAR="$PLUGINS/orbital.account/orbital-avatar"
+LOCKER="$PLUGINS/orbital.account/orbital-widgets-lock"
+LOCKFILE="$HOME/.local/state/omarchy/orbital-widgets-lock"
+KBLUA="$HOME/.config/hypr/orbital-keyboard.lua"
+THEMES_BG="$HOME/.config/omarchy/themes/orbital/backgrounds"
+DIRTY=0
+
+# --- screen -----------------------------------------------------------------
+if command -v tput >/dev/null 2>&1; then
+  C_ACC="$(tput setaf 4 2>/dev/null)"; C_BOLD="$(tput bold 2>/dev/null)"; C_OFF="$(tput sgr0 2>/dev/null)"
+else C_ACC="" C_BOLD="" C_OFF=""; fi
+draw_clear() { printf '\033[H\033[2J'; }
+
+# --- key reader: up|down|left|right|enter|quit|other --------------------------
+read_key() {
+  local k rest
+  IFS= read -rsn1 k || { echo hungup; return 0; }
+  if [[ $k == $'\e' ]]; then
+    IFS= read -rsn2 -t 1 rest || { echo esc; return 0; }
+    case "$rest" in
+      "[A") echo up;; "[B") echo down;; "[C") echo right;; "[D") echo left;;
+      *) echo other;;
+    esac
+  elif [[ -z $k ]]; then echo enter
+  elif [[ $k == [qQ] ]]; then echo quit
+  elif [[ $k == [jJ] ]]; then echo down
+  elif [[ $k == [kK] ]]; then echo up
+  elif [[ $k == [hH] ]]; then echo left
+  elif [[ $k == [lL] ]]; then echo right
+  else echo other; fi
+}
+
+# menu "Title" "item1" "item2" ... -> sets CHOICE (0-based), or QUIT=1 / BACK=1
+CHOICE=0; QUIT=0; BACK=0
+menu() {
+  local title="$1"; shift
+  local -a items=("$@")
+  local n=${#items[@]} pos=0 key
+  QUIT=0; BACK=0
+  while true; do
+    draw_clear
+    printf '%sOrbital Setup / %s%s\n\n' "$C_BOLD" "$title" "$C_OFF"
+    local i
+    for i in "${!items[@]}"; do
+      if (( i == pos )); then printf '%s> %s%s\n' "$C_ACC" "${items[$i]}" "$C_OFF"
+      else printf '  %s\n' "${items[$i]}"; fi
+    done
+    printf '\n↑↓/jk navigate · Enter select · ←/Esc back · q quit\n'
+    key="$(read_key)"
+    case "$key" in
+      up) (( pos = (pos + n - 1) % n )) ;;
+      down) (( pos = (pos + 1) % n )) ;;
+      left|esc) BACK=1; return 0 ;;
+      quit|hungup) QUIT=1; return 0 ;;
+      enter) CHOICE=$pos; return 0 ;;
+    esac
+  done
+}
+
+need_tty() {
+  if [[ ! -t 0 ]]; then
+    echo "orbital-setup needs an interactive terminal (stdin is not a tty)." >&2
+    echo "Usage: orbital-setup   # or: install.sh --setup" >&2
+    return 1
+  fi
+}
+
+run_quiet() { "$@" >/dev/null 2>&1; }
+mark_dirty() { DIRTY=1; }
+shell_restart() { run_quiet omarchy restart shell; }
+
+# --- sections ----------------------------------------------------------------
+sec_accent() {
+  local names=(blue indigo purple lilac magenta pink rose red orange amber lime green mint teal cyan white gray black custom)
+  while true; do
+    menu "Cor de acento" "${names[@]}" || return 0
+    (( QUIT )) && return 0
+    (( BACK )) && return 0
+    local pick="${names[$CHOICE]}"
+    if [[ $pick == custom ]]; then
+      draw_clear; printf 'Hex without # (ex: FF8800). Empty cancels.\n> '
+      IFS= read -r hex || return 0
+      [[ $hex =~ ^[0-9a-fA-F]{6}$ ]] || continue
+      # custom hex goes straight through the accent pipeline
+      run_quiet python3 "$ACC" "#$hex" && mark_dirty
+    else
+      run_quiet python3 "$ACC" "$pick" && mark_dirty
+    fi
+    draw_clear; printf 'Accent: %s applied.\nEnter volta.' "$pick"
+    read_key >/dev/null
+    return 0
+  done
+}
+
+sec_bar() {
+  menu "Bar" "orbital.floating-bar (default)" "orbital.bar (alternative)" || return 0
+  (( QUIT || BACK )) && return 0
+  if (( CHOICE == 0 )); then run_quiet omarchy bar use orbital.floating-bar && mark_dirty
+  else run_quiet omarchy bar use orbital.bar && mark_dirty; fi
+}
+
+sec_bar_position() {
+  menu "Bar position" "bottom" "top" "left" "right" || return 0
+  (( QUIT || BACK )) && return 0
+  local pos=""
+  case $CHOICE in
+    0) pos="bottom" ;;
+    1) pos="top" ;;
+    2) pos="left" ;;
+    3) pos="right" ;;
+    *) return 0 ;;
+  esac
+  run_quiet omarchy bar position "$pos" && mark_dirty
+}
+
+sec_widgets() {
+  local lock="unknown"
+  [[ -f $LOCKFILE && $(cat "$LOCKFILE" 2>/dev/null) == "0" ]] && lock="unlocked" || lock="locked"
+  menu "Widgets (now: $lock)" "Lock/Unlock widgets" "Divider on/off" || return 0
+  (( QUIT || BACK )) && return 0
+  if (( CHOICE == 0 )); then
+    run_quiet "$LOCKER" --toggle
+  else
+    if omarchy plugin list 2>/dev/null | grep -qE '^orbital.divider +enabled'; then
+      run_quiet omarchy plugin disable orbital.divider && mark_dirty
+    else
+      run_quiet omarchy plugin enable orbital.divider --section right && mark_dirty
+    fi
+  fi
+}
+
+sec_keyboard() {
+  menu "Keyboard" "us (US only)" "us,br (Alt+Shift switches)" "br,us (BR default)" || return 0
+  (( QUIT || BACK )) && return 0
+  local layouts="us"
+  (( CHOICE == 1 )) && layouts="us,br"
+  (( CHOICE == 2 )) && layouts="br,us"
+  mkdir -p "$(dirname "$KBLUA")"
+  cat > "$KBLUA" << LUA
+-- Orbital keyboard: layouts + Alt+Shift switching (managed by orbital-setup).
+hl.config({ input = { kb_layout = "$layouts", kb_options = "compose:caps,shift:both_capslock_cancel" } })
+local next_layout = hl.dsp.exec_cmd("hyprctl switchxkblayout all next")
+hl.bind("ALT + SHIFT + Shift_L", next_layout, { release = true })
+hl.bind("ALT + SHIFT + Alt_L", next_layout, { release = true })
+LUA
+  run_quiet hyprctl reload
+}
+
+sec_wallpaper() {
+  local -a files=()
+  while IFS= read -r f; do files+=("$(basename "$f")"); done < <(ls "$THEMES_BG" 2>/dev/null)
+  (( ${#files[@]} == 0 )) && { draw_clear; printf 'No wallpapers in theme.\nEnter to go back.'; read_key >/dev/null; return 0; }
+  menu "Wallpaper" "${files[@]}" || return 0
+  (( QUIT || BACK )) && return 0
+  run_quiet omarchy theme bg set "$THEMES_BG/${files[$CHOICE]}"
+}
+
+sec_avatar() {
+  menu "Avatar" "GitHub photo" "Remove avatar" "File... (type the path)" || return 0
+  (( QUIT || BACK )) && return 0
+  if (( CHOICE == 0 )); then run_quiet "$AVATAR" --github && mark_dirty
+  elif (( CHOICE == 1 )); then run_quiet "$AVATAR" --reset && mark_dirty
+  else
+    draw_clear; printf 'Image path (empty cancels):\n> '
+    IFS= read -r img || return 0
+    [[ -n $img && -f $img ]] && { run_quiet "$AVATAR" "$img" && mark_dirty; }
+  fi
+}
+
+sec_transparency() {
+  menu "Bar transparency" "Solid" "Transparent" || return 0
+  (( QUIT || BACK )) && return 0
+  if (( CHOICE == 0 )); then run_quiet omarchy bar transparent false && mark_dirty
+  else run_quiet omarchy bar transparent true && mark_dirty; fi
+}
+
+sec_gaps() {
+  menu "Gaps" "Default (8/12)" "Compact (4/4)" "No gaps (0)" || return 0
+  (( QUIT || BACK )) && return 0
+  local g="8,12"; (( CHOICE == 1 )) && g="4,4"; (( CHOICE == 2 )) && g="0,0"
+  local f="$HOME/.config/hypr/orbital-gaps.lua"
+  mkdir -p "$(dirname "$f")"
+  printf -- '-- Orbital window gaps (managed by orbital-setup).\nhl.config({ general = { gaps_in = %s, gaps_out = %s } })\n' "${g%%,*}" "${g##*,}" > "$f"
+  grep -qF 'hypr.orbital-gaps' "$HOME/.config/hypr/hyprland.lua" 2>/dev/null || \
+    printf 'require("hypr.orbital-gaps") -- orbital\n' >> "$HOME/.config/hypr/hyprland.lua"
+  run_quiet hyprctl reload
+}
+
+sec_extras() {
+  local wk="unknown"
+  grep -q 'hypr.orbital-keys-windows' "$HOME/.config/hypr/hyprland.lua" 2>/dev/null && wk="on" || wk="off"
+  menu "Extras (windows-keys: $wk)" "Windows-keys on/off" "Refazer pins do dock" || return 0
+  (( QUIT || BACK )) && return 0
+  if (( CHOICE == 0 )); then
+    if [[ $wk == on ]]; then
+      run_quiet rm -f "$HOME/.config/hypr/orbital-keys-windows.lua"
+      grep -v 'hypr.orbital-keys-windows' "$HOME/.config/hypr/hyprland.lua" > /tmp/hl.$$ 2>/dev/null && cat /tmp/hl.$$ > "$HOME/.config/hypr/hyprland.lua"; rm -f /tmp/hl.$$
+    else
+      wksrc=""; for c in "$REPO/hypr/orbital-keys-windows.lua"; do [[ -f $c ]] && wksrc="$c" && break; done
+      if [[ -n $wksrc ]]; then
+        run_quiet cp "$wksrc" "$HOME/.config/hypr/orbital-keys-windows.lua"
+        grep -qF 'hypr.orbital-keys-windows' "$HOME/.config/hypr/hyprland.lua" 2>/dev/null || \
+          printf 'require("hypr.orbital-keys-windows") -- orbital\n' >> "$HOME/.config/hypr/hyprland.lua"
+      fi
+    fi
+    run_quiet hyprctl reload
+  else
+    run_quiet rm -f "$HOME/.local/state/omarchy/orbital-dock.json" && mark_dirty
+  fi
+}
+
+# --- main --------------------------------------------------------------------
+main() {
+  # ORBITAL_SETUP_FORCE_TTY=1 skips the tty check so piped-keystroke tests
+  # (scripts/test-setup.sh) can drive every menu headlessly.
+  if [[ ${ORBITAL_SETUP_FORCE_TTY:-} != 1 ]]; then need_tty || exit 1; fi
+  local sections=("Accent color" "Bar" "Bar position" "Widgets" "Keyboard" "Wallpaper" "Avatar" "Transparency" "Gaps" "Extras")
+  while true; do
+    menu "Menu principal" "${sections[@]}" || exit 0
+    (( QUIT )) && break
+    (( BACK )) && continue
+    case $CHOICE in
+      0) sec_accent ;; 1) sec_bar ;; 2) sec_bar_position ;; 3) sec_widgets ;;
+      4) sec_keyboard ;; 5) sec_wallpaper ;; 6) sec_avatar ;; 7) sec_transparency ;;
+      8) sec_gaps ;; 9) sec_extras ;;
+    esac
+    (( QUIT )) && break
+  done
+  draw_clear
+  if (( DIRTY )); then
+    printf 'Applying changes (single restart)...\n'
+    shell_restart
+  fi
+  printf 'Done.\n'
+}
+
+main "$@"
