@@ -53,6 +53,8 @@ The wizard follows Omarchy's Gum-based prompts. It walks through the install pro
 keyboard layouts and theme files. A checklist marks completed choices; the final screen lets you choose separately
 whether to activate Orbital after installation. Nothing is changed before that confirmation. During installation each
 successful phase gets a check mark, and a failure rolls the transaction back.
+The final choices are **Install and activate Orbital** and **Install and keep current theme**; keeping the current theme
+is the default.
 
 **All or nothing.** Installation completes only if every install phase works; activation is a separate final choice.
 Before touching anything the installer checks
