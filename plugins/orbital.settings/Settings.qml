@@ -84,6 +84,44 @@ Item {
   function close() { root.opened = false }
   function toggle(payloadJson) { if (root.opened) root.close(); else root.open(payloadJson) }
 
+  function focusSection(index) {
+    var row = sectionRows.itemAt(index)
+    if (row && row.visible && row.enabled) {
+      root.sectionIndex = index
+      row.forceActiveFocus()
+    }
+  }
+
+  function moveKeyboardFocus(current, forward) {
+    var target = current.nextItemInFocusChain(forward)
+    var attempts = 0
+    while (target && target !== current && attempts < 100) {
+      if (target.keyboardTarget === true && target.visible && target.enabled) {
+        target.forceActiveFocus()
+        return
+      }
+      target = target.nextItemInFocusChain(forward)
+      attempts++
+    }
+  }
+
+  function moveGridFocus(current, repeater, index, columns, count, key) {
+    if (count <= 0) return
+    var row = Math.floor(index / columns)
+    var column = index % columns
+    var nextRow = row
+    var nextColumn = column
+    if (key === Qt.Key_Left) nextColumn = Math.max(0, column - 1)
+    else if (key === Qt.Key_Right) nextColumn = Math.min(columns - 1, column + 1)
+    else if (key === Qt.Key_Up) nextRow = Math.max(0, row - 1)
+    else if (key === Qt.Key_Down) nextRow = Math.min(Math.ceil(count / columns) - 1, row + 1)
+    var rowLength = Math.min(columns, count - nextRow * columns)
+    var nextIndex = nextRow * columns + Math.min(nextColumn, rowLength - 1)
+    if (nextIndex === index) return
+    var target = repeater.itemAt(nextIndex)
+    if (target && target.visible && target.enabled) target.forceActiveFocus()
+  }
+
   function loadSettings() {
     root.settingsLoaded = false
     root.settingsOutput = ""
@@ -190,6 +228,7 @@ Item {
         root.pResetPins = false
         root.settingsLoaded = true
         root.statusText = "Choices save and apply immediately."
+        Qt.callLater(function() { root.focusSection(root.sectionIndex) })
       } catch (e) {
         root.statusText = "Could not read current settings. Apply is disabled."
       }
@@ -249,7 +288,9 @@ Item {
     required property string label
     required property string iconName
     property int rowIdx: -1
+    readonly property bool keyboardTarget: true
     signal activated()
+    activeFocusOnTab: true
     width: parent ? parent.width : 0
     height: Style.space(34)
     radius: Style.space(8)
@@ -257,6 +298,26 @@ Item {
       ? Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.22)
       : (sideMouse.containsMouse
         ? Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.08) : "transparent")
+    Keys.onPressed: function(event) {
+      if (event.key === Qt.Key_Escape) {
+        root.close()
+        event.accepted = true
+      } else if (event.key === Qt.Key_Up || event.key === Qt.Key_Down) {
+        root.focusSection(Math.max(0, Math.min(root.sections.length - 1, rowIdx + (event.key === Qt.Key_Up ? -1 : 1))))
+        event.accepted = true
+      } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter || event.key === Qt.Key_Space) {
+        sideRow.activated()
+        event.accepted = true
+      }
+    }
+    Rectangle {
+      anchors.fill: parent
+      radius: parent.radius
+      color: "transparent"
+      border.width: sideRow.activeFocus ? 2 : 0
+      border.color: Color.accent
+      z: 1
+    }
     Row {
       anchors.left: parent.left
       anchors.right: parent.right
@@ -298,7 +359,9 @@ Item {
     property bool selected: false
     property bool isSwitch: false
     property bool switchOn: false
+    readonly property bool keyboardTarget: true
     signal activated()
+    activeFocusOnTab: true
     width: parent ? parent.width : 0
     height: optSub.visible ? Style.space(52) : Style.space(38)
     radius: Style.space(8)
@@ -306,8 +369,28 @@ Item {
       ? Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.16)
       : (optMouse.containsMouse
         ? Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.08) : "transparent")
-    border.width: optRow.selected ? 2 : 0
-    border.color: Color.accent
+    border.width: optRow.activeFocus ? 3 : (optRow.selected ? 2 : 0)
+    border.color: optRow.activeFocus ? root.foreground : Color.accent
+    Keys.onPressed: function(event) {
+      if (event.key === Qt.Key_Escape) {
+        root.close()
+        event.accepted = true
+      } else if (event.key === Qt.Key_Up || event.key === Qt.Key_Down) {
+        root.moveKeyboardFocus(optRow, event.key === Qt.Key_Down)
+        event.accepted = true
+      } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter || event.key === Qt.Key_Space) {
+        optRow.activated()
+        event.accepted = true
+      }
+    }
+    Rectangle {
+      anchors.fill: parent
+      radius: parent.radius
+      color: "transparent"
+      border.width: optRow.activeFocus ? 2 : 0
+      border.color: Color.accent
+      z: 1
+    }
     Column {
       anchors.left: parent.left
       anchors.right: switchWidget.left
@@ -380,7 +463,11 @@ Item {
     id: swBtn
     required property string swName
     required property color swColor
+    property int itemIndex: -1
+    property var itemRepeater
+    readonly property bool keyboardTarget: true
     signal activated()
+    activeFocusOnTab: true
     width: Style.space(30)
     height: Style.space(30)
     radius: width / 2
@@ -388,6 +475,26 @@ Item {
     border.width: root.pAccent === swBtn.swName && root.pAccentCustom.length === 0 ? 3 : 1
     border.color: root.pAccent === swBtn.swName && root.pAccentCustom.length === 0
       ? Color.accent : Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.3)
+    Keys.onPressed: function(event) {
+      if (event.key === Qt.Key_Escape) {
+        root.close()
+        event.accepted = true
+      } else if ([Qt.Key_Up, Qt.Key_Down, Qt.Key_Left, Qt.Key_Right].indexOf(event.key) >= 0) {
+        root.moveGridFocus(swBtn, itemRepeater, itemIndex, 9, root.swatches.length, event.key)
+        event.accepted = true
+      } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter || event.key === Qt.Key_Space) {
+        swBtn.activated()
+        event.accepted = true
+      }
+    }
+    Rectangle {
+      anchors.fill: parent
+      radius: width / 2
+      color: "transparent"
+      border.width: swBtn.activeFocus ? 3 : 0
+      border.color: Color.accent
+      z: 1
+    }
     MouseArea {
       anchors.fill: parent
       hoverEnabled: true
@@ -400,7 +507,11 @@ Item {
     id: thBtn
     required property string filePath
     property bool selected: false
+    property int itemIndex: -1
+    property var itemRepeater
+    readonly property bool keyboardTarget: true
     signal activated()
+    activeFocusOnTab: true
     width: 104
     height: 64
     radius: Style.space(8)
@@ -408,6 +519,26 @@ Item {
     border.width: thBtn.selected ? 2 : 1
     border.color: thBtn.selected ? Color.accent : Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.25)
     clip: true
+    Keys.onPressed: function(event) {
+      if (event.key === Qt.Key_Escape) {
+        root.close()
+        event.accepted = true
+      } else if ([Qt.Key_Up, Qt.Key_Down, Qt.Key_Left, Qt.Key_Right].indexOf(event.key) >= 0) {
+        root.moveGridFocus(thBtn, itemRepeater, itemIndex, 4, root.wallpapers.length, event.key)
+        event.accepted = true
+      } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter || event.key === Qt.Key_Space) {
+        thBtn.activated()
+        event.accepted = true
+      }
+    }
+    Rectangle {
+      anchors.fill: parent
+      radius: parent.radius
+      color: "transparent"
+      border.width: thBtn.activeFocus ? 2 : 0
+      border.color: Color.accent
+      z: 1
+    }
     Image {
       anchors.fill: parent
       source: Util.fileUrl(thBtn.filePath)
@@ -476,6 +607,7 @@ Item {
   PanelWindow {
     id: panel
     visible: root.opened
+    onVisibleChanged: if (visible) Qt.callLater(function() { root.focusSection(root.sectionIndex) })
     anchors { top: true; bottom: true; left: true; right: true }
     color: "transparent"
     WlrLayershell.namespace: "orbital-settings"
@@ -532,6 +664,7 @@ Item {
             spacing: Style.space(2)
             enabled: root.settingsLoaded && !applyProc.running && !changeProc.running
             Repeater {
+              id: sectionRows
               model: root.sections
               SideRow {
                 required property var modelData
@@ -539,7 +672,7 @@ Item {
                 label: modelData.label
                 iconName: modelData.icon
                 rowIdx: index
-                onActivated: root.sectionIndex = index
+                onActivated: root.focusSection(index)
               }
             }
           }
@@ -556,6 +689,12 @@ Item {
             width: parent.width - sidebar.width - 1 - parent.spacing * 2
             height: parent.height
             enabled: root.settingsLoaded && !applyProc.running && !changeProc.running
+            Keys.onPressed: function(event) {
+              if (event.key === Qt.Key_Escape) {
+                root.close()
+                event.accepted = true
+              }
+            }
 
             Item {
               anchors.fill: parent
@@ -569,11 +708,15 @@ Item {
                   columnSpacing: Style.space(8)
                   rowSpacing: Style.space(8)
                   Repeater {
+                    id: swatchRepeater
                     model: root.swatches
                     SwatchButton {
                       required property var modelData
+                      required property int index
                       swName: modelData.name
                       swColor: modelData.color
+                      itemIndex: index
+                      itemRepeater: swatchRepeater
                       onActivated: root.applyAccentLive(swName)
                     }
                   }
@@ -596,9 +739,10 @@ Item {
                     anchors.verticalCenter: parent.verticalCenter
                     color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.08)
                     border.width: 1
-                    border.color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.25)
+                    border.color: hexInput.activeFocus ? Color.accent : Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.25)
                     TextInput {
                       id: hexInput
+                      readonly property bool keyboardTarget: true
                       anchors.fill: parent
                       anchors.leftMargin: 8
                       text: root.pAccentCustom
@@ -607,6 +751,14 @@ Item {
                       font.family: root.fontFamily
                       font.pixelSize: Style.font.bodySmall
                       color: root.foreground
+                      activeFocusOnTab: true
+                      selectByMouse: true
+                      Keys.onPressed: function(event) {
+                        if (event.key === Qt.Key_Up || event.key === Qt.Key_Down) {
+                          root.moveKeyboardFocus(hexInput, event.key === Qt.Key_Down)
+                          event.accepted = true
+                        }
+                      }
                       onEditingFinished: root.applyCustomHex(text)
                     }
                   }
@@ -706,10 +858,14 @@ Item {
                   columnSpacing: Style.space(8)
                   rowSpacing: Style.space(8)
                   Repeater {
+                    id: wallpaperRepeater
                     model: root.wallpapers
                     ThumbButton {
                       required property var modelData
+                      required property int index
                       filePath: String(modelData)
+                      itemIndex: index
+                      itemRepeater: wallpaperRepeater
                       selected: root.pWallpaper === String(modelData)
                       onActivated: root.setPreference("wallpaper", String(modelData))
                     }
@@ -736,9 +892,10 @@ Item {
                   radius: Style.space(8)
                   color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.08)
                   border.width: 1
-                  border.color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.25)
+                  border.color: avatarPathInput.activeFocus ? Color.accent : Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.25)
                   TextInput {
                     id: avatarPathInput
+                    readonly property bool keyboardTarget: true
                     anchors.fill: parent
                     anchors.leftMargin: 8
                     text: root.pAvatarPath
@@ -746,6 +903,8 @@ Item {
                     font.family: root.fontFamily
                     font.pixelSize: Style.font.bodySmall
                     color: root.foreground
+                    activeFocusOnTab: true
+                    selectByMouse: true
                     onTextChanged: root.pAvatarPath = text
                     onEditingFinished: {
                       if (text.length > 0) root.setPreference("avatar", "file:" + text)
@@ -824,12 +983,30 @@ Item {
           }
           Rectangle {
             id: closeButton
+            readonly property bool keyboardTarget: true
+            activeFocusOnTab: true
             width: 90
             height: Style.space(34)
             radius: Style.space(8)
             anchors.verticalCenter: parent.verticalCenter
             color: closeMouse.containsMouse
               ? Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.12) : "transparent"
+            Keys.onPressed: function(event) {
+              if (event.key === Qt.Key_Escape) {
+                root.close()
+                event.accepted = true
+              } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter || event.key === Qt.Key_Space) {
+                root.close()
+                event.accepted = true
+              }
+            }
+            Rectangle {
+              anchors.fill: parent
+              radius: parent.radius
+              color: "transparent"
+              border.width: closeButton.activeFocus ? 2 : 0
+              border.color: Color.accent
+            }
             border.width: 1
             border.color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.3)
             Text {
@@ -850,11 +1027,29 @@ Item {
           }
           Rectangle {
           id: applyButton
+            readonly property bool keyboardTarget: true
+            activeFocusOnTab: true
             width: 130
             height: Style.space(34)
             radius: Style.space(8)
             anchors.verticalCenter: parent.verticalCenter
             color: Color.accent
+            Keys.onPressed: function(event) {
+              if (event.key === Qt.Key_Escape) {
+                root.close()
+                event.accepted = true
+              } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter || event.key === Qt.Key_Space) {
+                root.applyAll()
+                event.accepted = true
+              }
+            }
+            Rectangle {
+              anchors.fill: parent
+              radius: parent.radius
+              color: "transparent"
+              border.width: applyButton.activeFocus ? 2 : 0
+              border.color: root.foreground
+            }
             opacity: root.settingsLoaded && !applyProc.running && !changeProc.running && root.changeQueue.length === 0 ? 1 : 0.45
             Text {
               anchors.centerIn: parent
