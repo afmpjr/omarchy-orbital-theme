@@ -1869,7 +1869,7 @@ Item {
                 Repeater {
                   model: root.bootCustomDesigns
                   Column {
-                    id: editorCard
+                    id: editorThumb
                     required property var modelData
                     spacing: Style.space(6)
 
@@ -1886,7 +1886,7 @@ Item {
                       Image {
                         anchors.fill: parent
                         anchors.margins: 1
-                        source: root.bootCardPreview("custom:" + editorCard.modelData)
+                        source: root.bootCardPreview("custom:" + editorThumb.modelData)
                         fillMode: Image.PreserveAspectCrop
                         asynchronous: true
                         cache: false
@@ -1896,12 +1896,12 @@ Item {
                         id: editorCardArea
                         anchors.fill: parent
                         hoverEnabled: true
-                        onClicked: root.openBootEditor(editorCard.modelData)
+                        onClicked: root.openBootEditor(editorThumb.modelData)
                       }
                     }
 
                     Text {
-                      text: editorCard.modelData
+                      text: editorThumb.modelData
                       color: root.foreground
                       font.family: root.fontFamily
                       font.pixelSize: Style.font.bodySmall
