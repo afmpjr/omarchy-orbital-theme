@@ -1,9 +1,15 @@
 #!/usr/bin/env bash
 # Stub Gum's prompts with their configured defaults for terminal-driven installer tests.
+# Test hooks (all optional, all unset by default):
+#   ORBITAL_GUM_EXIT=N   make choose/input exit N (e.g. 130 simulates Esc/cancel).
+#   ORBITAL_GUM_PICK=LBL make single-choice return LBL when it is one of the options.
 set -euo pipefail
 
 command=$1
 shift
+
+if [[ -n ${ORBITAL_GUM_EXIT:-} ]]; then exit "$ORBITAL_GUM_EXIT"; fi
+pick=${ORBITAL_GUM_PICK:-}
 
 case $command in
   choose)
@@ -22,6 +28,9 @@ case $command in
     if (( multi )); then
       [[ -n $selected ]] && tr ',' '\n' <<<"$selected"
       exit 0
+    fi
+    if [[ -n $pick ]]; then
+      for o in "${options[@]}"; do [[ $o == "$pick" ]] && { echo "$pick"; exit 0; }; done
     fi
     if [[ -n $selected ]]; then echo "$selected"; else echo "${options[0]}"; fi
     ;;

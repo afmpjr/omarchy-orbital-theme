@@ -104,7 +104,17 @@ case "$key" in
     ;;
   reset-pins)
     [[ $value == true ]] || fail "reset-pins accepts only true"
-    rm -f "$home/.local/state/omarchy/orbital-dock.json"
+    pins="$home/.local/state/omarchy/orbital-dock.json"
+    if [[ -f $pins ]]; then
+      cp -a "$pins" "$pins.bak" || fail "could not back up the current pins"
+    fi
+    rm -f "$pins"
+    ;;
+  restore-pins)
+    [[ $value == true ]] || fail "restore-pins accepts only true"
+    pins="$home/.local/state/omarchy/orbital-dock.json"
+    [[ -f $pins.bak ]] || fail "no saved pins to restore"
+    cp -a "$pins.bak" "$pins" || fail "could not restore the saved pins"
     ;;
   *) fail "unknown setting: $key" ;;
 esac

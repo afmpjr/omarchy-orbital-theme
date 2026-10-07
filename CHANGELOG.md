@@ -2,6 +2,18 @@
 
 All notable changes to the Orbital theme.
 
+## Unreleased
+
+- Installer upgrades keep the current bar and widgets by default: when a previous Orbital install is
+  detected, the guided wizard offers to keep everything and applies Orbital's bar and widgets only on
+  explicit choice. The verifier no longer demands bar widgets that were deliberately skipped.
+- Settings: the ambiguous **Apply** button is now **Reload Hyprland**, matching what it does (re-read
+  the compositor config; every choice already saved itself when selected).
+- Settings: **Reset dock pins** asks first (Cancel is the default) and snapshots the current pins;
+  a **Restore dock pins** row appears while the backup exists.
+- New `scripts/test-qml-lint.sh` syntax gate over all shipped QML; it caught and fixed a duplicated
+  `editorCard` id in the lockscreen editor gallery.
+
 ## v0.2.0 — 2026-10-06
 
 - New `orbital.settings` setup center (the official graphical setup; the bash TUI stays parked): sidebar with

@@ -82,12 +82,25 @@ state=$("$PLUGINS/orbital.settings/orbital-settings-state")
 ok "current shortcut profile loads into the settings state"
 
 printf '{"pinned":[]}\n' > "$HOME/.local/state/omarchy/orbital-dock.json"
+state=$("$PLUGINS/orbital.settings/orbital-settings-state")
+[[ $(python3 -c 'import json,sys; print(json.loads(sys.argv[1])["pinsBackup"])' "$state") == False ]]
+printf '{"pinned":[{"key":"test","entry":"test.desktop"}]}\n' > "$HOME/.local/state/omarchy/orbital-dock.json"
 change reset-pins true
 [[ ! -e "$HOME/.local/state/omarchy/orbital-dock.json" ]]
+[[ $(cat "$HOME/.local/state/omarchy/orbital-dock.json.bak") == '{"pinned":[{"key":"test","entry":"test.desktop"}]}' ]]
+state=$("$PLUGINS/orbital.settings/orbital-settings-state")
+[[ $(python3 -c 'import json,sys; print(json.loads(sys.argv[1])["pinsBackup"])' "$state") == True ]]
+change restore-pins true
+[[ $(cat "$HOME/.local/state/omarchy/orbital-dock.json") == '{"pinned":[{"key":"test","entry":"test.desktop"}]}' ]]
+ok "reset-pins backs the pins up first and restore-pins brings them back"
+rm -f "$HOME/.local/state/omarchy/orbital-dock.json" "$HOME/.local/state/omarchy/orbital-dock.json.bak"
+! "$PLUGINS/orbital.settings/orbital-settings-change" restore-pins true >/dev/null 2>&1
+[[ ! -e "$HOME/.local/state/omarchy/orbital-dock.json" ]]
+ok "restore-pins without a backup fails instead of writing an empty dock"
 apply_output=$("$PLUGINS/orbital.settings/orbital-settings-apply")
-[[ $apply_output == "Applied. Setup remains open." ]]
+[[ $apply_output == "Hyprland reloaded. Setup remains open." ]]
 ! grep -q 'restart shell' "$HOME/commands.log"
-ok "Apply reloads Hyprland without restarting the shell"
+ok "Reload Hyprland reloads the compositor without restarting the shell"
 
 grep -q 'Array.isArray(data.pinned)' "$REPO/plugins/orbital.dock/Dock.qml"
 grep -q 'root.pinned = out' "$REPO/plugins/orbital.dock/Dock.qml"

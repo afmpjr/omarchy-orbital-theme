@@ -8,4 +8,4 @@ if (($# != 0)); then
 fi
 
 hyprctl reload >/dev/null
-echo "Applied. Setup remains open."
+echo "Hyprland reloaded. Setup remains open."

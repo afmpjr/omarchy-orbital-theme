@@ -7,8 +7,9 @@ import qs.Commons
 import qs.Ui
 import "../orbital.ui" as OrbitalUi
 
-// Orbital Settings applies and persists each choice as it is selected.
-// Apply reloads Hyprland without restarting the shell or closing this panel.
+// Orbital Settings applies and persists each choice as it is selected:
+// nothing waits for confirmation. "Reload Hyprland" only re-reads the
+// Hyprland config, without restarting the shell or closing this panel.
 
 Item {
   id: root
@@ -42,6 +43,8 @@ Item {
   property string pGaps: "8,12"
   property string pShortcutStyle: "default"
   property bool pResetPins: false
+  property bool pPinsBackup: false
+  property bool confirmResetPins: false
 
   readonly property var sections: [
     { id: "accent", label: "Accent", icon: "preferences-desktop-appearance-symbolic" },
@@ -166,6 +169,7 @@ Item {
       case "gaps": root.pGaps = value; break
       case "shortcuts": root.pShortcutStyle = value; break
       case "reset-pins": root.pResetPins = value === "true"; break
+      case "restore-pins": break // no local option state; the change script restores the file
     }
     var queue = root.changeQueue.slice()
     queue.push({ key: key, value: value })
@@ -191,9 +195,9 @@ Item {
     root.setPreference("accent", "#" + hex)
   }
 
-  function applyAll() {
+  function reloadHyprland() {
     if (!root.settingsLoaded || applyProc.running || changeProc.running || root.changeQueue.length > 0) return
-    root.statusText = "Applying..."
+    root.statusText = "Reloading Hyprland..."
     applyProc.command = [installedPath("orbital.settings/orbital-settings-apply")]
     applyProc.running = true
   }
@@ -205,7 +209,7 @@ Item {
     }
     onExited: function(code) {
       if (code !== 0) {
-        root.statusText = "Could not read current settings. Apply is disabled."
+        root.statusText = "Could not read current settings. Reload is disabled."
         return
       }
       try {
@@ -226,11 +230,13 @@ Item {
         root.pAvatarMode = "keep"
         root.pAvatarPath = ""
         root.pResetPins = false
+        root.pPinsBackup = state.pinsBackup === true
+        root.confirmResetPins = false
         root.settingsLoaded = true
         root.statusText = "Choices save and apply immediately."
         Qt.callLater(function() { root.focusSection(root.sectionIndex) })
       } catch (e) {
-        root.statusText = "Could not read current settings. Apply is disabled."
+        root.statusText = "Could not read current settings. Reload is disabled."
       }
     }
   }
@@ -244,6 +250,9 @@ Item {
       onRead: function(line) { root.statusText = String(line || "").trim() }
     }
     onExited: function(code) {
+      var pinsChanged = root.activeChange
+        && (root.activeChange.key === "reset-pins" || root.activeChange.key === "restore-pins")
+        && code === 0
       if (code === 0) {
         if (root.activeChange && root.activeChange.key === "reset-pins") root.pResetPins = false
       } else {
@@ -252,6 +261,9 @@ Item {
       }
       root.activeChange = null
       Qt.callLater(root.processNextChange)
+      // Re-read state so the pins-backup row reflects the new snapshot; only when
+      // nothing else is queued, so a reload never overtakes a pending change.
+      if (pinsChanged && root.changeQueue.length === 0) root.loadSettings()
     }
   }
 
@@ -264,8 +276,28 @@ Item {
       }
     }
     onExited: function(code) {
-      root.statusText = code === 0 ? "Applied. Setup remains open." : "Apply failed (code " + code + ")."
+      root.statusText = code === 0 ? "Hyprland reloaded. Setup remains open." : "Reload failed (code " + code + ")."
     }
+  }
+
+  // Destructive actions confirm first and never run on open: the dialog only
+  // sends reset-pins after an explicit Reset, Cancel/Esc/outside-click drops it.
+  OrbitalUi.OrbitalDialog {
+    opened: root.confirmResetPins
+    layerNamespace: "orbital-settings-reset-pins"
+    tone: "danger"
+    title: "Reset dock pins?"
+    message: "This replaces your custom pinned apps with the default set. Your current pins are saved as a backup first, so you can restore them below."
+    defaultButton: 0
+    buttons: [
+      { id: "cancel", label: "Cancel", role: "neutral" },
+      { id: "reset", label: "Reset pins", role: "danger" }
+    ]
+    onActivated: function(id) {
+      root.confirmResetPins = false
+      if (id === "reset") root.setPreference("reset-pins", "true")
+    }
+    onDismissed: root.confirmResetPins = false
   }
 
   property var wallpapers: []
@@ -957,9 +989,16 @@ Item {
                 OptionRow { label: "Windows-style"; sub: "Super+R, Super+E and friends"; selected: root.pShortcutStyle === "windows"; onActivated: root.setPreference("shortcuts", "windows") }
                 OptionRow {
                   label: "Reset dock pins"
-                  sub: "Reset the dock now"
+                  sub: "Asks first; your pins are backed up"
                   selected: root.pResetPins
-                  onActivated: root.setPreference("reset-pins", "true")
+                  onActivated: { if (root.settingsLoaded) root.confirmResetPins = true }
+                }
+                OptionRow {
+                  label: "Restore dock pins"
+                  sub: "Bring back the pins saved before the last reset"
+                  visible: root.pPinsBackup
+                  selected: false
+                  onActivated: root.setPreference("restore-pins", "true")
                 }
               }
             }
@@ -1029,7 +1068,7 @@ Item {
           id: applyButton
             readonly property bool keyboardTarget: true
             activeFocusOnTab: true
-            width: 130
+            width: 170
             height: Style.space(34)
             radius: Style.space(8)
             anchors.verticalCenter: parent.verticalCenter
@@ -1039,7 +1078,7 @@ Item {
                 root.close()
                 event.accepted = true
               } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter || event.key === Qt.Key_Space) {
-                root.applyAll()
+                root.reloadHyprland()
                 event.accepted = true
               }
             }
@@ -1053,7 +1092,7 @@ Item {
             opacity: root.settingsLoaded && !applyProc.running && !changeProc.running && root.changeQueue.length === 0 ? 1 : 0.45
             Text {
               anchors.centerIn: parent
-              text: "Apply"
+              text: "Reload Hyprland"
               textFormat: Text.PlainText
               color: Color.background
               font.family: root.fontFamily
@@ -1065,7 +1104,7 @@ Item {
               hoverEnabled: true
               cursorShape: Qt.PointingHandCursor
               enabled: root.settingsLoaded && !applyProc.running && !changeProc.running && root.changeQueue.length === 0
-              onClicked: root.applyAll()
+              onClicked: root.reloadHyprland()
             }
           }
         }
