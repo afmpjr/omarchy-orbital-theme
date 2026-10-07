@@ -7,8 +7,9 @@ import qs.Commons
 import qs.Ui
 import "../orbital.ui" as OrbitalUi
 
-// Orbital Settings applies and persists each choice as it is selected.
-// Apply reloads Hyprland without restarting the shell or closing this panel.
+// Orbital Settings applies and persists each choice as it is selected:
+// nothing waits for confirmation. "Reload Hyprland" only re-reads the
+// Hyprland config, without restarting the shell or closing this panel.
 
 Item {
   id: root
@@ -191,9 +192,9 @@ Item {
     root.setPreference("accent", "#" + hex)
   }
 
-  function applyAll() {
+  function reloadHyprland() {
     if (!root.settingsLoaded || applyProc.running || changeProc.running || root.changeQueue.length > 0) return
-    root.statusText = "Applying..."
+    root.statusText = "Reloading Hyprland..."
     applyProc.command = [installedPath("orbital.settings/orbital-settings-apply")]
     applyProc.running = true
   }
@@ -205,7 +206,7 @@ Item {
     }
     onExited: function(code) {
       if (code !== 0) {
-        root.statusText = "Could not read current settings. Apply is disabled."
+        root.statusText = "Could not read current settings. Reload is disabled."
         return
       }
       try {
@@ -230,7 +231,7 @@ Item {
         root.statusText = "Choices save and apply immediately."
         Qt.callLater(function() { root.focusSection(root.sectionIndex) })
       } catch (e) {
-        root.statusText = "Could not read current settings. Apply is disabled."
+        root.statusText = "Could not read current settings. Reload is disabled."
       }
     }
   }
@@ -264,7 +265,7 @@ Item {
       }
     }
     onExited: function(code) {
-      root.statusText = code === 0 ? "Applied. Setup remains open." : "Apply failed (code " + code + ")."
+      root.statusText = code === 0 ? "Hyprland reloaded. Setup remains open." : "Reload failed (code " + code + ")."
     }
   }
 
@@ -1029,7 +1030,7 @@ Item {
           id: applyButton
             readonly property bool keyboardTarget: true
             activeFocusOnTab: true
-            width: 130
+            width: 170
             height: Style.space(34)
             radius: Style.space(8)
             anchors.verticalCenter: parent.verticalCenter
@@ -1039,7 +1040,7 @@ Item {
                 root.close()
                 event.accepted = true
               } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter || event.key === Qt.Key_Space) {
-                root.applyAll()
+                root.reloadHyprland()
                 event.accepted = true
               }
             }
@@ -1053,7 +1054,7 @@ Item {
             opacity: root.settingsLoaded && !applyProc.running && !changeProc.running && root.changeQueue.length === 0 ? 1 : 0.45
             Text {
               anchors.centerIn: parent
-              text: "Apply"
+              text: "Reload Hyprland"
               textFormat: Text.PlainText
               color: Color.background
               font.family: root.fontFamily
@@ -1065,7 +1066,7 @@ Item {
               hoverEnabled: true
               cursorShape: Qt.PointingHandCursor
               enabled: root.settingsLoaded && !applyProc.running && !changeProc.running && root.changeQueue.length === 0
-              onClicked: root.applyAll()
+              onClicked: root.reloadHyprland()
             }
           }
         }

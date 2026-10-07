@@ -85,9 +85,9 @@ printf '{"pinned":[]}\n' > "$HOME/.local/state/omarchy/orbital-dock.json"
 change reset-pins true
 [[ ! -e "$HOME/.local/state/omarchy/orbital-dock.json" ]]
 apply_output=$("$PLUGINS/orbital.settings/orbital-settings-apply")
-[[ $apply_output == "Applied. Setup remains open." ]]
+[[ $apply_output == "Hyprland reloaded. Setup remains open." ]]
 ! grep -q 'restart shell' "$HOME/commands.log"
-ok "Apply reloads Hyprland without restarting the shell"
+ok "Reload Hyprland reloads the compositor without restarting the shell"
 
 grep -q 'Array.isArray(data.pinned)' "$REPO/plugins/orbital.dock/Dock.qml"
 grep -q 'root.pinned = out' "$REPO/plugins/orbital.dock/Dock.qml"

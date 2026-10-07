@@ -16,7 +16,9 @@ matters (swatches, wallpaper thumbs, bar mock).
 - Every choice is saved and applied immediately. Bar configuration is picked
   up by the running shell; Hyprland preferences reload the compositor config
   without restarting Quickshell.
-- **Apply** reloads Hyprland and leaves Settings open.
+- **Reload Hyprland** re-reads the compositor config without restarting
+  Quickshell and leaves Settings open. It confirms nothing: every choice
+  above already saved itself when selected.
 - Keyboard shortcut styles are mutually exclusive: Default, Mac-style
   (Super/⌘ sends common Ctrl shortcuts to Linux apps; Alt remains Option), and
   Windows-style.
