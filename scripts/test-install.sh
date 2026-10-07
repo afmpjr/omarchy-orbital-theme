@@ -378,4 +378,46 @@ grep -q 'Installer.*complete\|Installation complete\|Installed' "$HOME/wizard.lo
 export ORBITAL_INSTALL_NO_WAIT=1 HOME="$SAVED_HOME"
 ok "guided wizard uses defaults in a TTY and keeps theme activation separate"
 
+# Upgrade: a previous Orbital install keeps the current bar and widgets unless the user
+# explicitly asks for Orbital's layout. Same TTY wizard, Gum stub picks the defaults.
+export HOME="$T/upgrade"; rm -rf "$HOME"; mkdir -p "$HOME/.config/omarchy" "$HOME/.config/hypr" "$HOME/.local/state/omarchy"
+cp /usr/share/omarchy/config/omarchy/shell.json "$HOME/.config/omarchy/shell.json"
+jq '.bar.id = "someone.floating-bar"' "$HOME/.config/omarchy/shell.json" > "$HOME/.sj" && mv "$HOME/.sj" "$HOME/.config/omarchy/shell.json"
+printf '{"theme":"Tokyo Night","shell_backup":""}' > "$HOME/.local/state/omarchy/orbital-install.json"
+printf 'require("default.hypr.omarchy")\n' > "$HOME/.config/hypr/hyprland.lua"
+env -u ORBITAL_INSTALL_NO_WAIT script -qec "bash '$REPO/install.sh' --no-restart" /dev/null >"$HOME/upgrade.log" 2>&1 \
+  || { cat "$HOME/upgrade.log"; bad "upgrade install with defaults failed"; }
+[[ $(jq -r .bar.id "$HOME/.config/omarchy/shell.json") == someone.floating-bar ]] || bad "upgrade wizard changed the bar by default"
+grep -q orbital <<<"$(jq -r '[.bar.layout[]?[]?.id] | join(" ")' "$HOME/.config/omarchy/shell.json")" && bad "upgrade wizard added Orbital widgets by default"
+grep -q 'Installer.*complete\|Installation complete\|Installed' "$HOME/upgrade.log" || bad "upgrade install did not reach completion"
+export ORBITAL_INSTALL_NO_WAIT=1 HOME="$SAVED_HOME"
+ok "upgrade preserves the current bar and widgets by default"
+
+# Upgrade with an explicit choice applies Orbital's bar and widgets.
+export HOME="$T/upgrade-apply"; rm -rf "$HOME"; mkdir -p "$HOME/.config/omarchy" "$HOME/.config/hypr" "$HOME/.local/state/omarchy"
+cp /usr/share/omarchy/config/omarchy/shell.json "$HOME/.config/omarchy/shell.json"
+jq '.bar.id = "someone.floating-bar"' "$HOME/.config/omarchy/shell.json" > "$HOME/.sj" && mv "$HOME/.sj" "$HOME/.config/omarchy/shell.json"
+printf '{"theme":"Tokyo Night","shell_backup":""}' > "$HOME/.local/state/omarchy/orbital-install.json"
+printf 'require("default.hypr.omarchy")\n' > "$HOME/.config/hypr/hyprland.lua"
+env -u ORBITAL_INSTALL_NO_WAIT ORBITAL_GUM_PICK='Apply Orbital bar and widgets' script -qec "bash '$REPO/install.sh' --no-restart" /dev/null >"$HOME/upgrade-apply.log" 2>&1 \
+  || { cat "$HOME/upgrade-apply.log"; bad "upgrade install with explicit Orbital layout failed"; }
+[[ $(jq -r .bar.id "$HOME/.config/omarchy/shell.json") == orbital.floating-bar ]] || bad "explicit Orbital layout did not switch the bar"
+jq -e '[.bar.layout.left[]?.id] | index("orbital.dock")' "$HOME/.config/omarchy/shell.json" >/dev/null || bad "explicit Orbital layout did not place the dock"
+jq -e '[.bar.layout.center[]?.id] | index("orbital.workspaces")' "$HOME/.config/omarchy/shell.json" >/dev/null || bad "explicit Orbital layout did not place workspaces"
+export ORBITAL_INSTALL_NO_WAIT=1 HOME="$SAVED_HOME"
+ok "upgrade applies the Orbital bar and widgets when explicitly chosen"
+
+# Cancelling the wizard (Esc) changes nothing and says so.
+export HOME="$T/cancel"; rm -rf "$HOME"; mkdir -p "$HOME/.config/omarchy" "$HOME/.config/hypr"
+cp /usr/share/omarchy/config/omarchy/shell.json "$HOME/.config/omarchy/shell.json"
+cp "$HOME/.config/omarchy/shell.json" "$HOME/shell.before.json"
+printf 'require("default.hypr.omarchy")\n' > "$HOME/.config/hypr/hyprland.lua"
+env -u ORBITAL_INSTALL_NO_WAIT ORBITAL_GUM_EXIT=130 script -qec "bash '$REPO/install.sh' --no-restart" /dev/null >"$HOME/cancel.log" 2>&1 \
+  || bad "cancelled wizard did not exit cleanly"
+grep -q 'Installer cancelled; nothing was changed' "$HOME/cancel.log" || bad "cancel did not say nothing was changed"
+cmp -s "$HOME/shell.before.json" "$HOME/.config/omarchy/shell.json" || bad "cancelled wizard touched shell.json"
+[[ ! -e $HOME/.local/state/omarchy/orbital-install.json ]] || bad "cancelled wizard left install state behind"
+export ORBITAL_INSTALL_NO_WAIT=1 HOME="$SAVED_HOME"
+ok "cancelling the wizard changes nothing"
+
 echo "ALL PASSED"

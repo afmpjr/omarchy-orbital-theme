@@ -16,6 +16,11 @@
 # Both bar plugins are copied (orbital.floating-bar, the default, and orbital.bar, the self-contained
 # alternative), but only the one named in shell.json's .bar.id is ever loaded.
 #
+# Upgrades keep what you have. When a previous Orbital install is detected (the install state file,
+# the settings plugin, or the theme copy), the guided wizard defaults to keeping the current bar
+# and widgets; applying Orbital's bar and widgets is an explicit choice. Fresh installs keep the
+# current guided flow, which defaults to the Orbital bar and widgets.
+#
 # All or nothing. Every problem that can be found without touching the system is found first and
 # reported together; anything that goes wrong while applying is rolled back to the exact previous
 # state and reported. The shell is only restarted, and the install only declared done, after a
@@ -86,6 +91,8 @@ wizard_select() {
 
 guided_setup() {
   local step=0 choice status default_profile layout_default selected
+  local UPGRADE=0
+  orbital_detected && UPGRADE=1
   local -a selected_args=()
   local -a full_options=('Super+S launcher' 'Alt+Shift layout switching' '4-finger workspace gestures' 'Free Ctrl+Enter in Ghostty')
   local -a standard_options=('Windows-style shortcuts' 'Free Ctrl+Enter in Ghostty')
@@ -102,19 +109,33 @@ guided_setup() {
       0)
         default_profile='Standard (Orbital bar and widgets)'
         (( FULL )) && default_profile='Full desktop'
+        if (( UPGRADE )) && (( ! FULL )); then default_profile='Standard (keep current bar and widgets)'; fi
         choice="$(wizard_select "$header" "$default_profile" \
-          'Standard (Orbital bar and widgets)' 'Full desktop')" && status=0 || status=$?
+          'Standard (Orbital bar and widgets)' 'Standard (keep current bar and widgets)' 'Full desktop')" && status=0 || status=$?
         if (( status != 0 )); then (( step > 0 )) && ((step--)) || return 130; continue; fi
         if [[ $choice == 'Full desktop' ]]; then FULL=1; BAR=1
         else FULL=0; BAR=1; fi
         ;;
       1)
         if (( FULL )); then
-          choice="$(wizard_select "$header" 'Use Orbital floating bar' \
+          default_profile='Use Orbital floating bar'
+          if (( UPGRADE )) || (( KEEP_BAR )); then default_profile='Keep my current bar'; fi
+          choice="$(wizard_select "$header" "$default_profile" \
             'Use Orbital floating bar' 'Keep my current bar')" && status=0 || status=$?
         if (( status != 0 )); then ((step--)); continue; fi
           if [[ $choice == 'Keep my current bar' ]]; then KEEP_BAR=1; else KEEP_BAR=0; fi
           BAR=1
+        elif (( UPGRADE )); then
+          default_profile='Keep current bar and skip widgets'
+          (( KEEP_BAR && BAR )) && default_profile='Keep current bar and add Orbital widgets'
+          choice="$(wizard_select "$header" "$default_profile" \
+            'Keep current bar and skip widgets' 'Keep current bar and add Orbital widgets' 'Apply Orbital bar and widgets')" && status=0 || status=$?
+        if (( status != 0 )); then ((step--)); continue; fi
+          case $choice in
+            'Apply Orbital bar and widgets') BAR=1; KEEP_BAR=0 ;;
+            'Keep current bar and add Orbital widgets') BAR=1; KEEP_BAR=1 ;;
+            *) BAR=0; KEEP_BAR=1 ;;
+          esac
         else
           default_profile='Install Orbital bar and widgets'
           (( KEEP_BAR )) && default_profile='Keep current bar and add Orbital widgets'
@@ -240,6 +261,12 @@ user_hypr_has() {
   return 1
 }
 have_omarchy() { command -v omarchy >/dev/null 2>&1; }
+# A previous Orbital install leaves the state file behind; even without it, the settings plugin
+# or the theme copy means Orbital was installed here before. Upgrades default to preserving the
+# current bar and widgets (see guided_setup); only an explicit choice applies Orbital's layout.
+orbital_detected() {
+  [[ -f $STATE || -d $PLUGINS/orbital.settings || -d $THEME_DIR ]]
+}
 problem() { PROBLEMS+=("$1"); echo "    ! $1" >&2; }
 warn() { WARNINGS+=("$1"); }
 
@@ -1043,10 +1070,14 @@ verify_all() {
 
   # Right after a shell restart the plugin list can come back empty or half done for a while, so read it
   # again for up to half a minute before calling a plugin "not enabled".
+  # Bar widgets are only promised when they were asked for (BAR): "keep my bar and skip widgets"
+  # must verify cleanly without them.
   local try missing
+  local -a need=("${OVERLAYS[@]}" "${LOCKSCREEN[@]}")
+  (( BAR )) && need+=("${EXTRA_WIDGETS[@]}" "${WIDGETS[@]%%:*}")
   for try in $(seq 1 15); do
     list="$(omarchy plugin list 2>/dev/null || true)"; missing=()
-    for id in "${OVERLAYS[@]}" "${EXTRA_WIDGETS[@]}" "${WIDGETS[@]%%:*}" "${LOCKSCREEN[@]}"; do
+    for id in "${need[@]}"; do
       grep -qE "^$id +enabled" <<<"$list" || missing+=("$id")
     done
     (( ${#missing[@]} == 0 )) && break
