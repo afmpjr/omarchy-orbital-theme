@@ -43,6 +43,8 @@ Item {
   property string pGaps: "8,12"
   property string pShortcutStyle: "default"
   property bool pResetPins: false
+  property bool pPinsBackup: false
+  property bool confirmResetPins: false
 
   readonly property var sections: [
     { id: "accent", label: "Accent", icon: "preferences-desktop-appearance-symbolic" },
@@ -167,6 +169,7 @@ Item {
       case "gaps": root.pGaps = value; break
       case "shortcuts": root.pShortcutStyle = value; break
       case "reset-pins": root.pResetPins = value === "true"; break
+      case "restore-pins": break // no local option state; the change script restores the file
     }
     var queue = root.changeQueue.slice()
     queue.push({ key: key, value: value })
@@ -227,6 +230,8 @@ Item {
         root.pAvatarMode = "keep"
         root.pAvatarPath = ""
         root.pResetPins = false
+        root.pPinsBackup = state.pinsBackup === true
+        root.confirmResetPins = false
         root.settingsLoaded = true
         root.statusText = "Choices save and apply immediately."
         Qt.callLater(function() { root.focusSection(root.sectionIndex) })
@@ -245,6 +250,9 @@ Item {
       onRead: function(line) { root.statusText = String(line || "").trim() }
     }
     onExited: function(code) {
+      var pinsChanged = root.activeChange
+        && (root.activeChange.key === "reset-pins" || root.activeChange.key === "restore-pins")
+        && code === 0
       if (code === 0) {
         if (root.activeChange && root.activeChange.key === "reset-pins") root.pResetPins = false
       } else {
@@ -253,6 +261,9 @@ Item {
       }
       root.activeChange = null
       Qt.callLater(root.processNextChange)
+      // Re-read state so the pins-backup row reflects the new snapshot; only when
+      // nothing else is queued, so a reload never overtakes a pending change.
+      if (pinsChanged && root.changeQueue.length === 0) root.loadSettings()
     }
   }
 
@@ -267,6 +278,26 @@ Item {
     onExited: function(code) {
       root.statusText = code === 0 ? "Hyprland reloaded. Setup remains open." : "Reload failed (code " + code + ")."
     }
+  }
+
+  // Destructive actions confirm first and never run on open: the dialog only
+  // sends reset-pins after an explicit Reset, Cancel/Esc/outside-click drops it.
+  OrbitalUi.OrbitalDialog {
+    opened: root.confirmResetPins
+    layerNamespace: "orbital-settings-reset-pins"
+    tone: "danger"
+    title: "Reset dock pins?"
+    message: "This replaces your custom pinned apps with the default set. Your current pins are saved as a backup first, so you can restore them below."
+    defaultButton: 0
+    buttons: [
+      { id: "cancel", label: "Cancel", role: "neutral" },
+      { id: "reset", label: "Reset pins", role: "danger" }
+    ]
+    onActivated: function(id) {
+      root.confirmResetPins = false
+      if (id === "reset") root.setPreference("reset-pins", "true")
+    }
+    onDismissed: root.confirmResetPins = false
   }
 
   property var wallpapers: []
@@ -958,9 +989,16 @@ Item {
                 OptionRow { label: "Windows-style"; sub: "Super+R, Super+E and friends"; selected: root.pShortcutStyle === "windows"; onActivated: root.setPreference("shortcuts", "windows") }
                 OptionRow {
                   label: "Reset dock pins"
-                  sub: "Reset the dock now"
+                  sub: "Asks first; your pins are backed up"
                   selected: root.pResetPins
-                  onActivated: root.setPreference("reset-pins", "true")
+                  onActivated: { if (root.settingsLoaded) root.confirmResetPins = true }
+                }
+                OptionRow {
+                  label: "Restore dock pins"
+                  sub: "Bring back the pins saved before the last reset"
+                  visible: root.pPinsBackup
+                  selected: false
+                  onActivated: root.setPreference("restore-pins", "true")
                 }
               }
             }

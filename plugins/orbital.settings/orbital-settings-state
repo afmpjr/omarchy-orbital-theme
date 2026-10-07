@@ -154,6 +154,7 @@ def main():
         "gaps": gaps,
         "windowsKeys": windows_keys,
         "shortcutStyle": shortcut_style,
+        "pinsBackup": (STATE / "orbital-dock.json.bak").is_file(),
     }))
 
 
