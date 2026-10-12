@@ -1,0 +1,72 @@
+{
+  "schemaVersion": 1,
+  "id": "orbital.notifications",
+  "name": "Orbital Notification Center",
+  "version": "1.0.0",
+  "author": "afmpjr",
+  "description": "Bell with an unread badge; click opens the notification history kept by this plugin (it outlives omarchy's 10-file history). Reads omarchy's on-disk notifications, never another plugin's live service.",
+  "kinds": [
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "barWidget": "BarWidget.qml"
+  },
+  "barWidget": {
+    "displayName": "Orbital Notification Center",
+    "description": "Bell with unread badge + notification history",
+    "category": "System",
+    "allowMultiple": false,
+    "defaultSection": "right",
+    "defaults": {
+      "badge": "Dot",
+      "keepDays": 30,
+      "maxItems": 1000,
+      "panelWidth": 420
+    },
+    "schema": [
+      {
+        "key": "badge",
+        "type": "enum",
+        "label": "Mark what you have not read",
+        "options": [
+          "Dot",
+          "Count",
+          "None"
+        ],
+        "defaultValue": "Dot",
+        "description": "What the bell says about notifications that arrived since you last opened the center. A dot says there are some; a count says how many; none keeps the bell quiet."
+      },
+      {
+        "key": "keepDays",
+        "type": "integer",
+        "label": "Keep notifications for",
+        "min": 1,
+        "max": 365,
+        "step": 1,
+        "defaultValue": 30,
+        "description": "Days. Past this a notification is deleted. Whichever of this and the count below is reached first wins."
+      },
+      {
+        "key": "maxItems",
+        "type": "integer",
+        "label": "Keep at most",
+        "min": 50,
+        "max": 10000,
+        "step": 50,
+        "defaultValue": 1000,
+        "description": "Notifications. A ceiling on the archive regardless of age, so a chatty week cannot grow it without limit."
+      },
+      {
+        "key": "panelWidth",
+        "type": "integer",
+        "label": "Panel width",
+        "min": 320,
+        "max": 900,
+        "step": 20,
+        "defaultValue": 420,
+        "description": "In the shell's spacing units. Anything wider than the screen is trimmed to fit."
+      }
+    ]
+  },
+  "license": "MIT"
+}
