@@ -37,5 +37,12 @@ var pt = {
   "Pomodoro": "Pomodoro", "Short Break": "Pausa curta", "Long Break": "Pausa longa",
   "A focused mind builds extraordinary things.": "Uma mente focada constrói coisas extraordinárias.",
   "Small steps, done consistently, add up.": "Pequenos passos, dados com constância, somam muito.",
-  "One task at a time.": "Uma tarefa de cada vez.", "Deep work beats busy work.": "Trabalho profundo vence trabalho ocupado."
+  "One task at a time.": "Uma tarefa de cada vez.", "Deep work beats busy work.": "Trabalho profundo vence trabalho ocupado.",
+  // Notifications
+  "Notifications": "Notificações", "No notifications yet": "Nenhuma notificação ainda",
+  "Clear all": "Limpar tudo",
+  "Do Not Disturb: on": "Não perturbe: ativado", "Do Not Disturb: off": "Não perturbe: desativado",
+  "now": "agora", "minute": "minuto", "minutes": "minutos",
+  "hour": "hora", "hours": "horas", "day": "dia", "days": "dias",
+  "week": "semana", "weeks": "semanas", "ago": "atrás",
 }
