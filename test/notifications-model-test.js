@@ -36,6 +36,45 @@ check("normalize drops malformed timestamps and urgencies", function () {
   assert.strictEqual(e.urgency, 1)
 })
 
+// --- image/appIcon sanitizing: only local paths and theme names survive ---
+check("normalize drops remote image/appIcon URLs", function () {
+  var e = Model.normalizeEntry({ summary: "x", timestamp: 1, originalId: 1,
+    appIcon: "https://evil.example/t.png", image: "http://evil.example/p.png" })
+  assert.strictEqual(e.appIcon, "")
+  assert.strictEqual(e.image, "")
+  e = Model.normalizeEntry({ summary: "x", timestamp: 1, originalId: 1,
+    appIcon: "data:image/png;base64,AAA", image: "javascript:alert(1)" })
+  assert.strictEqual(e.appIcon, "")
+  assert.strictEqual(e.image, "")
+})
+
+check("normalize drops remote preview fallback too", function () {
+  var e = Model.normalizeEntry({ summary: "x", timestamp: 1, originalId: 1,
+    image: "", preview: "https://evil.example/p.png" })
+  assert.strictEqual(e.image, "")
+})
+
+check("normalize keeps local paths, file URLs and theme icon names", function () {
+  var e = Model.normalizeEntry({ summary: "x", timestamp: 1, originalId: 1,
+    appIcon: "com.mitchellh.ghostty", image: "file:///tmp/p.png" })
+  assert.strictEqual(e.appIcon, "com.mitchellh.ghostty")
+  assert.strictEqual(e.image, "file:///tmp/p.png")
+  e = Model.normalizeEntry({ summary: "x", timestamp: 1, originalId: 1,
+    appIcon: "/usr/share/icons/app.png", image: "/tmp/p.png", preview: "notifications-bell-symbolic" })
+  assert.strictEqual(e.appIcon, "/usr/share/icons/app.png")
+  assert.strictEqual(e.image, "/tmp/p.png")
+  assert.strictEqual(Model.sanitizeImageRef("notifications-bell-symbolic"), "notifications-bell-symbolic")
+})
+
+check("normalize drops relative paths and odd icon names", function () {
+  assert.strictEqual(Model.sanitizeImageRef("images/p.png"), "")
+  assert.strictEqual(Model.sanitizeImageRef("../etc/passwd"), "")
+  assert.strictEqual(Model.sanitizeImageRef("file://relative/p.png"), "")
+  assert.strictEqual(Model.sanitizeImageRef("my icon"), "")
+  assert.strictEqual(Model.sanitizeImageRef("image://dead"), "")
+  assert.strictEqual(Model.sanitizeImageRef(""), "")
+})
+
 // --- parseEntryLines skips torn lines, sorts newest first ---
 check("parse skips torn lines", function () {
   var text = '{"summary":"old","timestamp":100,"originalId":1}\n{"summary":\n{"summary":"new","timestamp":300,"originalId":2}\n'
@@ -139,7 +178,84 @@ check("image copies planned only for omarchy files", function () {
   assert.strictEqual(plan.copies[0].from, "/home/u/.local/state/omarchy/notifications/images/1-1-image")
   assert.strictEqual(plan.entries[0].image, "file:///home/u/.local/state/omarchy/orbital-notifications/images/1-1-image")
   assert.strictEqual(plan.entries[1].appIcon, "com.mitchellh.ghostty")
-  assert.strictEqual(plan.entries[1].image, "image://dead")
+  // Non-local artwork never survives normalizeEntry, so there is nothing left
+  // here for the panel to fetch remotely.
+  assert.strictEqual(plan.entries[1].image, "")
+})
+
+// --- dismissed tombstones: discards persist across polls and restarts ---
+check("dismissed round-trips through parse/serialize", function () {
+  var map = Model.addDismissed({}, ["100-1", "200-2"], 5000)
+  var back = Model.parseDismissedLines(Model.serializeDismissed(map))
+  assert.deepStrictEqual(back, { "100-1": 5000, "200-2": 5000 })
+  assert.deepStrictEqual(Model.parseDismissedLines("torn {\n\n"), {})
+  assert.deepStrictEqual(Model.parseDismissedLines('{"nope":1}\n{"key":"","at":9}\n'), {})
+})
+
+check("dismissedLines formats one JSON line per key", function () {
+  var lines = Model.dismissedLines(["100-1", "", "200-2"], 7777)
+  assert.strictEqual(lines.length, 2)
+  assert.deepStrictEqual(JSON.parse(lines[0]), { key: "100-1", at: 7777 })
+  assert.strictEqual(Model.dismissedLines([], 1).length, 0)
+})
+
+check("merge excludes dismissed keys, old callers unaffected", function () {
+  var a = Model.normalizeEntry({ summary: "a", timestamp: 100, originalId: 1 })
+  var b = Model.normalizeEntry({ summary: "b", timestamp: 200, originalId: 2 })
+  var out = Model.mergeEntries([a], [a, b], { "100-1": 5000 })
+  assert.strictEqual(out.length, 1)
+  assert.strictEqual(out[0].summary, "b")
+  assert.strictEqual(Model.mergeEntries([a], [a, b]).length, 2)
+})
+
+check("withoutDismissed drops discarded entries", function () {
+  var rows = [100, 200].map(function (t, i) {
+    return Model.normalizeEntry({ summary: "s" + i, timestamp: t, originalId: i + 1 })
+  })
+  assert.strictEqual(Model.withoutDismissed(rows, { "100-1": 1 }).length, 1)
+  assert.strictEqual(Model.withoutDismissed(rows, null).length, 2)
+})
+
+check("mergeDismissed unions, newest discard wins", function () {
+  assert.deepStrictEqual(Model.mergeDismissed({ "1-1": 10 }, { "1-1": 30, "2-2": 5 }), { "1-1": 30, "2-2": 5 })
+  assert.deepStrictEqual(Model.mergeDismissed(null, { "1-1": 1 }), { "1-1": 1 })
+})
+
+check("trimDismissed expires by age and caps by count", function () {
+  var now = 30 * 24 * 3600 * 1000 + 1000000
+  var freshKey = String(now - 5000) + "-3" // at 0: age falls back to the key time
+  var map = {
+    "100-1": now - 1000, // fresh, kept
+    "200-2": now - 40 * 24 * 3600 * 1000, // older than keepDays, dropped
+  }
+  map[freshKey] = 0 // unknown discard time, fresh key time: kept by the age pass
+  map["legacy-no-time"] = 0 // no parseable time at all: kept by the age pass
+  var out = Model.trimDismissed(map, 1000, 30, now)
+  assert.ok(!("200-2" in out))
+  assert.ok("100-1" in out)
+  assert.ok(freshKey in out)
+  assert.ok("legacy-no-time" in out)
+  // Ancient key time with no discard time is still older than keepDays.
+  out = Model.trimDismissed({ "300-3": 0 }, 1000, 30, now)
+  assert.ok(!("300-3" in out))
+  out = Model.trimDismissed({ "1-1": 1, "2-2": 2, "3-3": 3 }, 2, 365, now)
+  assert.strictEqual(Object.keys(out).length, 2)
+  assert.ok(!("1-1" in out))
+  assert.ok("3-3" in out)
+})
+
+check("dismissed key re-ingested from disk stays gone", function () {
+  var raw = JSON.stringify({ summary: "ping", timestamp: 100, originalId: 1 })
+  var archived = Model.parseEntryLines(raw)
+  assert.strictEqual(archived.length, 1)
+  // Dismiss: drop from entries, record the tombstone.
+  var dismissed = Model.addDismissed({}, [archived[0].key], 5000)
+  var entries = Model.withoutDismissed(archived, dismissed)
+  assert.strictEqual(entries.length, 0)
+  // Next 3 s poll re-reads the same omarchy file: the key must not come back.
+  var again = Model.withoutDismissed(Model.parseEntryLines(raw), dismissed)
+  var merged = Model.mergeEntries(entries, again, dismissed)
+  assert.strictEqual(merged.length, 0)
 })
 
 // --- seed entries are deterministic and ordered ---

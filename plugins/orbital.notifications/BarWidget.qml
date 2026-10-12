@@ -32,6 +32,7 @@ BarWidget {
   readonly property string home: Quickshell.env("HOME")
   readonly property string storeDir: home + "/.local/state/omarchy/orbital-notifications/"
   readonly property string archivePath: storeDir + "archive.jsonl"
+  readonly property string dismissedPath: storeDir + "dismissed.jsonl"
   readonly property string seenPath: storeDir + "seen"
   readonly property string importMarkerPath: storeDir + "imported"
   readonly property string ownImagesDir: storeDir + "images/"
@@ -43,6 +44,12 @@ BarWidget {
 
   // Newest first. The panel reads this straight off its host widget.
   property var entries: []
+  // Discarded keys (tombstones): dismissEntry()/clearAll() remove entries from
+  // the archive, but omarchy's own history files still hold them, so without
+  // this map the next 3 s poll would resurrect them. Persisted append-only in
+  // dismissed.jsonl so discards survive restarts and converge across the
+  // per-monitor instances via the file watcher below.
+  property var dismissed: ({})
   property double seenMs: 0
   readonly property int unread: Model.unreadCount(entries, seenMs)
 
@@ -112,6 +119,11 @@ BarWidget {
   }
 
   function clearAll() {
+    var keys = root.entries.map(function (e) { return e.key })
+    if (keys.length > 0) {
+      root.dismissed = Model.trimDismissed(Model.addDismissed(root.dismissed, keys, Date.now()), dismissedCap(), root.keepDays, Date.now())
+      appendDismissed(keys)
+    }
     root.entries = []
     writeArchive()
     markSeen()
@@ -120,12 +132,35 @@ BarWidget {
   function dismissEntry(key) {
     var needle = String(key || "")
     if (!needle) return
+    root.dismissed = Model.trimDismissed(Model.addDismissed(root.dismissed, [needle], Date.now()), dismissedCap(), root.keepDays, Date.now())
+    appendDismissed([needle])
     root.entries = root.entries.filter(function (e) { return String(e.key || "") !== needle })
     writeArchive()
   }
 
+  // Tombstones stay bounded: same age window as the archive, count capped at
+  // (at least) 1000 so every key the archive could still hold stays covered.
+  function dismissedCap() {
+    return Math.max(1000, root.maxItems)
+  }
+
+  // Append-only so two per-monitor instances discarding at the same moment
+  // never clobber each other (a full rewrite would last-writer-wins). Values
+  // travel as argv, never interpolated into the shell script.
+  function appendDismissed(keys) {
+    var lines = Model.dismissedLines(keys, Date.now())
+    if (lines.length === 0) return
+    var command = ["bash", "-c",
+      "f=\"$1\"; shift\nmkdir -p \"$(dirname \"$f\")\"\nfor l in \"$@\"; do printf '%s\\n' \"$l\" >> \"$f\"; done",
+      "--", root.dismissedPath]
+    for (var i = 0; i < lines.length; i++) command.push(lines[i])
+    dismissAppendProc.command = command
+    dismissAppendProc.running = true
+  }
+
   function writeArchive() {
-    var trimmed = Model.trimEntries(root.entries, root.maxItems, root.keepDays, Date.now())
+    var visible = Model.withoutDismissed(root.entries, root.dismissed)
+    var trimmed = Model.trimEntries(visible, root.maxItems, root.keepDays, Date.now())
     root.entries = trimmed
     archiveView.setText(Model.serializeArchive(trimmed))
   }
@@ -142,28 +177,29 @@ BarWidget {
   }
 
   function ingestOmarchy(raw) {
-    var rows = Model.parseEntryLines(raw)
+    var rows = Model.withoutDismissed(Model.parseEntryLines(raw), root.dismissed)
     if (rows.length === 0) return
     var known = {}
     for (var i = 0; i < root.entries.length; i++) known[root.entries[i].key] = true
     var fresh = rows.filter(function (e) { return !known[e.key] })
     if (fresh.length === 0) return
-    var merged = Model.mergeEntries(root.entries, fresh)
+    var merged = Model.mergeEntries(root.entries, fresh, root.dismissed)
     var planned = Model.planImageCopies(merged, root.omarchyImagesDir, root.ownImagesDir)
     runCopies(planned.copies)
-    root.entries = Model.trimEntries(planned.entries, root.maxItems, root.keepDays, Date.now())
+    root.entries = Model.trimEntries(Model.withoutDismissed(planned.entries, root.dismissed), root.maxItems, root.keepDays, Date.now())
     archiveView.setText(Model.serializeArchive(root.entries))
   }
 
   // One-time, read-only import of the retired third-party center's archive:
   // entries are copied, never moved; that directory is never written to.
+  // Already-discarded keys stay discarded.
   function importLegacy(raw) {
-    var rows = Model.parseEntryLines(raw)
+    var rows = Model.withoutDismissed(Model.parseEntryLines(raw), root.dismissed)
     if (rows.length === 0) {
       markImported()
       return
     }
-    var merged = Model.mergeEntries(root.entries, rows)
+    var merged = Model.mergeEntries(root.entries, rows, root.dismissed)
     var first = Model.planImageCopies(merged, root.omarchyImagesDir, root.ownImagesDir)
     var second = Model.planImageCopies(first.entries, root.legacyImagesDir, root.ownImagesDir)
     runCopies(first.copies.concat(second.copies))
@@ -192,7 +228,8 @@ BarWidget {
   function seedEntries(count) {
     var rows = Model.makeSeedEntries(count, Date.now())
     if (rows.length === 0) return "none"
-    root.entries = Model.trimEntries(Model.mergeEntries(root.entries, rows), root.maxItems, root.keepDays, Date.now())
+    var visible = Model.withoutDismissed(rows, root.dismissed)
+    root.entries = Model.trimEntries(Model.mergeEntries(root.entries, visible, root.dismissed), root.maxItems, root.keepDays, Date.now())
     archiveView.setText(Model.serializeArchive(root.entries))
     return "seeded " + rows.length
   }
@@ -213,12 +250,41 @@ BarWidget {
     atomicWrites: true
     printErrors: false
     onLoaded: {
-      root.entries = Model.trimEntries(Model.parseEntryLines(text()), root.maxItems, root.keepDays, Date.now())
+      var rows = Model.withoutDismissed(Model.parseEntryLines(text()), root.dismissed)
+      root.entries = Model.trimEntries(rows, root.maxItems, root.keepDays, Date.now())
     }
     onLoadFailed: {
       // First run: no archive yet. The legacy import and the poll below fill
       // entries; either way the panel renders an honest empty state, never a
       // spinner.
+    }
+  }
+
+  // Tombstone store: union what is on disk with the in-memory map (our own
+  // appends may not have flushed yet) so concurrent instances converge instead
+  // of overwriting each other. Matching in-memory entries are dropped without
+  // rewriting the archive — the dismissing instance already did — so instances
+  // never ping-pong writes at each other. The file is rewritten only when the
+  // bound actually evicts something, which keeps it from growing without limit.
+  FileView {
+    id: dismissedView
+    path: root.dismissedPath
+    watchChanges: true
+    atomicWrites: true
+    printErrors: false
+    onLoaded: {
+      var loaded = Model.parseDismissedLines(text())
+      var union = Model.mergeDismissed(root.dismissed, loaded)
+      var trimmed = Model.trimDismissed(union, root.dismissedCap(), root.keepDays, Date.now())
+      root.dismissed = trimmed
+      var kept = Model.withoutDismissed(root.entries, trimmed)
+      if (kept.length !== root.entries.length) root.entries = kept
+      if (Object.keys(trimmed).length < Object.keys(loaded).length) {
+        dismissedView.setText(Model.serializeDismissed(trimmed))
+      }
+    }
+    onLoadFailed: {
+      // No tombstone file yet: nothing discarded anywhere, keep the map as is.
     }
   }
 
@@ -281,6 +347,11 @@ BarWidget {
 
   Process {
     id: markImportedProc
+    running: false
+  }
+
+  Process {
+    id: dismissAppendProc
     running: false
   }
 
