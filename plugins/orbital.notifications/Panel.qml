@@ -59,7 +59,8 @@ Panel {
     if (parts.kind === "now") return tr("now")
     if (parts.kind === "date") return Qt.formatDate(new Date(Number(timestamp) || 0), Qt.locale().dateFormat(Locale.ShortFormat))
     var unit = unitLabel(parts.unit)
-    if (OrbitalUi.OrbitalI18n.pt) return "há " + parts.amount + " " + unit
+    // Word order stays English ("5 minutes ago"); the Portuguese dictionary
+    // renders it as "5 minutos atrás", which needs no special case here.
     return parts.amount + " " + unit + " " + tr("ago")
   }
 

@@ -22,6 +22,24 @@ function entryKey(entry) {
 // (execArgv, expireTimeout, preview, file, id) are dropped on purpose: a stored
 // execArgv is someone else's command waiting for a click, and the panel never
 // runs sender-provided commands.
+// Remote or otherwise non-local artwork must never reach the panel's Image
+// element: a sender-supplied http(s) URL would make the panel fetch a remote
+// resource on render (IP leak / tracking pixel). Only absolute local paths,
+// file:// URLs pointing at absolute paths, and bare theme icon names survive;
+// everything else normalizes to "" and the panel renders its fallback icon.
+function sanitizeImageRef(value) {
+  var s = String(value || "")
+  if (!s) return ""
+  if (s.indexOf("file://") === 0) {
+    return s.slice(7).charAt(0) === "/" ? s : ""
+  }
+  if (s.charAt(0) === "/") return s
+  if (s.indexOf("://") !== -1) return ""
+  if (s.indexOf("/") !== -1 || s.indexOf("\\") !== -1) return ""
+  if (/^[A-Za-z0-9._:+-]+$/.test(s)) return s
+  return ""
+}
+
 function normalizeEntry(raw) {
   var v = raw || {}
   var timestamp = Number(v.timestamp || 0)
@@ -40,10 +58,10 @@ function normalizeEntry(raw) {
   if (!isFinite(urgency)) urgency = 1
   var entry = {
     app: String(v.app || ""),
-    appIcon: String(v.appIcon || ""),
+    appIcon: sanitizeImageRef(v.appIcon),
     summary: String(v.summary || ""),
     body: String(v.body || ""),
-    image: String(v.image || ""),
+    image: sanitizeImageRef(v.image),
     glyph: String(v.glyph || ""),
     urgency: urgency,
     timestamp: timestamp,
@@ -52,8 +70,8 @@ function normalizeEntry(raw) {
   entry.key = rawKey || entryKey(entry)
   // The third-party archive kept a separate preview/file pair for
   // picture-about notifications; when the canonical image is empty but a
-  // preview survived, the preview is the picture.
-  if (!entry.image) entry.image = String(v.preview || v.file || "")
+  // preview survived, the preview is the picture (sanitized like any other).
+  if (!entry.image) entry.image = sanitizeImageRef(v.preview || v.file || "")
   return entry
 }
 
@@ -79,14 +97,17 @@ function parseEntryLines(text) {
 
 // Merge freshly read entries into the archived ones. Dedupe is by key, so a
 // re-read directory, a re-imported third-party archive, and two bar instances
-// racing an append all converge instead of duplicating.
-function mergeEntries(archived, incoming) {
+// racing an append all converge instead of duplicating. The optional dismissed
+// map (see the tombstone helpers below) excludes already-discarded keys so a
+// still-on-disk omarchy file cannot resurrect them.
+function mergeEntries(archived, incoming, dismissed) {
   var seen = {}
   var out = []
   function collect(rows) {
     for (var i = 0; i < rows.length; i++) {
       var entry = rows[i]
       if (!entry || seen[entry.key]) continue
+      if (dismissed && Object.prototype.hasOwnProperty.call(dismissed, entry.key)) continue
       seen[entry.key] = true
       out.push(entry)
     }
@@ -95,6 +116,138 @@ function mergeEntries(archived, incoming) {
   collect(Array.isArray(archived) ? archived : [])
   out.sort(function (a, b) { return (b.timestamp || 0) - (a.timestamp || 0) })
   return out
+}
+
+// Dismissed-key tombstones: dismissEntry()/clearAll() remove entries from the
+// archive, but omarchy keeps its own 10 history files on disk, so the next
+// 3 s poll would re-ingest the same keys. Every discard is therefore recorded
+// in dismissed.jsonl (one {"key","at"} JSON object per line) and re-ingested
+// keys matching a tombstone are dropped before the merge. The file is
+// append-only under concurrency (each discard appends its lines, so two
+// per-monitor instances never clobber each other) and bounded by
+// trimDismissed(): tombstones expire with the same keepDays as the archive,
+// and the count is capped, so the file cannot grow without limit.
+function parseDismissedLines(text) {
+  var tombstones = {}
+  var lines = String(text || "").split("\n")
+  for (var i = 0; i < lines.length; i++) {
+    var line = lines[i].trim()
+    if (!line) continue
+    try {
+      var value = JSON.parse(line)
+      var key = value && typeof value === "object" ? String(value.key || "") : ""
+      if (!key) continue
+      var at = value && typeof value === "object" ? Number(value.at) : NaN
+      tombstones[key] = (isFinite(at) && at > 0) ? at : 0
+    } catch (e) {
+      // Torn line: skip, keep the rest.
+    }
+  }
+  return tombstones
+}
+
+function serializeDismissed(tombstones) {
+  var keys = []
+  var src = tombstones || {}
+  for (var k in src) {
+    if (Object.prototype.hasOwnProperty.call(src, k) && k) keys.push(k)
+  }
+  keys.sort()
+  return keys.map(function (key) {
+    return JSON.stringify({ key: key, at: Number(src[key]) || 0 })
+  }).join("\n") + "\n"
+}
+
+// One JSON line per discarded key for the append-only write path in the
+// widget (argv-safe: keys never span lines once stringified).
+function dismissedLines(keys, nowMs) {
+  var now = Number(nowMs)
+  if (!isFinite(now)) now = Date.now()
+  var list = Array.isArray(keys) ? keys : [keys]
+  var out = []
+  for (var i = 0; i < list.length; i++) {
+    var key = String(list[i] || "")
+    if (key) out.push(JSON.stringify({ key: key, at: now }))
+  }
+  return out
+}
+
+function addDismissed(tombstones, keys, nowMs) {
+  var out = {}
+  var src = tombstones || {}
+  for (var k in src) {
+    if (Object.prototype.hasOwnProperty.call(src, k)) out[k] = src[k]
+  }
+  var now = Number(nowMs)
+  if (!isFinite(now)) now = Date.now()
+  var list = Array.isArray(keys) ? keys : [keys]
+  for (var i = 0; i < list.length; i++) {
+    var key = String(list[i] || "")
+    if (key) out[key] = now
+  }
+  return out
+}
+
+// Union of two tombstone maps (local state plus a freshly read file): the
+// newest discard timestamp wins per key, so converging instances agree.
+function mergeDismissed(a, b) {
+  var out = {}
+  function absorb(src) {
+    src = src || {}
+    for (var k in src) {
+      if (!Object.prototype.hasOwnProperty.call(src, k) || !k) continue
+      var at = Number(src[k]) || 0
+      if (!(Object.prototype.hasOwnProperty.call(out, k)) || at > out[k]) out[k] = at
+    }
+  }
+  absorb(a)
+  absorb(b)
+  return out
+}
+
+// Timestamp embedded in "timestamp-originalId" keys, for tombstones stored
+// without an `at` (or with at 0): lets age-trimming work on those too.
+function tombstoneKeyTime(key) {
+  var text = String(key || "")
+  var dash = text.indexOf("-")
+  var ts = Number(dash === -1 ? text : text.slice(0, dash))
+  return (isFinite(ts) && ts > 0) ? ts : 0
+}
+
+// Bound the tombstone map: entries older than keepDays go first (using `at`,
+// falling back to the timestamp embedded in the key), then the oldest beyond
+// maxItems. Unknown-age tombstones (time 0) are kept by the age pass and
+// evicted oldest-first by the count pass, so the map stays bounded anyway.
+function trimDismissed(tombstones, maxItems, keepDays, nowMs) {
+  var src = tombstones || {}
+  var now = Number(nowMs)
+  if (!isFinite(now)) now = Date.now()
+  var days = Number(keepDays)
+  var cutoff = (isFinite(days) && days > 0) ? now - days * 24 * 60 * 60 * 1000 : -Infinity
+  var pairs = []
+  for (var k in src) {
+    if (!Object.prototype.hasOwnProperty.call(src, k) || !k) continue
+    var raw = Number(src[k])
+    var at = (isFinite(raw) && raw > 0) ? raw : 0
+    var age = at > 0 ? at : tombstoneKeyTime(k)
+    if (age > 0 && age < cutoff) continue
+    pairs.push({ key: k, at: at })
+  }
+  pairs.sort(function (a, b) { return a.at - b.at })
+  var max = Number(maxItems)
+  if (isFinite(max) && max >= 0) pairs = pairs.slice(Math.max(0, pairs.length - Math.floor(max)))
+  var out = {}
+  for (var i = 0; i < pairs.length; i++) out[pairs[i].key] = pairs[i].at
+  return out
+}
+
+// Drop archived/incoming entries whose keys were discarded.
+function withoutDismissed(entries, dismissed) {
+  var rows = Array.isArray(entries) ? entries : []
+  if (!dismissed) return rows.slice()
+  return rows.filter(function (e) {
+    return !e || !Object.prototype.hasOwnProperty.call(dismissed, e.key)
+  })
 }
 
 // Bound the archive so a chatty month cannot grow it without limit. Whichever
@@ -264,9 +417,17 @@ function makeSeedEntries(count, nowMs) {
 if (typeof module !== "undefined") {
   module.exports = {
     entryKey: entryKey,
+    sanitizeImageRef: sanitizeImageRef,
     normalizeEntry: normalizeEntry,
     parseEntryLines: parseEntryLines,
     mergeEntries: mergeEntries,
+    parseDismissedLines: parseDismissedLines,
+    serializeDismissed: serializeDismissed,
+    dismissedLines: dismissedLines,
+    addDismissed: addDismissed,
+    mergeDismissed: mergeDismissed,
+    trimDismissed: trimDismissed,
+    withoutDismissed: withoutDismissed,
     trimEntries: trimEntries,
     unreadCount: unreadCount,
     filterEntries: filterEntries,
