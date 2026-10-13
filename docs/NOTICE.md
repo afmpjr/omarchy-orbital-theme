@@ -16,8 +16,13 @@
 - `orbital.keyboard/flags/*.svg` are from `lipis/flag-icons` (MIT, Copyright (c) 2013 Panayiotis Lipiridis); license text in
   `plugins/orbital.keyboard/LICENSE-flag-icons`. The widget itself is based on Omarchy's keyboard-layout widget (MIT).
 
-- `jankeesvw.notification-center` (MIT, Copyright (c) 2026 Jankees van Woezik) is **not bundled**: `install.sh --full` installs it
-  with `omarchy plugin add https://github.com/jankeesvw/omarchy-notification-center.git`, and puts the bell after the clock.
+- `orbital.notifications` is original Orbital code and ships bundled: `install.sh`
+  copies it like every other plugin (no network fetch) and puts the bell after
+  the clock. It replaced the retired third-party `jankeesvw.notification-center`
+  (MIT, Copyright (c) 2026 Jankees van Woezik): the installer migrates that id
+  away wherever it is found and removes its plugin folder, keeping the user's
+  notification archives untouched (the widget imports the retired archive
+  read-only, once, on first run).
 
 ## License
 
