@@ -440,10 +440,13 @@ restore_shell_json() {
 
 uninstall() {
   say "Removing Orbital plugins, Hyprland hook and crash drop-in"
-  for id in "${OVERLAYS[@]}" "${LIBS[@]}" "${BAR_IDS[@]}" "${EXTRA_WIDGETS[@]}" "${WIDGETS[@]%%:*}" "${LOCKSCREEN[@]}"; do
+  for id in "${OVERLAYS[@]}" "${LIBS[@]}" "${BAR_IDS[@]}" "${EXTRA_WIDGETS[@]}" "${WIDGETS[@]%%:*}" "${LOCKSCREEN[@]}" "$NOTIF_ID"; do
     have_omarchy && run omarchy plugin disable "$id" 2>/dev/null || true
     run rm -rf "$PLUGINS/$id"
   done
+  # The retired third-party bell: disabled and removed if a previous era left it behind.
+  have_omarchy && run omarchy plugin disable "$LEGACY_NOTIF_ID" 2>/dev/null || true
+  run rm -rf "$PLUGINS/$LEGACY_NOTIF_ID"
   [[ -f $CFG/ghostty/config ]] && run sed -i --follow-symlinks '/^# orbital-shortcuts/,/^# orbital-shortcuts end/d' "$CFG/ghostty/config"
   # Take the require() lines out first: Hyprland reloads when a file it loads disappears, and a
   # require without its file is a hard config error. Only what this installer put there is removed:
@@ -505,17 +508,57 @@ desktop_id() { # first installed .desktop among candidates
   done
 }
 
-# Third-party (MIT) notification center: the bell after the clock. Installed with Omarchy's own
-# `plugin add` (not bundled). It needs the network and is not part of the theme, so failing to
-# fetch it is a warning, not a reason to abort: the layout is written without it.
-NOTIF_ID="jankeesvw.notification-center"
-NOTIF_URL="https://github.com/jankeesvw/omarchy-notification-center.git"
-install_notification_center() {
-  [[ -d $PLUGINS/$NOTIF_ID ]] && return 0
-  say "Installing the notification center ($NOTIF_ID)"
-  if (( DRY )); then echo "    [dry-run] omarchy plugin add $NOTIF_URL --enable --yes"; return 0; fi
-  if ! omarchy plugin add "$NOTIF_URL" --enable --yes >/dev/null 2>&1 || [[ ! -d $PLUGINS/$NOTIF_ID ]]; then
-    warn "the notification bell (third-party $NOTIF_ID) could not be installed; everything else is fine without it"
+# Notification center: the bell after the clock is this repo's own bundled
+# `orbital.notifications` (plugins/orbital.notifications, installed by apply_plugins
+# like every other plugin, no network involved). It replaced the retired third-party
+# `jankeesvw.notification-center`: that id is migrated away wherever it is found and
+# its plugin folder is removed. User data is never touched: the archives under
+# ~/.local/state stay exactly as they are (the widget imports the retired archive
+# read-only on first run). A missing bell degrades to a warning, never an abort:
+# the layout is then written without it.
+NOTIF_ID="orbital.notifications"
+LEGACY_NOTIF_ID="jankeesvw.notification-center"
+bell_present() { [[ -d $PLUGINS/$NOTIF_ID ]]; }
+ensure_notification_bell() {
+  if bell_present; then return 0; fi
+  warn "the notification bell ($NOTIF_ID) is not installed; the bar is written without it"
+}
+# One-way, idempotent migration from the retired third-party bell. No-op when
+# neither its shell.json entries nor its plugin folder exist.
+migrate_notification_bell() {
+  local sj="$SJ" has_legacy=0 has_dir=0 tmp
+  [[ -f $sj ]] && jq -e --arg l "$LEGACY_NOTIF_ID" '[.bar.layout[]?[]?.id] | index($l)' "$sj" >/dev/null 2>&1 && has_legacy=1
+  [[ -d $PLUGINS/$LEGACY_NOTIF_ID ]] && has_dir=1
+  (( has_legacy == 0 && has_dir == 0 )) && return 0
+  say "Migrating the notification bell to the bundled $NOTIF_ID"
+  if (( has_dir )); then
+    snapshot "$PLUGINS/$LEGACY_NOTIF_ID"
+    if (( DRY )); then
+      echo "    [dry-run] disable and remove $PLUGINS/$LEGACY_NOTIF_ID (your notification archives are kept)"
+    else
+      have_omarchy && omarchy plugin disable "$LEGACY_NOTIF_ID" >/dev/null 2>&1 || true
+      rm -rf "$PLUGINS/$LEGACY_NOTIF_ID" \
+        || warn "could not remove the retired bell $PLUGINS/$LEGACY_NOTIF_ID; remove it by hand"
+    fi
+  fi
+  if (( has_legacy )) && (( FULL )); then return 0; fi  # full_shell_json rewrites the layout next, shell stopped
+  if (( has_legacy )); then
+    if (( DRY )); then echo "    [dry-run] replace $LEGACY_NOTIF_ID with $NOTIF_ID in $sj"; return 0; fi
+    # The running shell rewrites shell.json from memory on every change, so it
+    # goes down while the mapping lands and comes back on the migrated file.
+    stop_shell
+    tmp="$(mktemp)"
+    if ! jq --arg l "$LEGACY_NOTIF_ID" --arg n "$NOTIF_ID" '
+        (.bar.layout // {}) |= with_entries(.value |= (
+          map(if .id == $l then .id = $n else . end) |
+          reduce .[] as $x ([]; if ($x.id == $n and (map(.id) | index($n))) then . else . + [$x] end)
+        ))' "$sj" > "$tmp"; then
+      rm -f "$tmp"; restart_shell_wait
+      problem "could not migrate the retired bell out of $sj (jq failed; is the file valid JSON?)"
+      return 1
+    fi
+    cat "$tmp" > "$sj"; rm -f "$tmp"
+    restart_shell_wait
   fi
 }
 
@@ -529,7 +572,7 @@ full_shell_json() {
   run cp "$sj" "$sj.bak-orbital-$STAMP"
   if (( DRY )); then return 0; fi
   tmp="$(mktemp)"
-  if ! jq --argjson keep "$( (( KEEP_BAR )) && echo true || echo false )" --argjson bell "$( [[ -d $PLUGINS/$NOTIF_ID ]] && echo true || echo false )" --arg bellid "$NOTIF_ID" '
+  if ! jq --argjson keep "$( (( KEEP_BAR )) && echo true || echo false )" --argjson bell "$( bell_present && echo true || echo false )" --arg bellid "$NOTIF_ID" --arg legacyid "$LEGACY_NOTIF_ID" '
       .bar = (.bar // {}) |
       (if $keep then . else
         .bar.id = "orbital.floating-bar" | .bar.position = "bottom" | .bar.transparent = false |
@@ -544,8 +587,8 @@ full_shell_json() {
         center: [{id: "orbital.workspaces"}],
         right:  ( ($right | map(select(.id == "omarchy.tray")))
                 + $ind
-                + ($right | map(select(.id != "omarchy.tray" and .id != "omarchy.indicators"
-                                        and .id != "orbital.divider" and .id != "orbital.keyboard" and .id != "orbital.clock" and .id != "omarchy.clock" and .id != $bellid)))
+                 + ($right | map(select(.id != "omarchy.tray" and .id != "omarchy.indicators"
+                                         and .id != "orbital.divider" and .id != "orbital.keyboard" and .id != "orbital.clock" and .id != "omarchy.clock" and .id != $bellid and .id != $legacyid)))
                 + [{id: "orbital.keyboard"}, {id: "orbital.divider"},
                    {id: "orbital.clock", format: "HH:mm", formatAlt: "d MMMM '"'"'W'"'"'ww yyyy", verticalFormat: "HH\n—\nmm"}]
                 + (if $bell then [{id: $bellid}] else [] end) )
@@ -907,8 +950,9 @@ apply_shell_json() {
   # From here on the shell itself rewrites shell.json (every `plugin enable` goes through it), so this
   # is the file a rollback has to put back: snapshot it once, before anything touches it.
   snapshot "$SJ"; TOUCHED_SHELL_JSON=1
+  migrate_notification_bell || return 1
   if (( FULL )); then
-    install_notification_center
+    ensure_notification_bell
     if (( ! DRY )); then stop_shell; fi   # the shell rewrites shell.json from memory when it exits
     full_shell_json || return 1
     if (( ! DRY )); then restart_shell_wait; fi
@@ -935,6 +979,17 @@ enable_verified() { # `plugin enable` talks to the running shell; confirm it stu
     problem "$id is installed but 'omarchy plugin enable $id' did not stick"
   fi
   return 1
+}
+
+enable_best_effort() { # like enable_verified, but a bell that will not enable is a warning, not an abort
+  local id="$1" n
+  for n in 1 2 3; do
+    trip enable && break
+    omarchy plugin enable "$id" >/dev/null 2>&1 || true
+    omarchy plugin list 2>/dev/null | grep -E "^$id +enabled" >/dev/null && { echo "    enabled $id"; return 0; }
+    nap 2
+  done
+  warn "$id is installed but 'omarchy plugin enable $id' did not stick; enable it by hand"
 }
 
 # `omarchy plugin enable --section` reports "omarchy-shell is not responding" under a burst of calls
@@ -971,9 +1026,17 @@ apply_enable() {
     (( DRY )) && { echo "    [dry-run] enable $id"; continue; }
     enable_verified "$id" || return 1
   done
+  (( DRY )) && return 0
+  # The bundled notification bell: wherever the layout names it, make sure it is
+  # enabled. Best effort (a bell that will not enable is a warning, like the old
+  # fetch failure was), never a reason to abort the install.
+  if in_bar "$NOTIF_ID" && bell_present; then
+    enable_best_effort "$NOTIF_ID" || true
+  elif in_bar "$NOTIF_ID"; then
+    warn "the bar names $NOTIF_ID but it is not installed; the bell stays empty"
+  fi
   # The theme ships its own bar, so use it: without this the plugins install but the user keeps
   # Omarchy's stock bar. Reverting is one command, printed below.
-  (( DRY )) && return 0
   TOUCHED_SHELL_JSON=1
   local cur; cur="$(jq -r '.bar.id // "omarchy.bar"' "$SJ" 2>/dev/null || echo omarchy.bar)"
   if (( KEEP_BAR )); then
@@ -1112,6 +1175,17 @@ verify_all() {
       || problem "the right side of the bar is out of order (want keyboard, divider, clock: ${order:-empty})"
     grep -qw orbital.workspaces <<<"$(jq -r '[.bar.layout[]?[]?.id] | join(" ")' "$SJ" 2>/dev/null || true)" \
       || problem "orbital.workspaces is not in the bar layout"
+    # The --full layout is written by this installer, so the bundled bell must be
+    # there exactly once (elsewhere the bell is best-effort and not promised).
+    if (( FULL )) && (( ! KEEP_BAR )) && bell_present; then
+      [[ $(jq -c --arg b "$NOTIF_ID" '[.bar.layout.right[].id | select(. == $b)] | length' "$SJ") == 1 ]] \
+        || problem "the notification bell ($NOTIF_ID) is missing or duplicated in the right section of the bar"
+    fi
+    # The installer never writes a bind to the retired bell, but a hand-kept
+    # Hyprland config may still dispatch Super+N to it: point at it, do not fail.
+    if user_hypr_has 'jankeesvw'; then
+      warn "your Hyprland config still mentions jankeesvw (probably a Super+N bind); point that bind at '$NOTIF_ID' (see hypr/orbital-keys-windows.lua)"
+    fi
   fi
   if (( FULL )); then
     (( KEEP_BAR )) || [[ $(jq -r '.bar.position' "$SJ") == bottom ]] || problem "the bar should be at the bottom with --full"
