@@ -40,7 +40,10 @@ var pt = {
   "One task at a time.": "Uma tarefa de cada vez.", "Deep work beats busy work.": "Trabalho profundo vence trabalho ocupado.",
   // Notifications
   "Notifications": "Notificações", "No notifications yet": "Nenhuma notificação ainda",
-  "Clear all": "Limpar tudo",
+  "No unread notifications": "Nenhuma notificação não lida",
+  "Clear all": "Limpar tudo", "Mark all as read": "Marcar todas como lidas",
+  "Mark as read": "Marcar como lida", "Mark as unread": "Marcar como não lida",
+  "All": "Todas", "Unread": "Não lidas",
   "Do Not Disturb: on": "Não perturbe: ativado", "Do Not Disturb: off": "Não perturbe: desativado",
   "now": "agora", "minute": "minuto", "minutes": "minutos",
   "hour": "hora", "hours": "horas", "day": "dia", "days": "dias",

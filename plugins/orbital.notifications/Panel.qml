@@ -30,8 +30,14 @@ Panel {
   readonly property int configuredWidth: hostWidget ? hostWidget.panelWidth : 420
   // The list virtualizes, but the card still sizes itself up front: cap the
   // visible rows so a 1000-entry archive opens a screen-fitting card, not a
-  // screen-filling one.
-  readonly property var visibleEntries: hostWidget ? hostWidget.entries.slice(0, 300) : []
+  // screen-filling one. The unread filter applies before the cap.
+  readonly property var visibleEntries: {
+    if (!hostWidget) return []
+    var rows = hostWidget.entries || []
+    if (hostWidget.unreadOnly) rows = Model.unreadEntries(rows, hostWidget.read)
+    return rows.slice(0, 300)
+  }
+  readonly property int unreadTotal: hostWidget ? Model.unreadCount(hostWidget.entries, hostWidget.read) : 0
   readonly property bool dndOn: hostWidget ? hostWidget.dnd === true : false
   readonly property bool dndWritable: hostWidget ? hostWidget.dndWritable === true : false
   readonly property real rowHeight: Style.space(78)
@@ -81,7 +87,8 @@ Panel {
   }
 
   function open() {
-    if (hostWidget && typeof hostWidget.markSeen === "function") hostWidget.markSeen()
+    // Opening marks nothing: read/unread is per notification, toggled
+    // explicitly on the row or via "Mark all as read".
     root.controller.show()
     Qt.callLater(function() {
       if (root.opened) setCenterHoverRevealSuppressed(true)
@@ -124,16 +131,25 @@ Panel {
     id: actionRoot
     property string label: ""
     property bool actionEnabled: true
+    property bool selected: false
     property color labelColor: "white"
     property string labelFontFamily: ""
     signal clicked()
     width: Math.max(Style.space(64), actionLabel.implicitWidth + Style.space(20))
     height: Style.space(28)
     radius: Style.space(8)
-    color: actionMouse.containsMouse && actionEnabled ? Qt.rgba(1, 1, 1, 0.10) : Qt.rgba(1, 1, 1, 0.05)
-    border.color: Qt.rgba(1, 1, 1, 0.18)
-    border.width: 1
+    color: actionRoot.selected ? Qt.rgba(1, 1, 1, 0.14)
+      : actionMouse.containsMouse && actionEnabled ? Qt.rgba(1, 1, 1, 0.10) : Qt.rgba(1, 1, 1, 0.05)
+    border.color: actionRoot.activeFocus ? labelColor : Qt.rgba(1, 1, 1, 0.18)
+    border.width: actionRoot.activeFocus ? 2 : 1
     opacity: actionEnabled ? 1.0 : 0.45
+    activeFocusOnTab: true
+    Keys.onReturnPressed: function(event) {
+      if (actionEnabled) { actionRoot.clicked(); event.accepted = true }
+    }
+    Keys.onSpacePressed: function(event) {
+      if (actionEnabled) { actionRoot.clicked(); event.accepted = true }
+    }
 
     Text {
       id: actionLabel
@@ -186,7 +202,7 @@ Panel {
 
         Item {
           width: parent.width
-          height: Math.max(titleText.implicitHeight, clearButton.height)
+          height: Math.max(titleText.implicitHeight, headerActions.height)
 
           Text {
             id: titleText
@@ -200,23 +216,68 @@ Panel {
             font.bold: true
           }
 
-          ActionButton {
-            id: clearButton
+          Row {
+            id: headerActions
             anchors.right: parent.right
             anchors.verticalCenter: parent.verticalCenter
-            visible: root.visibleEntries.length > 0
-            label: tr("Clear all")
-            labelColor: root.contentForeground
-            labelFontFamily: root.contentFontFamily
-            onClicked: {
-              if (root.hostWidget && typeof root.hostWidget.clearAll === "function") root.hostWidget.clearAll()
+            spacing: Style.space(8)
+
+            ActionButton {
+              id: markAllButton
+              visible: root.unreadTotal > 0
+              label: tr("Mark all as read")
+              labelColor: root.contentForeground
+              labelFontFamily: root.contentFontFamily
+              onClicked: {
+                if (root.hostWidget && typeof root.hostWidget.markAllRead === "function") root.hostWidget.markAllRead()
+              }
+            }
+
+            ActionButton {
+              id: clearButton
+              visible: root.visibleEntries.length > 0 || (root.hostWidget && root.hostWidget.entries.length > 0)
+              label: tr("Clear all")
+              labelColor: root.contentForeground
+              labelFontFamily: root.contentFontFamily
+              onClicked: {
+                if (root.hostWidget && typeof root.hostWidget.clearAll === "function") root.hostWidget.clearAll()
+              }
             }
           }
         }
 
         Item {
           width: parent.width
-          height: dndButton.height
+          height: Math.max(filterRow.height, dndButton.height)
+
+          Row {
+            id: filterRow
+            anchors.left: parent.left
+            anchors.verticalCenter: parent.verticalCenter
+            spacing: Style.space(8)
+
+            ActionButton {
+              id: allButton
+              selected: !(root.hostWidget && root.hostWidget.unreadOnly)
+              label: tr("All")
+              labelColor: root.contentForeground
+              labelFontFamily: root.contentFontFamily
+              onClicked: {
+                if (root.hostWidget) root.hostWidget.unreadOnly = false
+              }
+            }
+
+            ActionButton {
+              id: unreadButton
+              selected: root.hostWidget && root.hostWidget.unreadOnly
+              label: tr("Unread")
+              labelColor: root.contentForeground
+              labelFontFamily: root.contentFontFamily
+              onClicked: {
+                if (root.hostWidget) root.hostWidget.unreadOnly = true
+              }
+            }
+          }
 
           ActionButton {
             id: dndButton
@@ -246,7 +307,8 @@ Panel {
           topPadding: Style.space(24)
           bottomPadding: Style.space(24)
           textFormat: Text.PlainText
-          text: tr("No notifications yet")
+          text: (root.hostWidget && root.hostWidget.unreadOnly && root.hostWidget.entries.length > 0)
+            ? tr("No unread notifications") : tr("No notifications yet")
           color: root.contentForeground
           opacity: 0.6
           font.family: root.contentFontFamily
@@ -263,6 +325,18 @@ Panel {
           model: root.visibleEntries
           delegate: Item {
             required property var modelData
+            // Unread rows carry the accent dot and a bold subject; read rows
+            // render attenuated. Re-evaluates when the host's read map changes.
+            readonly property bool rowUnread: root.hostWidget
+              ? !Model.isRead(root.hostWidget.read, modelData.key) : true
+            function toggleRowRead() {
+              if (!root.hostWidget) return
+              if (rowUnread) {
+                if (typeof root.hostWidget.markRead === "function") root.hostWidget.markRead(modelData.key)
+              } else {
+                if (typeof root.hostWidget.markUnread === "function") root.hostWidget.markUnread(modelData.key)
+              }
+            }
             width: historyList.width
             height: root.rowHeight
 
@@ -281,6 +355,20 @@ Panel {
               spacing: Style.space(10)
 
               Item {
+                width: Style.space(8)
+                height: parent.height
+
+                Rectangle {
+                  anchors.verticalCenter: parent.verticalCenter
+                  width: 8
+                  height: 8
+                  radius: width / 2
+                  visible: rowUnread
+                  color: tokens.accent
+                }
+              }
+
+              Item {
                 width: Style.space(36)
                 height: parent.height
 
@@ -291,46 +379,66 @@ Panel {
                   source: root.iconFile(modelData)
                   preserveColors: root.iconFile(modelData) !== ""
                   tint: root.contentForeground
+                  opacity: rowUnread ? 1.0 : 0.55
                 }
               }
 
-              Column {
-                width: parent.width - 36 - dismissSlot.width - thumbSlot.width - parent.spacing * 3
-                anchors.verticalCenter: parent.verticalCenter
-                spacing: 1
+              Item {
+                id: textSlot
+                width: parent.width - 8 - 36 - readSlot.width - dismissSlot.width - thumbSlot.width - parent.spacing * 5
+                height: parent.height
 
-                Text {
+                Column {
+                  anchors.verticalCenter: parent.verticalCenter
                   width: parent.width
-                  textFormat: Text.PlainText
-                  elide: Text.ElideRight
-                  text: (modelData.app ? modelData.app + "  ·  " : "") + root.relativeText(modelData.timestamp)
-                  color: root.contentForeground
-                  opacity: 0.55
-                  font.family: root.contentFontFamily
-                  font.pixelSize: Style.font.caption
+                  spacing: 1
+
+                  Text {
+                    width: parent.width
+                    textFormat: Text.PlainText
+                    elide: Text.ElideRight
+                    text: (modelData.app ? modelData.app + "  ·  " : "") + root.relativeText(modelData.timestamp)
+                    color: root.contentForeground
+                    opacity: rowUnread ? 0.55 : 0.35
+                    font.family: root.contentFontFamily
+                    font.pixelSize: Style.font.caption
+                  }
+
+                  Text {
+                    width: parent.width
+                    textFormat: Text.PlainText
+                    elide: Text.ElideRight
+                    text: modelData.summary
+                    color: root.contentForeground
+                    opacity: rowUnread ? 1.0 : 0.55
+                    font.family: root.contentFontFamily
+                    font.pixelSize: Style.font.body
+                    font.bold: rowUnread
+                  }
+
+                  Text {
+                    width: parent.width
+                    textFormat: Text.PlainText
+                    elide: Text.ElideRight
+                    maximumLineCount: 1
+                    text: modelData.body
+                    color: root.contentForeground
+                    opacity: rowUnread ? 0.75 : 0.45
+                    font.family: root.contentFontFamily
+                    font.pixelSize: Style.font.bodySmall
+                  }
                 }
 
-                Text {
-                  width: parent.width
-                  textFormat: Text.PlainText
-                  elide: Text.ElideRight
-                  text: modelData.summary
-                  color: root.contentForeground
-                  font.family: root.contentFontFamily
-                  font.pixelSize: Style.font.body
-                  font.bold: true
-                }
-
-                Text {
-                  width: parent.width
-                  textFormat: Text.PlainText
-                  elide: Text.ElideRight
-                  maximumLineCount: 1
-                  text: modelData.body
-                  color: root.contentForeground
-                  opacity: 0.75
-                  font.family: root.contentFontFamily
-                  font.pixelSize: Style.font.bodySmall
+                // Clicking the body marks an unread row read; read rows keep
+                // the default cursor so the control reads as already settled.
+                MouseArea {
+                  id: bodyMouse
+                  anchors.fill: parent
+                  hoverEnabled: true
+                  cursorShape: rowUnread ? Qt.PointingHandCursor : Qt.ArrowCursor
+                  onClicked: {
+                    if (rowUnread) toggleRowRead()
+                  }
                 }
               }
 
@@ -346,6 +454,48 @@ Panel {
                   fillMode: Image.PreserveAspectCrop
                   asynchronous: true
                   cache: true
+                }
+              }
+
+              // Per-row read toggle: filled dot = unread (click marks read),
+              // hollow dot = read (click marks unread). Tab-focusable with a
+              // focus ring, Enter/Space toggles, so it works by keyboard too.
+              Item {
+                id: readSlot
+                width: Style.space(28)
+                height: parent.height
+                activeFocusOnTab: true
+                Accessible.name: rowUnread ? tr("Mark as read") : tr("Mark as unread")
+                Accessible.description: modelData.summary
+                Keys.onReturnPressed: function(event) { toggleRowRead(); event.accepted = true }
+                Keys.onSpacePressed: function(event) { toggleRowRead(); event.accepted = true }
+
+                Rectangle {
+                  anchors.fill: parent
+                  radius: Style.space(8)
+                  color: readMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.06) : "transparent"
+                  border.color: root.contentForeground
+                  border.width: readSlot.activeFocus ? 1 : 0
+                  opacity: readSlot.activeFocus ? 0.8 : 1.0
+                }
+
+                Text {
+                  anchors.centerIn: parent
+                  textFormat: Text.PlainText
+                  text: rowUnread ? "●" : "○"
+                  color: rowUnread ? tokens.accent
+                    : Qt.rgba(root.contentForeground.r, root.contentForeground.g, root.contentForeground.b,
+                        readMouse.containsMouse || readSlot.activeFocus ? 0.9 : 0.35)
+                  font.family: root.contentFontFamily
+                  font.pixelSize: Style.font.body
+                }
+
+                MouseArea {
+                  id: readMouse
+                  anchors.fill: parent
+                  hoverEnabled: true
+                  cursorShape: Qt.PointingHandCursor
+                  onClicked: toggleRowRead()
                 }
               }
 
