@@ -19,8 +19,8 @@ function entryKey(entry) {
 
 // Canonical entry: { key, app, appIcon, summary, body, image, glyph, urgency,
 // timestamp }. Everything the panel draws; nothing it does not. Unknown fields
-// (execArgv, expireTimeout, preview, file, id) are dropped on purpose: a stored
-// execArgv is someone else's command waiting for a click, and the panel never
+// (execArgv, expireTimeout, preview, file, id, and any foreign `read` flag)
+// are dropped on purpose: a stored execArgv is someone else's command waiting for a click, and the panel never
 // runs sender-provided commands.
 // Remote or otherwise non-local artwork must never reach the panel's Image
 // element: a sender-supplied http(s) URL would make the panel fetch a remote
@@ -250,6 +250,181 @@ function withoutDismissed(entries, dismissed) {
   })
 }
 
+// Read/unread state per notification: unlike the old global `seen` timestamp
+// (opening the panel cleared the bell), every entry carries its own flag and
+// opening the panel marks nothing. The map is { key: { read, at } }, persisted
+// append-only in read.jsonl (one {"key","read","at"} JSON object per line)
+// with the same contract as the dismissed tombstones: concurrent per-monitor
+// instances append their own lines and converge via the file watcher
+// (mergeRead: newest `at` wins per key), so no last-writer-wins rewrite can
+// ever drop a marking made elsewhere. Absent keys are UNREAD: new arrivals
+// need no write to light the bell. trimRead() bounds the map with the same
+// keepDays/maxItems contract as the archive, so it cannot grow without limit.
+//
+// The map never lives inside archive.jsonl entries (normalizeEntry drops a
+// foreign `read` field on purpose): the archive is fully rewritten on every
+// change, and a read flag stored there would last-writer-wins away concurrent
+// markings.
+function parseReadLines(text) {
+  var state = {}
+  var lines = String(text || "").split("\n")
+  for (var i = 0; i < lines.length; i++) {
+    var line = lines[i].trim()
+    if (!line) continue
+    try {
+      var value = JSON.parse(line)
+      var key = value && typeof value === "object" ? String(value.key || "") : ""
+      if (!key) continue
+      var raw = value && typeof value === "object" ? value.read : undefined
+      var read = !(raw === false || raw === 0 || raw === "false" || raw === "no")
+      var at = value && typeof value === "object" ? Number(value.at) : NaN
+      if (!Object.prototype.hasOwnProperty.call(state, key) || (isFinite(at) && at > 0 && at > state[key].at)) {
+        state[key] = { read: read, at: (isFinite(at) && at > 0) ? at : 0 }
+      }
+    } catch (e) {
+      // Torn line: skip, keep the rest.
+    }
+  }
+  return state
+}
+
+function serializeRead(state) {
+  var keys = []
+  var src = state || {}
+  for (var k in src) {
+    if (Object.prototype.hasOwnProperty.call(src, k) && k) keys.push(k)
+  }
+  keys.sort()
+  return keys.map(function (key) {
+    var cell = src[key] || {}
+    return JSON.stringify({ key: key, read: cell.read !== false, at: Number(cell.at) || 0 })
+  }).join("\n") + "\n"
+}
+
+// One JSON line per (un)marked key for the append-only write path in the
+// widget (argv-safe: keys never span lines once stringified).
+function readLines(keys, read, nowMs) {
+  var now = Number(nowMs)
+  if (!isFinite(now)) now = Date.now()
+  var flag = !(read === false || read === 0 || read === "false")
+  var list = Array.isArray(keys) ? keys : [keys]
+  var out = []
+  for (var i = 0; i < list.length; i++) {
+    var key = String(list[i] || "")
+    if (key) out.push(JSON.stringify({ key: key, read: flag, at: now }))
+  }
+  return out
+}
+
+function setRead(state, keys, read, nowMs) {
+  var out = {}
+  var src = state || {}
+  for (var k in src) {
+    if (Object.prototype.hasOwnProperty.call(src, k)) out[k] = { read: src[k] && src[k].read !== false, at: Number(src[k] && src[k].at) || 0 }
+  }
+  var now = Number(nowMs)
+  if (!isFinite(now)) now = Date.now()
+  var flag = !(read === false || read === 0 || read === "false")
+  var list = Array.isArray(keys) ? keys : [keys]
+  for (var i = 0; i < list.length; i++) {
+    var key = String(list[i] || "")
+    if (key) out[key] = { read: flag, at: now }
+  }
+  return out
+}
+
+// Union of two read maps (local state plus a freshly read file): the newest
+// marking wins per key, so converging instances agree even when one marked
+// read and the other marked unread.
+function mergeRead(a, b) {
+  var out = {}
+  function absorb(src) {
+    src = src || {}
+    for (var k in src) {
+      if (!Object.prototype.hasOwnProperty.call(src, k) || !k) continue
+      var cell = src[k] || {}
+      var read = cell.read !== false
+      var raw = Number(cell.at)
+      var at = (isFinite(raw) && raw > 0) ? raw : 0
+      if (!Object.prototype.hasOwnProperty.call(out, k) || at > out[k].at) out[k] = { read: read, at: at }
+    }
+  }
+  absorb(a)
+  absorb(b)
+  return out
+}
+
+// Bound the read map: markings older than keepDays go first (using `at`,
+// falling back to the timestamp embedded in the key), then the oldest beyond
+// maxItems. Same shape as trimDismissed; kept separate so each store's bound
+// reads on its own terms.
+function trimRead(state, maxItems, keepDays, nowMs) {
+  var src = state || {}
+  var now = Number(nowMs)
+  if (!isFinite(now)) now = Date.now()
+  var days = Number(keepDays)
+  var cutoff = (isFinite(days) && days > 0) ? now - days * 24 * 60 * 60 * 1000 : -Infinity
+  var pairs = []
+  for (var k in src) {
+    if (!Object.prototype.hasOwnProperty.call(src, k) || !k) continue
+    var cell = src[k] || {}
+    var raw = Number(cell.at)
+    var at = (isFinite(raw) && raw > 0) ? raw : 0
+    var age = at > 0 ? at : tombstoneKeyTime(k)
+    if (age > 0 && age < cutoff) continue
+    pairs.push({ key: k, read: cell.read !== false, at: at })
+  }
+  pairs.sort(function (a, b) { return a.at - b.at })
+  var max = Number(maxItems)
+  if (isFinite(max) && max >= 0) pairs = pairs.slice(Math.max(0, pairs.length - Math.floor(max)))
+  var out = {}
+  for (var i = 0; i < pairs.length; i++) out[pairs[i].key] = { read: pairs[i].read, at: pairs[i].at }
+  return out
+}
+
+// Absent keys are unread (new arrivals light the bell with no write).
+function isRead(state, key) {
+  var needle = String(key || "")
+  if (!needle || !state) return false
+  return Object.prototype.hasOwnProperty.call(state, needle) && state[needle] && state[needle].read !== false
+}
+
+// Entries with no marking at all (everything except the migrated/imported
+// ones below).
+function unreadEntries(entries, state) {
+  var rows = Array.isArray(entries) ? entries : []
+  return rows.filter(function (e) { return e && !isRead(state, e.key) })
+}
+
+// Migration from the old global `seen` timestamp: entries at or below `seen`
+// were visible when the panel last opened, so they become read. Anything
+// newer stays unread. Returns a map to merge into the read state.
+function migrateSeenToRead(entries, seenMs, nowMs) {
+  var seen = Number(seenMs || 0)
+  if (!isFinite(seen) || seen <= 0) return {}
+  var now = Number(nowMs)
+  if (!isFinite(now)) now = Date.now()
+  var out = {}
+  var rows = Array.isArray(entries) ? entries : []
+  for (var i = 0; i < rows.length; i++) {
+    if (rows[i] && Number(rows[i].timestamp || 0) <= seen) out[rows[i].key] = { read: true, at: now }
+  }
+  return out
+}
+
+// Imported legacy entries (the retired center's archive) always arrive read:
+// without this the first run would light the bell over ~950 old rows.
+function legacyReadMap(entries, nowMs) {
+  var now = Number(nowMs)
+  if (!isFinite(now)) now = Date.now()
+  var out = {}
+  var rows = Array.isArray(entries) ? entries : []
+  for (var i = 0; i < rows.length; i++) {
+    if (rows[i] && rows[i].key) out[rows[i].key] = { read: true, at: now }
+  }
+  return out
+}
+
 // Bound the archive so a chatty month cannot grow it without limit. Whichever
 // of the age cap and the count cap is reached first wins (same contract as the
 // retired center's keepDays/maxItems settings).
@@ -267,17 +442,22 @@ function trimEntries(entries, maxItems, keepDays, nowMs) {
   return rows
 }
 
-// Entries newer than the last-seen timestamp are unread. Opening the panel
-// writes seen = now, which is what clears the bell.
-function unreadCount(entries, seenMs) {
-  var seen = Number(seenMs || 0)
-  if (!isFinite(seen)) seen = 0
-  var count = 0
+// Unread means "no read marking" in the read map (see isRead). A numeric
+// second argument keeps the retired contract — entries newer than the
+// last-seen timestamp — so the seen-to-read migration stays expressible and
+// old callers read honestly during the transition.
+function unreadCount(entries, readState) {
   var rows = Array.isArray(entries) ? entries : []
-  for (var i = 0; i < rows.length; i++) {
-    if (Number(rows[i].timestamp || 0) > seen) count++
+  if (typeof readState === "number" || typeof readState === "string") {
+    var seen = Number(readState || 0)
+    if (!isFinite(seen)) seen = 0
+    var legacy = 0
+    for (var i = 0; i < rows.length; i++) {
+      if (Number(rows[i].timestamp || 0) > seen) legacy++
+    }
+    return legacy
   }
-  return count
+  return unreadEntries(rows, readState).length
 }
 
 // Plain substring match over sender, subject and message. Deliberately naive:
@@ -379,12 +559,13 @@ function planImageCopies(entries, omarchyImagesDir, ownImagesDir) {
 }
 
 // Small JSON blob for the state/test IpcHandler: totals plus the newest subject
-// line so a post-install check can eyeball one call.
-function stateSummary(entries, seenMs) {
+// line so a post-install check can eyeball one call. The second argument is
+// the read map (a legacy numeric `seen` still reads honestly).
+function stateSummary(entries, readState) {
   var rows = Array.isArray(entries) ? entries : []
   return {
     total: rows.length,
-    unread: unreadCount(rows, seenMs),
+    unread: unreadCount(rows, readState),
     newest: rows.length > 0 ? String(rows[0].summary || "") : ""
   }
 }
@@ -429,6 +610,16 @@ if (typeof module !== "undefined") {
     trimDismissed: trimDismissed,
     withoutDismissed: withoutDismissed,
     trimEntries: trimEntries,
+    parseReadLines: parseReadLines,
+    serializeRead: serializeRead,
+    readLines: readLines,
+    setRead: setRead,
+    mergeRead: mergeRead,
+    trimRead: trimRead,
+    isRead: isRead,
+    unreadEntries: unreadEntries,
+    migrateSeenToRead: migrateSeenToRead,
+    legacyReadMap: legacyReadMap,
     unreadCount: unreadCount,
     filterEntries: filterEntries,
     relativeParts: relativeParts,

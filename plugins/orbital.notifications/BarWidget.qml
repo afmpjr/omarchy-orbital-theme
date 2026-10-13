@@ -33,6 +33,7 @@ BarWidget {
   readonly property string storeDir: home + "/.local/state/omarchy/orbital-notifications/"
   readonly property string archivePath: storeDir + "archive.jsonl"
   readonly property string dismissedPath: storeDir + "dismissed.jsonl"
+  readonly property string readPath: storeDir + "read.jsonl"
   readonly property string seenPath: storeDir + "seen"
   readonly property string importMarkerPath: storeDir + "imported"
   readonly property string ownImagesDir: storeDir + "images/"
@@ -50,8 +51,19 @@ BarWidget {
   // dismissed.jsonl so discards survive restarts and converge across the
   // per-monitor instances via the file watcher below.
   property var dismissed: ({})
+  // Read/unread state per notification ({ key: { read, at } }): absent keys are
+  // unread, so new arrivals light the bell with no write. Persisted
+  // append-only in read.jsonl and converged across the per-monitor instances
+  // through the watcher below (newest marking wins), exactly like the
+  // dismissed tombstones. Opening the panel marks nothing.
+  property var read: ({})
+  // Panel filter memory: the Todas/Não lidas choice survives close/reopen
+  // within the session (the widget outlives its panel).
+  property bool unreadOnly: false
+  // Legacy global timestamp, read once for the seen-to-read migration (entries
+  // at or below it become read). Never written anymore.
   property double seenMs: 0
-  readonly property int unread: Model.unreadCount(entries, seenMs)
+  readonly property int unread: Model.unreadCount(entries, read)
 
   // First-party DND proxy. Under orbital.floating-bar `bar` is the bar's own
   // root and `bar.shell` is the bar plugin's scoped shell, which carries bar
@@ -81,7 +93,6 @@ BarWidget {
   readonly property bool opened: panelLoader.item ? panelLoader.item.opened === true : false
 
   function open() {
-    markSeen()
     if (panelLoader.item) panelLoader.item.open()
   }
 
@@ -111,11 +122,51 @@ BarWidget {
   onBarChanged: injectPanel()
   onSettingsChanged: injectPanel()
 
-  // Opening the center means everything in it has been seen: the bell clears
-  // on the click itself, and the seen file converges the other instances.
-  function markSeen() {
-    root.seenMs = Date.now()
-    seenView.setText(String(root.seenMs))
+  // Marking helpers: every marking appends its lines to read.jsonl (queued, so
+  // rapid clicks never lose a write) and updates the in-memory map at once so
+  // the bell answers immediately, before the watcher round-trips.
+  function markRead(key) {
+    var needle = String(key || "")
+    if (!needle || Model.isRead(root.read, needle)) return
+    var now = Date.now()
+    root.read = Model.trimRead(Model.setRead(root.read, [needle], true, now), readCap(), root.keepDays, now)
+    enqueueAppend(root.readPath, Model.readLines([needle], true, now))
+  }
+
+  function markUnread(key) {
+    var needle = String(key || "")
+    if (!needle || !Model.isRead(root.read, needle)) return
+    var now = Date.now()
+    root.read = Model.trimRead(Model.setRead(root.read, [needle], false, now), readCap(), root.keepDays, now)
+    enqueueAppend(root.readPath, Model.readLines([needle], false, now))
+  }
+
+  function markAllRead() {
+    var keys = []
+    for (var i = 0; i < root.entries.length; i++) {
+      if (!Model.isRead(root.read, root.entries[i].key)) keys.push(root.entries[i].key)
+    }
+    if (keys.length === 0) return
+    var now = Date.now()
+    root.read = Model.trimRead(Model.setRead(root.read, keys, true, now), readCap(), root.keepDays, now)
+    enqueueAppend(root.readPath, Model.readLines(keys, true, now))
+  }
+
+  // Seen-to-read migration for entries that predate the per-notification
+  // state: anything at or below the legacy `seen` timestamp was visible when
+  // the panel last opened, so it counts as read. Idempotent (keys already
+  // marked are skipped), so every archive/seen reload can call it safely.
+  function applySeenMigration() {
+    if (!(root.seenMs > 0) || root.entries.length === 0) return
+    var now = Date.now()
+    var migrated = Model.migrateSeenToRead(root.entries, root.seenMs, now)
+    var fresh = []
+    for (var key in migrated) {
+      if (!Model.isRead(root.read, key)) fresh.push(key)
+    }
+    if (fresh.length === 0) return
+    root.read = Model.trimRead(Model.mergeRead(root.read, migrated), readCap(), root.keepDays, now)
+    enqueueAppend(root.readPath, Model.readLines(fresh, true, now))
   }
 
   function clearAll() {
@@ -126,7 +177,6 @@ BarWidget {
     }
     root.entries = []
     writeArchive()
-    markSeen()
   }
 
   function dismissEntry(key) {
@@ -138,24 +188,56 @@ BarWidget {
     writeArchive()
   }
 
-  // Tombstones stay bounded: same age window as the archive, count capped at
-  // (at least) 1000 so every key the archive could still hold stays covered.
+  // Tombstones and read markings stay bounded: same age window as the archive,
+  // count capped at (at least) 1000 so every key the archive could still hold
+  // stays covered.
   function dismissedCap() {
     return Math.max(1000, root.maxItems)
   }
 
-  // Append-only so two per-monitor instances discarding at the same moment
-  // never clobber each other (a full rewrite would last-writer-wins). Values
-  // travel as argv, never interpolated into the shell script.
-  function appendDismissed(keys) {
-    var lines = Model.dismissedLines(keys, Date.now())
-    if (lines.length === 0) return
+  function readCap() {
+    return Math.max(1000, root.maxItems)
+  }
+
+  // Single append queue for every append-only store (dismissed.jsonl,
+  // read.jsonl). The old code parked each write on one shared Process: two
+  // discards landing milliseconds apart overwrote the pending command and one
+  // append never reached the disk. Jobs queue here and pump one at a time;
+  // consecutive jobs for the same file group into one shell call, so a burst
+  // of per-row markings costs a single append. Values travel as argv, never
+  // interpolated into the shell script.
+  property var appendQueue: []
+
+  function enqueueAppend(path, lines) {
+    var fresh = (lines || []).filter(function (l) { return l })
+    if (fresh.length === 0 || !path) return
+    var queue = root.appendQueue.slice()
+    var tail = queue.length > 0 ? queue[queue.length - 1] : null
+    if (tail && tail.file === path && tail.lines.length + fresh.length <= 500) {
+      tail.lines = tail.lines.concat(fresh)
+    } else {
+      queue.push({ file: String(path), lines: fresh })
+    }
+    root.appendQueue = queue
+    pumpAppendQueue()
+  }
+
+  function pumpAppendQueue() {
+    if (fileAppendProc.running || root.appendQueue.length === 0) return
+    var job = root.appendQueue[0]
+    root.appendQueue = root.appendQueue.slice(1)
     var command = ["bash", "-c",
       "f=\"$1\"; shift\nmkdir -p \"$(dirname \"$f\")\"\nfor l in \"$@\"; do printf '%s\\n' \"$l\" >> \"$f\"; done",
-      "--", root.dismissedPath]
-    for (var i = 0; i < lines.length; i++) command.push(lines[i])
-    dismissAppendProc.command = command
-    dismissAppendProc.running = true
+      "--", job.file]
+    for (var i = 0; i < job.lines.length; i++) command.push(job.lines[i])
+    fileAppendProc.command = command
+    fileAppendProc.running = true
+  }
+
+  // Append-only so two per-monitor instances discarding at the same moment
+  // never clobber each other (a full rewrite would last-writer-wins).
+  function appendDismissed(keys) {
+    enqueueAppend(root.dismissedPath, Model.dismissedLines(keys, Date.now()))
   }
 
   function writeArchive() {
@@ -183,6 +265,14 @@ BarWidget {
     for (var i = 0; i < root.entries.length; i++) known[root.entries[i].key] = true
     var fresh = rows.filter(function (e) { return !known[e.key] })
     if (fresh.length === 0) return
+    var now = Date.now()
+    // Fresh arrivals are unread, except pre-migration ones at or below the
+    // legacy `seen` timestamp, which count as already seen.
+    var migrated = Model.migrateSeenToRead(fresh, root.seenMs, now)
+    if (Object.keys(migrated).length > 0) {
+      root.read = Model.trimRead(Model.mergeRead(root.read, migrated), readCap(), root.keepDays, now)
+      enqueueAppend(root.readPath, Model.readLines(Object.keys(migrated), true, now))
+    }
     var merged = Model.mergeEntries(root.entries, fresh, root.dismissed)
     var planned = Model.planImageCopies(merged, root.omarchyImagesDir, root.ownImagesDir)
     runCopies(planned.copies)
@@ -192,13 +282,17 @@ BarWidget {
 
   // One-time, read-only import of the retired third-party center's archive:
   // entries are copied, never moved; that directory is never written to.
-  // Already-discarded keys stay discarded.
+  // Already-discarded keys stay discarded. Every imported entry arrives READ,
+  // so the first run never lights the bell over ~950 old rows.
   function importLegacy(raw) {
     var rows = Model.withoutDismissed(Model.parseEntryLines(raw), root.dismissed)
     if (rows.length === 0) {
       markImported()
       return
     }
+    var now = Date.now()
+    root.read = Model.trimRead(Model.mergeRead(root.read, Model.legacyReadMap(rows, now)), readCap(), root.keepDays, now)
+    enqueueAppend(root.readPath, Model.readLines(rows.map(function (e) { return e.key }), true, now))
     var merged = Model.mergeEntries(root.entries, rows, root.dismissed)
     var first = Model.planImageCopies(merged, root.omarchyImagesDir, root.ownImagesDir)
     var second = Model.planImageCopies(first.entries, root.legacyImagesDir, root.ownImagesDir)
@@ -226,6 +320,7 @@ BarWidget {
   }
 
   function seedEntries(count) {
+    // Synthetic entries arrive unread (no read markings), like any arrival.
     var rows = Model.makeSeedEntries(count, Date.now())
     if (rows.length === 0) return "none"
     var visible = Model.withoutDismissed(rows, root.dismissed)
@@ -252,6 +347,7 @@ BarWidget {
     onLoaded: {
       var rows = Model.withoutDismissed(Model.parseEntryLines(text()), root.dismissed)
       root.entries = Model.trimEntries(rows, root.maxItems, root.keepDays, Date.now())
+      root.applySeenMigration()
     }
     onLoadFailed: {
       // First run: no archive yet. The legacy import and the poll below fill
@@ -288,6 +384,31 @@ BarWidget {
     }
   }
 
+  // Read-marking store: union what is on disk with the in-memory map (our own
+  // appends may not have flushed yet) so concurrent instances converge instead
+  // of overwriting each other. Newest marking wins per key, so a read here
+  // and an unread there resolve deterministically everywhere. The file is
+  // rewritten only when the bound actually evicts something.
+  FileView {
+    id: readView
+    path: root.readPath
+    watchChanges: true
+    atomicWrites: true
+    printErrors: false
+    onLoaded: {
+      var loaded = Model.parseReadLines(text())
+      var union = Model.mergeRead(root.read, loaded)
+      var trimmed = Model.trimRead(union, root.readCap(), root.keepDays, Date.now())
+      root.read = trimmed
+      if (Object.keys(trimmed).length < Object.keys(loaded).length) {
+        readView.setText(Model.serializeRead(trimmed))
+      }
+    }
+    onLoadFailed: {
+      // No read file yet: everything unmarked is unread, keep the map as is.
+    }
+  }
+
   FileView {
     id: seenView
     path: root.seenPath
@@ -296,6 +417,7 @@ BarWidget {
     onLoaded: {
       var value = Number(String(text()).trim())
       root.seenMs = isFinite(value) ? value : 0
+      root.applySeenMigration()
     }
     onLoadFailed: root.seenMs = 0
   }
@@ -351,8 +473,11 @@ BarWidget {
   }
 
   Process {
-    id: dismissAppendProc
+    id: fileAppendProc
     running: false
+    onRunningChanged: {
+      if (!fileAppendProc.running) root.pumpAppendQueue()
+    }
   }
 
   Loader {
@@ -370,7 +495,7 @@ BarWidget {
     target: "orbital.notifications"
 
     function state(): string {
-      return JSON.stringify(Model.stateSummary(root.entries, root.seenMs))
+      return JSON.stringify(Model.stateSummary(root.entries, root.read))
     }
     function clear(): string {
       root.clearAll()
@@ -378,6 +503,18 @@ BarWidget {
     }
     function dismiss(key: string): string {
       root.dismissEntry(key)
+      return "ok"
+    }
+    function markRead(key: string): string {
+      root.markRead(key)
+      return "ok"
+    }
+    function markUnread(key: string): string {
+      root.markUnread(key)
+      return "ok"
+    }
+    function markAllRead(): string {
+      root.markAllRead()
       return "ok"
     }
     function reload(): string {

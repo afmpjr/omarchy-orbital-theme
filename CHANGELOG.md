@@ -4,6 +4,22 @@ All notable changes to the Orbital theme.
 
 ## Unreleased
 
+- `orbital.notifications` now tracks read/unread per notification, Slack/Jira
+  style: opening the center marks nothing; the bell badge and tooltip count
+  unread only. The panel filters `All` / `Unread` (choice remembered while the
+  bar lives), offers `Mark all as read` in the header, toggles read per row
+  (mouse, Tab + Enter/Space, screen-reader label), and marks a row read when
+  its body is clicked. Unread rows carry the accent dot and a bold subject;
+  read rows render attenuated. Markings persist append-only in
+  `read.jsonl` (newest marking wins across per-monitor instances, bounded by
+  `keepDays` / `maxItems`); pre-existing entries at or below the legacy `seen`
+  timestamp migrate to read and the retired-center import always arrives read,
+  so the first run never lights the bell over old rows. All append-only
+  writes (dismissals and markings) now go through one FIFO queue with grouped
+  bursts, fixing the shared-`Process` race that could drop a discard. New IPC
+  verbs `markRead` / `markUnread` / `markAllRead`; `state` reports the
+  map-coherent unread count.
+
 - Installer upgrades keep the current bar and widgets by default: when a previous Orbital install is
   detected, the guided wizard offers to keep everything and applies Orbital's bar and widgets only on
   explicit choice. The verifier no longer demands bar widgets that were deliberately skipped.

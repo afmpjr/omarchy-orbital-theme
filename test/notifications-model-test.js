@@ -276,6 +276,130 @@ check("state summary", function () {
   ]
   assert.deepStrictEqual(Model.stateSummary(rows, 150), { total: 2, unread: 1, newest: "newest" })
   assert.deepStrictEqual(Model.stateSummary([], 0), { total: 0, unread: 0, newest: "" })
+  var read = Model.setRead({}, ["200-1"], true, 5000)
+  assert.deepStrictEqual(Model.stateSummary(rows, read), { total: 2, unread: 1, newest: "newest" })
+})
+
+// --- per-notification read state: absent keys are unread ---
+check("isRead defaults unread, setRead marks both ways", function () {
+  assert.strictEqual(Model.isRead({}, "100-1"), false)
+  assert.strictEqual(Model.isRead(null, "100-1"), false)
+  var read = Model.setRead({}, ["100-1"], true, 5000)
+  assert.strictEqual(Model.isRead(read, "100-1"), true)
+  assert.strictEqual(Model.isRead(read, "200-2"), false)
+  read = Model.setRead(read, ["100-1"], false, 6000)
+  assert.strictEqual(Model.isRead(read, "100-1"), false)
+})
+
+check("read round-trips through parse/serialize", function () {
+  var map = Model.setRead(Model.setRead({}, ["100-1"], true, 5000), ["200-2"], false, 6000)
+  var back = Model.parseReadLines(Model.serializeRead(map))
+  assert.deepStrictEqual(back, map)
+  assert.deepStrictEqual(Model.parseReadLines("torn {\n\n"), {})
+  assert.deepStrictEqual(Model.parseReadLines('{"nope":1}\n{"key":"","read":true,"at":9}\n'), {})
+})
+
+check("readLines formats one JSON line per key", function () {
+  var lines = Model.readLines(["100-1", "", "200-2"], true, 7777)
+  assert.strictEqual(lines.length, 2)
+  assert.deepStrictEqual(JSON.parse(lines[0]), { key: "100-1", read: true, at: 7777 })
+  lines = Model.readLines("100-1", false, 7777)
+  assert.deepStrictEqual(JSON.parse(lines[0]), { key: "100-1", read: false, at: 7777 })
+  assert.strictEqual(Model.readLines([], true, 1).length, 0)
+})
+
+check("unreadCount over the read map", function () {
+  var rows = [100, 200, 300].map(function (t, i) {
+    return Model.normalizeEntry({ summary: "s", timestamp: t, originalId: i })
+  })
+  assert.strictEqual(Model.unreadCount(rows, {}), 3)
+  var read = Model.setRead({}, [rows[0].key, rows[2].key], true, 5000)
+  assert.strictEqual(Model.unreadCount(rows, read), 1)
+  read = Model.setRead(read, [rows[0].key], false, 6000)
+  assert.strictEqual(Model.unreadCount(rows, read), 2)
+  // Marking every row read clears the bell.
+  var all = Model.setRead({}, rows.map(function (e) { return e.key }), true, 7000)
+  assert.strictEqual(Model.unreadCount(rows, all), 0)
+  // Numeric legacy `seen` still reads honestly.
+  assert.strictEqual(Model.unreadCount(rows, 150), 2)
+})
+
+check("unreadEntries filters to unmarked rows", function () {
+  var rows = [100, 200].map(function (t, i) {
+    return Model.normalizeEntry({ summary: "s" + i, timestamp: t, originalId: i + 1 })
+  })
+  var read = Model.setRead({}, [rows[0].key], true, 5000)
+  var out = Model.unreadEntries(rows, read)
+  assert.strictEqual(out.length, 1)
+  assert.strictEqual(out[0].key, rows[1].key)
+  assert.strictEqual(Model.unreadEntries(rows, {}).length, 2)
+})
+
+check("migration: entries at/below seen become read", function () {
+  var rows = [100, 200, 300].map(function (t, i) {
+    return Model.normalizeEntry({ summary: "s", timestamp: t, originalId: i })
+  })
+  var migrated = Model.migrateSeenToRead(rows, 200, 9000)
+  assert.strictEqual(Model.isRead(migrated, rows[0].key), true)
+  assert.strictEqual(Model.isRead(migrated, rows[1].key), true)
+  assert.strictEqual(Model.isRead(migrated, rows[2].key), false)
+  assert.strictEqual(Model.unreadCount(rows, migrated), 1)
+  assert.deepStrictEqual(Model.migrateSeenToRead(rows, 0, 9000), {})
+  assert.deepStrictEqual(Model.migrateSeenToRead([], 200, 9000), {})
+})
+
+check("legacy import arrives fully read", function () {
+  var rows = [100, 200].map(function (t, i) {
+    return Model.normalizeEntry({ summary: "old" + i, timestamp: t, originalId: i + 1 })
+  })
+  var map = Model.legacyReadMap(rows, 9000)
+  assert.strictEqual(Model.unreadCount(rows, map), 0)
+  // A foreign `read` flag on disk never sneaks into the canonical entry: the
+  // read state lives in its own file, not in the archive.
+  var e = Model.normalizeEntry({ summary: "x", timestamp: 1, originalId: 1, read: true })
+  assert.strictEqual(e.read, undefined)
+})
+
+check("mergeRead: newest marking wins per key", function () {
+  var a = Model.setRead({}, ["1-1"], true, 1000)
+  var b = Model.setRead({}, ["1-1"], false, 2000)
+  assert.strictEqual(Model.isRead(Model.mergeRead(a, b), "1-1"), false)
+  assert.strictEqual(Model.isRead(Model.mergeRead(b, a), "1-1"), false)
+  var c = Model.setRead({}, ["1-1"], false, 500)
+  assert.strictEqual(Model.isRead(Model.mergeRead(a, c), "1-1"), true)
+  assert.deepStrictEqual(Model.mergeRead(null, a), a)
+})
+
+check("two instances converge over appended read lines", function () {
+  // Instance A marks one row read, instance B another; each appends its own
+  // lines and both reload the shared file: union, no clobbering.
+  var linesA = Model.readLines(["100-1"], true, 5000)
+  var linesB = Model.readLines(["200-2"], true, 6000)
+  var file = linesA.concat(linesB).join("\n") + "\n"
+  var converged = Model.mergeRead(Model.parseReadLines(linesA.join("\n") + "\n"), Model.parseReadLines(file))
+  assert.strictEqual(Model.isRead(converged, "100-1"), true)
+  assert.strictEqual(Model.isRead(converged, "200-2"), true)
+  // A later unread marking on A wins over its own earlier read.
+  var later = Model.readLines(["100-1"], false, 7000)
+  converged = Model.mergeRead(converged, Model.parseReadLines(later.join("\n") + "\n"))
+  assert.strictEqual(Model.isRead(converged, "100-1"), false)
+  assert.strictEqual(Model.isRead(converged, "200-2"), true)
+})
+
+check("trimRead expires by age and caps by count", function () {
+  var now = 30 * 24 * 3600 * 1000 + 1000000
+  var freshKey = String(now - 5000) + "-3"
+  var map = Model.setRead({}, ["100-1", freshKey, "legacy-no-time"], true, now - 1000)
+  map["200-2"] = { read: true, at: now - 40 * 24 * 3600 * 1000 } // older than keepDays
+  var out = Model.trimRead(map, 1000, 30, now)
+  assert.ok(!("200-2" in out))
+  assert.ok("100-1" in out)
+  assert.ok(freshKey in out)
+  assert.ok("legacy-no-time" in out)
+  out = Model.trimRead({ "300-3": { read: true, at: 0 } }, 1000, 30, now)
+  assert.ok(!("300-3" in out))
+  out = Model.trimRead(Model.setRead({}, ["1-1", "2-2", "3-3"], true, now), 2, 365, now)
+  assert.strictEqual(Object.keys(out).length, 2)
 })
 
 // --- volume: 5000 synthetic entries parse+merge+trim in well under a second ---
