@@ -29,10 +29,10 @@ o.bind("SUPER + ALT + X", "Quick-link menu", "omarchy-menu toggle system")
 o.bind("SUPER + ALT + S", "Search (Orbital Launcher)", "omarchy-shell shell toggle orbital.launcher")
 do
   local home = os.getenv("HOME") or ""
-  local f = io.open(home .. "/.config/omarchy/plugins/jankeesvw.notification-center/manifest.json", "r")
+  local f = io.open(home .. "/.config/omarchy/plugins/orbital.notifications/manifest.json", "r")
   if f then
     f:close()
-    o.bind("SUPER + ALT + N", "Notification center", "omarchy-shell jankeesvw.notification-center toggle")
+    o.bind("SUPER + ALT + N", "Notification center", "omarchy-shell orbital.notifications toggle")
   end
 end
 o.bind("SUPER + ALT + P", "Projection (display panel)", "omarchy-shell shell toggle omarchy.monitor")

@@ -33,13 +33,15 @@ hl.unbind("CTRL + ALT + DELETE")
 o.bind("CTRL + ALT + DELETE", "System menu", "omarchy-menu toggle system")
 o.bind("CTRL + SHIFT + ALT + DELETE", "Close all windows", "omarchy-hyprland-window-close-all")
 
--- Notification center, only when that plugin is installed
+-- Notification center (the bundled orbital.notifications bell in the floating bar),
+-- only when that plugin is installed. Single Super+N bind: no other Orbital file
+-- binds this chord, so it never ends up bound twice.
 do
   local home = os.getenv("HOME") or ""
-  local f = io.open(home .. "/.config/omarchy/plugins/jankeesvw.notification-center/manifest.json", "r")
+  local f = io.open(home .. "/.config/omarchy/plugins/orbital.notifications/manifest.json", "r")
   if f then
     f:close()
-    o.bind("SUPER + N", "Notification center", "omarchy-shell jankeesvw.notification-center toggle")
+    o.bind("SUPER + N", "Notification center", "omarchy-shell orbital.notifications toggle")
   end
 end
 
