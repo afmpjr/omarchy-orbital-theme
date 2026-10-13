@@ -31,7 +31,7 @@ case "$1 $2" in
             | .bar.layout[$sec] = (if $idx >= ($rest | length) then $rest + [$o]
                                    else $rest[0:$idx] + [$o] + $rest[$idx:] end)
           end' "$HOME/.config/omarchy/shell.json" > "$HOME/.sj.new" && mv "$HOME/.sj.new" "$HOME/.config/omarchy/shell.json" ;;
-  "plugin add") mkdir -p "$HOME/.config/omarchy/plugins/jankeesvw.notification-center"; echo jankeesvw.notification-center >> "$HOME/enabled.txt" ;;
+  "plugin add") : ;;   # the installer must never fetch plugins from the network (a call here is a regression, asserted below)
   "theme list") printf '%s\n' "Tokyo Night" "Catppuccin" "Orbital" ;;
   "theme current") echo "Tokyo Night" ;;
   "theme set") echo "$3" >> "$HOME/theme-set.txt" ;;
@@ -70,12 +70,14 @@ GC="$HOME/.config/ghostty/config"
 SJ="$HOME/.config/omarchy/shell.json"
 [[ $(jq -r .bar.id "$SJ") == orbital.floating-bar && $(jq -r .bar.floatGapScale "$SJ") == 0.5 && $(jq -r .bar.cornerRadius "$SJ") == 10 ]] || bad "bar config"
 [[ $(jq -c '[.bar.layout.left[].id, .bar.layout.center[].id]' "$SJ") == '["orbital.dock","orbital.workspaces"]' ]] || bad "layout left/center"
-[[ $(jq -r '.bar.layout.right[-1].id' "$SJ") == jankeesvw.notification-center && $(jq -r '.bar.layout.right[-2].id' "$SJ") == orbital.clock && $(jq -r '.bar.layout.right[-3].id' "$SJ") == orbital.divider ]] || bad "layout right (bell, clock, divider order)"
+[[ $(jq -r '.bar.layout.right[-1].id' "$SJ") == orbital.notifications && $(jq -r '.bar.layout.right[-2].id' "$SJ") == orbital.clock && $(jq -r '.bar.layout.right[-3].id' "$SJ") == orbital.divider ]] || bad "layout right (bell, clock, divider order)"
 jq -e '.bar.layout.right | map(.id) | index("omarchy.tray") == 0 and (index("omarchy.indicators") == 1)' "$SJ" >/dev/null || bad "tray/indicators order"
 [[ $(jq -r '.bar.layout.right[-2].formatAlt' "$SJ") == "d MMMM 'W'ww yyyy" ]] || bad "clock format"
 ok "full: bar config + layout"
 [[ $(stat -c %a "$SJ") == 644 ]] || bad "shell.json permissions"; ok "shell.json keeps 644"
-[[ $(jq -c '[.bar.layout.right[].id | select(. == "jankeesvw.notification-center")] | length' "$SJ") == 1 ]] || bad "bell missing/duplicated"; ok "notification center installed and placed last"
+[[ $(jq -c '[.bar.layout.right[].id | select(. == "orbital.notifications")] | length' "$SJ") == 1 ]] || bad "bell missing/duplicated"; ok "notification center installed and placed last"
+! grep -q 'jankeesvw' "$SJ" || bad "retired bell id in shell.json"; ok "no retired bell references in shell.json"
+! grep -q 'plugin add' "$HOME/omarchy-calls.log" || bad "installer fetched a plugin from the network"; ok "bell comes bundled, nothing fetched"
 ls "$HOME/.config/omarchy/shell.json.bak-orbital-"* >/dev/null || bad "shell.json backup"; ok "shell.json backed up"
 G="$(grep -n 'hypr.orbital-gaps' "$HOME/.config/hypr/hyprland.lua" | cut -d: -f1)"; TG="$(grep -n 'default.hypr.toggles' "$HOME/.config/hypr/hyprland.lua" | cut -d: -f1)"
 (( G < TG )) || bad "gaps must load before toggles"; ok "gaps load before the gaps toggle"
@@ -210,6 +212,7 @@ cmp -s "$HOME/.config/omarchy/shell.json" "$HOME/.config/omarchy/shell.json.bak-
 [[ ! -e $HOME/.local/state/omarchy/orbital-install.json ]] || bad "uninstall left the install state"; ok "uninstall removes the install state"
 [[ ! -e $HOME/.local/state/omarchy/orbital-widgets-lock ]] || bad "uninstall left the widget lock (a stale unlock would open the next install)"; ok "uninstall removes the widget lock"
 [[ ! -e $HOME/.local/share/applications/orbital-settings.desktop ]] || bad "uninstall left the settings menu entry"; ok "uninstall removes the settings menu entry"
+[[ ! -d $HOME/.config/omarchy/plugins/orbital.notifications ]] || bad "uninstall left the notification bell"; ok "uninstall removes the notification bell"
 [[ ! -d $HOME/.config/omarchy/plugins/orbital.dock && ! -d $HOME/.config/omarchy/plugins/orbital.bar && ! -d $HOME/.config/omarchy/plugins/orbital.floating-bar && ! -f $HOME/.config/hypr/orbital.lua ]] || bad "uninstall"
 ! grep -q 'hypr.orbital' "$HOME/.config/hypr/hyprland.lua" || bad "hook not removed"; ok "uninstall clean"# ---- --dry-run must describe the work without doing any of it ---------------------------------
 SAVED_HOME="$HOME"
@@ -357,10 +360,55 @@ printf 'require("default.hypr.omarchy")\nrequire("default.hypr.toggles")\n' > "$
 "$REPO/install.sh" --bar-widgets --windows-keys --no-restart >/dev/null 2>&1 || bad "second --windows-keys install failed"
 [[ -f $HOME/.config/hypr/orbital-keys-windows.lua ]] || bad "Windows keys file missing"
 [[ $(grep -c 'orbital-keys-windows' "$HOME/.config/hypr/hyprland.lua") == 1 ]] || bad "Windows keys required twice"
+WK="$HOME/.config/hypr/orbital-keys-windows.lua"
+grep -q 'omarchy-shell orbital.notifications toggle' "$WK" || bad "Super+N does not toggle the bundled bell"
+! grep -q 'jankeesvw' "$WK" || bad "Windows keys still reference the retired bell"
+ok "Super+N toggles the bundled bell, no retired references"
 "$REPO/install.sh" --uninstall --no-restart >/dev/null 2>&1 || bad "uninstall failed"
 [[ ! -e $HOME/.config/hypr/orbital-keys-windows.lua ]] && ! grep -q 'orbital-keys-windows' "$HOME/.config/hypr/hyprland.lua" || bad "uninstall left the Windows keys"
 export HOME="$SAVED_HOME"
 ok "--windows-keys is opt-in, idempotent and removed by --uninstall"
+
+# ---- notification bell: bundled plugin is the default, the retired third-party bell migrates once ----
+# A system from the third-party era: legacy plugin installed, legacy bell in the bar, real archives on disk.
+export HOME="$T/notif"; rm -rf "$HOME"; mkdir -p "$HOME/.config/omarchy" "$HOME/.config/hypr" "$HOME/.local/share/applications" "$HOME/.local/state/omarchy/orbital-notifications" "$HOME/.local/state/omarchy-notification-center"
+cp /usr/share/omarchy/config/omarchy/shell.json "$HOME/.config/omarchy/shell.json"
+printf 'require("default.hypr.omarchy")\nrequire("default.hypr.toggles")\n' > "$HOME/.config/hypr/hyprland.lua"
+mkdir -p "$HOME/.config/omarchy/plugins/jankeesvw.notification-center"
+printf '{"schemaVersion":1,"id":"jankeesvw.notification-center"}\n' > "$HOME/.config/omarchy/plugins/jankeesvw.notification-center/manifest.json"
+jq '.bar.layout.right += [{id: "jankeesvw.notification-center"}]' "$HOME/.config/omarchy/shell.json" > "$HOME/.sj" && mv "$HOME/.sj" "$HOME/.config/omarchy/shell.json"
+printf '{"v":1}\n' > "$HOME/.local/state/omarchy/orbital-notifications/archive.jsonl"
+printf '{"legacy":true}\n' > "$HOME/.local/state/omarchy-notification-center/archive.jsonl"
+: > "$HOME/omarchy-calls.log"
+"$REPO/install.sh" --full --no-restart >/dev/null 2>"$HOME/err" || { cat "$HOME/err"; bad "full install over a legacy bell failed"; }
+SJ2="$HOME/.config/omarchy/shell.json"
+! grep -q 'jankeesvw' "$SJ2" || bad "legacy bell id survived in shell.json"
+[[ $(jq -c '[.bar.layout.right[].id | select(. == "orbital.notifications")] | length' "$SJ2") == 1 ]] || bad "bundled bell missing/duplicated after migration"
+[[ $(jq -r '.bar.layout.right[-1].id' "$SJ2") == orbital.notifications ]] || bad "bundled bell not last after migration"
+[[ -d $HOME/.config/omarchy/plugins/orbital.notifications ]] || bad "bundled bell plugin not installed"
+[[ ! -e $HOME/.config/omarchy/plugins/jankeesvw.notification-center ]] || bad "legacy plugin dir left behind"
+! grep -q 'plugin add' "$HOME/omarchy-calls.log" || bad "installer fetched a plugin from the network"
+grep -q 'plugin enable orbital.notifications' "$HOME/omarchy-calls.log" || bad "bundled bell never enabled"
+[[ -f $HOME/.local/state/omarchy/orbital-notifications/archive.jsonl && -f $HOME/.local/state/omarchy-notification-center/archive.jsonl ]] || bad "migration touched user notification data"
+"$REPO/install.sh" --full --no-restart >/dev/null 2>&1 || bad "second install over a migrated bell failed"
+[[ $(jq -c '[.bar.layout[]?[]?.id | select(. == "orbital.notifications")] | length' "$SJ2") == 1 ]] || bad "migration not idempotent (bell duplicated)"
+! grep -q 'jankeesvw' "$SJ2" || bad "legacy bell id came back on reinstall"
+export HOME="$SAVED_HOME"
+ok "legacy bell migrates to the bundled one exactly once; archives untouched; no network fetch"
+# The standard path migrates too (there is no --full layout rewrite there).
+export HOME="$T/notif-std"; rm -rf "$HOME"; mkdir -p "$HOME/.config/omarchy" "$HOME/.config/hypr" "$HOME/.local/share/applications"
+cp /usr/share/omarchy/config/omarchy/shell.json "$HOME/.config/omarchy/shell.json"
+printf 'require("default.hypr.omarchy")\nrequire("default.hypr.toggles")\n' > "$HOME/.config/hypr/hyprland.lua"
+mkdir -p "$HOME/.config/omarchy/plugins/jankeesvw.notification-center"
+printf '{"schemaVersion":1,"id":"jankeesvw.notification-center"}\n' > "$HOME/.config/omarchy/plugins/jankeesvw.notification-center/manifest.json"
+jq '.bar.layout.right += [{id: "jankeesvw.notification-center"}]' "$HOME/.config/omarchy/shell.json" > "$HOME/.sj" && mv "$HOME/.sj" "$HOME/.config/omarchy/shell.json"
+: > "$HOME/omarchy-calls.log"
+"$REPO/install.sh" --bar-widgets --no-restart >/dev/null 2>"$HOME/err" || { cat "$HOME/err"; bad "standard install over a legacy bell failed"; }
+! grep -q 'jankeesvw' "$HOME/.config/omarchy/shell.json" || bad "standard path left the legacy bell id"
+[[ $(jq -c '[.bar.layout[]?[]?.id | select(. == "orbital.notifications")] | length' "$HOME/.config/omarchy/shell.json") == 1 ]] || bad "standard path did not map the bell exactly once"
+grep -q 'plugin enable orbital.notifications' "$HOME/omarchy-calls.log" || bad "standard path never enabled the bundled bell"
+export HOME="$SAVED_HOME"
+ok "standard install maps the legacy bell without a --full rewrite"
 
 # The guided flow runs only with a terminal. A Gum stub selects each displayed default so this
 # exercises the real wizard and install transaction without driving an interactive user session.
