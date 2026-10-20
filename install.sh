@@ -619,7 +619,7 @@ terminal_shortcuts() {
 }
 
 keyboard_setup() {
-  local input="$HYPR/input.lua" layouts="$KBLAYOUTS" opts="compose:caps,shift:both_capslock_cancel"
+  local input="$HYPR/input.lua" layouts="$KBLAYOUTS" opts="compose:menu,shift:both_capslock_cancel"
   if [[ -f $input ]]; then
     [[ -n $layouts ]] || layouts="$(grep -E '^[[:space:]]*kb_layout[[:space:]]*=' "$input" | head -1 | sed -E 's/.*=[[:space:]]*"([^"]*)".*/\1/' || true)"
     local existing; existing="$(grep -E '^[[:space:]]*kb_options[[:space:]]*=' "$input" | head -1 | sed -E 's/.*=[[:space:]]*"([^"]*)".*/\1/' || true)"
