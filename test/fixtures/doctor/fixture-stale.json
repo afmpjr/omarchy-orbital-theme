@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "updated_at": "2026-10-27T20:30:00.000000+00:00",
+  "status": "ok",
+  "summary": "No significant bottleneck detected.",
+  "metrics": {
+    "disk": { "mountpoint": "/", "total_bytes": 274877906944, "used_bytes": 151182848819, "percent_used": 55.0 },
+    "memory": { "total": 17179869184, "used": 9792525434, "percent_used": 57.0 },
+    "zram": { "total": 8589934592, "used": 1460288880, "percent_used": 17.0 },
+    "psi": { "cpu": { "some_avg10": 1.2 }, "memory": { "some_avg10": 0.0 }, "io": { "some_avg10": 0.4 } }
+  },
+  "findings": [],
+  "recent_actions": [],
+  "failed_units": [],
+  "smart": { "available": false, "reason": "requires root privileges", "devices": [] },
+  "service": { "active": true, "pid": 1420, "uptime_seconds": 6620.0, "cycle": 120, "mode": "watch" }
+}

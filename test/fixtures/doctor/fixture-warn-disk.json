@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "updated_at": "2026-10-27T20:50:00.000000+00:00",
+  "status": "warning",
+  "summary": "System warning threshold reached (disk: 84%, RAM: 62%).",
+  "metrics": {
+    "disk": {
+      "mountpoint": "/",
+      "total_bytes": 274877906944,
+      "used_bytes": 230897441832,
+      "free_bytes": 43980465112,
+      "available_bytes": 43980465112,
+      "percent_used": 84.0,
+      "partitions": [
+        { "mountpoint": "/", "total_bytes": 274877906944, "used_bytes": 230897441832, "free_bytes": 43980465112, "percent_used": 84.0 }
+      ]
+    },
+    "memory": { "total": 17179869184, "used": 10651518894, "free": 6528350290, "percent_used": 62.0 },
+    "zram": { "total": 8589934592, "used": 2147483648, "percent_used": 25.0 },
+    "psi": { "cpu": { "some_avg10": 4.5 }, "memory": { "some_avg10": 1.2 }, "io": { "some_avg10": 18.4 } }
+  },
+  "findings": [
+    {
+      "id": "disk_root_warning",
+      "category": "disk",
+      "area": "disk",
+      "severity": "warning",
+      "title": "Partição raiz acima de 80%",
+      "detail": "Uso em 84% na partição raiz (/)",
+      "suggestion": "Execute omarchy-doctor fix --dry-run para simular limpeza"
+    }
+  ],
+  "recent_actions": [],
+  "failed_units": [],
+  "smart": { "available": false, "reason": "requires root privileges", "devices": [] },
+  "service": { "active": true, "pid": 1420, "uptime_seconds": 8120.0, "cycle": 162, "mode": "watch" }
+}

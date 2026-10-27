@@ -1,0 +1,76 @@
+{
+  "schema_version": 1,
+  "updated_at": "2026-10-27T20:50:00.000000+00:00",
+  "status": "ok",
+  "summary": "No significant bottleneck detected.",
+  "metrics": {
+    "disk": {
+      "mountpoint": "/",
+      "total_bytes": 274877906944,
+      "used_bytes": 151182848819,
+      "free_bytes": 123695058125,
+      "available_bytes": 123695058125,
+      "percent_used": 55.0,
+      "partitions": [
+        {
+          "mountpoint": "/",
+          "total_bytes": 274877906944,
+          "used_bytes": 151182848819,
+          "free_bytes": 123695058125,
+          "available_bytes": 123695058125,
+          "percent_used": 55.0
+        }
+      ]
+    },
+    "memory": {
+      "total": 17179869184,
+      "used": 9792525434,
+      "free": 7387343750,
+      "percent_used": 57.0,
+      "total_bytes": 17179869184,
+      "used_bytes": 9792525434,
+      "free_bytes": 7387343750
+    },
+    "zram": {
+      "total": 8589934592,
+      "used": 1460288880,
+      "free": 7129645712,
+      "percent_used": 17.0,
+      "total_bytes": 8589934592,
+      "used_bytes": 1460288880
+    },
+    "psi": {
+      "cpu": { "some_avg10": 1.2, "full_avg10": 0.0 },
+      "memory": { "some_avg10": 0.0, "full_avg10": 0.0 },
+      "io": { "some_avg10": 0.4, "full_avg10": 0.1 }
+    }
+  },
+  "findings": [],
+  "recent_actions": [
+    {
+      "timestamp": "2026-10-27T18:45:00+00:00",
+      "action_id": "pacman_cache",
+      "action_type": "pacman_cache",
+      "description": "Cache Pacman limpo (paccache)",
+      "message": "Removed 142 old package tarballs",
+      "freed_bytes": 1932735283,
+      "freed_human": "1.8 GiB",
+      "success": true,
+      "dry_run": false
+    }
+  ],
+  "failed_units": [],
+  "smart": {
+    "available": false,
+    "reason": "requires root privileges (sudoers rule pending)",
+    "devices": []
+  },
+  "service": {
+    "active": true,
+    "pid": 1420,
+    "uptime_seconds": 7820.5,
+    "started_at": "2026-10-27T18:40:00+00:00",
+    "cycle": 156,
+    "mode": "watch"
+  }
+}

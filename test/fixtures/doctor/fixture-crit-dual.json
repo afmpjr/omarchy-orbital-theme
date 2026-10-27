@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "updated_at": "2026-10-27T20:50:00.000000+00:00",
+  "status": "critical",
+  "summary": "System critical threshold reached (disk: 93%, RAM: 88%).",
+  "metrics": {
+    "disk": {
+      "mountpoint": "/",
+      "total_bytes": 274877906944,
+      "used_bytes": 255636453457,
+      "free_bytes": 19241453487,
+      "available_bytes": 19241453487,
+      "percent_used": 93.0,
+      "partitions": [{ "mountpoint": "/", "percent_used": 93.0 }]
+    },
+    "memory": { "total": 17179869184, "used": 15118284881, "percent_used": 88.0 },
+    "zram": { "total": 8589934592, "used": 6871947673, "percent_used": 80.0 },
+    "psi": { "cpu": { "some_avg10": 28.5 }, "memory": { "some_avg10": 19.8 }, "io": { "some_avg10": 34.2 } }
+  },
+  "findings": [
+    {
+      "id": "disk_space_critical",
+      "category": "disk",
+      "area": "disk",
+      "severity": "critical",
+      "title": "Disco quase cheio (93%)",
+      "detail": "Menos de 20 GiB disponíveis no sistema de arquivos raiz",
+      "suggestion": "Limpeza imediata de caches necessária"
+    }
+  ],
+  "recent_actions": [],
+  "failed_units": [
+    {
+      "name": "backup-sync.service",
+      "unit": "backup-sync.service",
+      "load": "loaded",
+      "active": "failed",
+      "sub": "failed",
+      "description": "Daily Workspace Remote Synchronization"
+    }
+  ],
+  "smart": { "available": false, "reason": "requires root privileges", "devices": [] },
+  "service": { "active": true, "pid": 1420, "uptime_seconds": 9400.0, "cycle": 188, "mode": "watch" }
+}

@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "updated_at": "2026-10-27T20:50:00.000000+00:00",
+  "status": "ok",
+  "summary": "No significant bottleneck detected.",
+  "metrics": {
+    "disk": { "mountpoint": "/", "total_bytes": 512110190592, "used_bytes": 204844076236, "percent_used": 40.0 },
+    "memory": { "total": 34359738368, "used": 12884901888, "percent_used": 37.5 },
+    "zram": null,
+    "psi": { "cpu": { "some_avg10": 0.5 }, "memory": { "some_avg10": 0.0 }, "io": { "some_avg10": 0.1 } }
+  },
+  "findings": [],
+  "recent_actions": [],
+  "failed_units": [],
+  "smart": {
+    "available": true,
+    "reason": null,
+    "devices": [
+      {
+        "device": "nvme0n1",
+        "path": "/dev/nvme0n1",
+        "health": "PASSED",
+        "failing": false,
+        "temperature": 34,
+        "temperature_celsius": 34,
+        "permission_denied": false
+      },
+      {
+        "device": "sda",
+        "path": "/dev/sda",
+        "health": "PASSED",
+        "failing": false,
+        "temperature": 31,
+        "temperature_celsius": 31,
+        "permission_denied": false
+      }
+    ]
+  },
+  "service": { "active": true, "pid": 2048, "uptime_seconds": 1200.0, "cycle": 24, "mode": "watch" }
+}

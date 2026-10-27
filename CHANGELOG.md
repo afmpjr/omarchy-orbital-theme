@@ -24,6 +24,12 @@ All notable changes to the Orbital theme.
   bursts, fixing the shared-`Process` race that could drop a discard. New IPC
   verbs `markRead` / `markUnread` / `markAllRead`; `state` reports the
   map-coherent unread count.
+- New `orbital.doctor` bar-widget plugin (`plugins/orbital.doctor`): system health
+  and diagnostics indicator and flyout panel for `omarchy-doctor`. Receptive to
+  state transitions (`ok`, `warning`, `critical`, `stale`, `stopped`), PSI pressure gauges,
+  SMART storage status, failed systemd units, recent automated remediation actions,
+  and safe terminal shortcuts (`omarchy-doctor scan --full`, `fix --dry-run`).
+  100% vector SVG icons, zero emojis, full keyboard navigation (Tab, Escape).
 - Installer upgrades keep the current bar and widgets by default: when a previous Orbital install is
   detected, the guided wizard offers to keep everything and applies Orbital's bar and widgets only on
   explicit choice. The verifier no longer demands bar widgets that were deliberately skipped.

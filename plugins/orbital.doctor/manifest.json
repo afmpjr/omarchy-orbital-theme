@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "id": "orbital.doctor",
+  "name": "Orbital Doctor",
+  "version": "1.0.0",
+  "author": "Antonio Francisco / Time de Engenharia",
+  "description": "System health scanner and resident monitor widget for the Orbital theme",
+  "kinds": [
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "barWidget": "BarWidget.qml"
+  },
+  "barWidget": {
+    "displayName": "Orbital Doctor",
+    "description": "Health indicator and quick diagnostics flyout",
+    "category": "System",
+    "allowMultiple": false,
+    "defaultSection": "right",
+    "defaults": {
+      "showBadge": true,
+      "panelWidth": 440
+    }
+  },
+  "license": "MIT"
+}
