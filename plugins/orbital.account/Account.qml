@@ -109,7 +109,7 @@ Item {
   }
 
   function toggleWidgetsLock() {
-    Util.execDetached(Quickshell.env("HOME") + "/.config/omarchy/plugins/orbital.account/orbital-widgets-lock --toggle")
+    Util.execArgv([Quickshell.env("HOME") + "/.config/omarchy/plugins/orbital.account/orbital-widgets-lock", "--toggle"])
     // The file may not have existed when this panel loaded (FileView cannot
     // watch a path that is not there yet), so re-read after the script lands.
     widgetsLockRefresh.restart()

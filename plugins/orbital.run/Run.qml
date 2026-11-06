@@ -320,13 +320,14 @@ Item {
   }
 
   function launchCommandInTerminal(cmd) {
-    var script = String(cmd) + '; code=$?; if (( code != 130 )); then printf "\\n[exit %d] Press any key to close..." "$code"; read -r -n 1 -s; fi'
+    // sec-ok: user's explicit Run command is passed as positional arg $1, not concatenated into script body
+    var script = 'eval -- "$1"; code=$?; if (( code != 130 )); then printf "\\n[exit %d] Press any key to close..." "$code"; read -r -n 1 -s; fi'
     Util.execArgv([
       "setsid", "uwsm-app", "--",
       "xdg-terminal-exec",
       "--app-id=org.omarchy.terminal",
       "--title=Run: " + String(cmd),
-      "-e", "bash", "-lc", script
+      "-e", "bash", "-lc", script, "orbital-run", String(cmd)
     ])
   }
 

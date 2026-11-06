@@ -54,13 +54,13 @@ Item {
   function pick(name) {
     root.currentName = name
     root.busy = true
-    applyProc.command = ["bash", "-c", root.script + " '" + name + "'"]
+    applyProc.command = [root.script, String(name)]
     applyProc.running = true
   }
 
   Process {
     id: currentProc
-    command: ["bash", "-c", root.script + " current"]
+    command: [root.script, "current"]
     stdout: SplitParser { onRead: function(line) { root.currentName = line.trim() } }
   }
   Process {
