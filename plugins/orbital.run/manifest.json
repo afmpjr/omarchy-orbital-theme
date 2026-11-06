@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "id": "orbital.run",
+  "name": "Orbital Run",
+  "version": "1.0.9",
+  "author": "afmpjr",
+  "description": "Windows-style Run dialog: type a command, app, path or URL; live suggestions (apps, PATH binaries, MRU history), persistent history.",
+  "kinds": [
+    "overlay",
+    "menu"
+  ],
+  "entryPoints": {
+    "overlay": "Run.qml",
+    "menu": "Run.qml"
+  },
+  "keepLoaded": true,
+  "license": "MIT"
+}

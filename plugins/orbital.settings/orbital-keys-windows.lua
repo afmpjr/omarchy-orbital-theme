@@ -3,7 +3,7 @@
 --
 -- Super is the Windows key. This replaces some Omarchy defaults, so read the list:
 --   Super+L            lock the screen                     (layout toggle moves to Super+Alt+L)
---   Super+R            run / app menu
+--   Super+R            run dialog (orbital.run)
 --   Super+A            audio panel        Super+N notification center (if installed)
 --   Super+I            system menu        Super+X quick-link menu    Ctrl+Alt+Del system menu
 --   Super+P            display panel      (pseudo window moves to Super+Alt+P)
@@ -21,7 +21,8 @@
 hl.unbind("SUPER + L")
 o.bind("SUPER + L", "Lock system", "omarchy-system-lock")
 o.bind("SUPER + ALT + L", "Toggle workspace layout", "omarchy-hyprland-workspace-layout-toggle")
-o.bind("SUPER + R", "Run", "omarchy-menu toggle apps")
+hl.unbind("SUPER + R")
+o.bind("SUPER + R", "Run / Executar (orbital.run)", "omarchy-shell shell toggle orbital.run")
 o.bind("SUPER + A", "Quick settings (audio)", "omarchy-shell shell toggle omarchy.audio")
 o.bind("SUPER + I", "System menu", "omarchy-menu toggle system")
 hl.unbind("SUPER + P")
