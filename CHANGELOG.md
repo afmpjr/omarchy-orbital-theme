@@ -4,6 +4,11 @@ All notable changes to the Orbital theme.
 
 ## Unreleased
 
+- New `orbital.run` Windows-style Run dialog (`plugins/orbital.run/`, bound to `Super+R` in `--windows-keys`):
+  bottom-left anchored card with live suggestions (GUI apps, MRU history, `PATH` binaries), `Tab` completion,
+  arrow history navigation, inline error feedback for unknown commands, and floating terminal execution
+  (`org.omarchy.terminal`) for CLI commands.
+- New `scripts/security-check.sh` repository-wide QML/shell security linter and `docs/security-audit-2026-11-06.md`.
 - Installer upgrades keep the current bar and widgets by default: when a previous Orbital install is
   detected, the guided wizard offers to keep everything and applies Orbital's bar and widgets only on
   explicit choice. The verifier no longer demands bar widgets that were deliberately skipped.

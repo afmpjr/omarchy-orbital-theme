@@ -12,6 +12,7 @@ white, gray and black, or any hex).
 |------|--------------|--------------|
 | Theme (repo root) | `colors.toml`, `shell.toml` (menu / popups / notifications glass tokens), terminals, GTK, btop, ... | `omarchy theme install` |
 | [`orbital.launcher`](plugins/orbital.launcher/) | App drawer: search, categories, Recommended, per-app context menu (pin, move to category, uninstall) | `install.sh` |
+| [`orbital.run`](plugins/orbital.run/) | Windows-style Run dialog (`Super+R` with `--windows-keys`): run apps, URLs, paths or CLI commands in a floating terminal, with live suggestions and MRU history | `install.sh` |
 | [`orbital.dock`](plugins/orbital.dock/) | Dock (bar widget): pinned + running apps, context menu | `install.sh` wizard |
 | [`orbital.clock`](plugins/orbital.clock/), [`orbital.workspaces`](plugins/orbital.workspaces/), [`orbital.divider`](plugins/orbital.divider/) | Calendar popup with real reminders and weather, workspace previews with application icons, hairline divider (bar widgets) | `install.sh` wizard |
 | [`orbital.account`](plugins/orbital.account/) | Profile card, links, power actions | `install.sh` |
@@ -170,7 +171,7 @@ SUPER+S) and `--no-alt-shift` (Alt+Shift layout switching; it also fires after e
 | `--full` | The author's whole desktop: bar layout, launcher key, gaps, text size 10, keyboard layouts + Alt+Shift, 4-finger swipe, dock pins |
 | `--bar-widgets` | Only place the Orbital widgets in your current bar |
 | `--keyboard-layouts us,br` | Layouts for the keyboard widget (default: the ones in your `input.lua`) |
-| `--windows-keys` | Windows-style shortcuts (opt-in, never part of `--full`): Super+L lock, Super+V clipboard history, Super+Shift+S snip, Alt+F4, F11, ... The full list is at the top of [`hypr/orbital-keys-windows.lua`](hypr/orbital-keys-windows.lua); it replaces some Omarchy defaults |
+| `--windows-keys` | Windows-style shortcuts (opt-in, never part of `--full`): Super+R Run dialog ([`orbital.run`](plugins/orbital.run/)), Super+L lock, Super+V clipboard history, Super+Shift+S snip, Alt+F4, F11, ... The full list is at the top of [`hypr/orbital-keys-windows.lua`](hypr/orbital-keys-windows.lua); it replaces some Omarchy defaults |
 | `--keep-bar` | Keep the bar you use now instead of switching to `orbital.floating-bar` |
 | `--no-launcher-key`, `--no-alt-shift`, `--no-gestures` | Skip that one binding |
 | `--fix-terminal-shortcuts` | Free Ctrl+Enter in Ghostty (also part of `--full`) |

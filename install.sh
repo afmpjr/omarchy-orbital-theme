@@ -44,7 +44,7 @@ SJ="$CFG/omarchy/shell.json"
 MARK='require("hypr.orbital") -- orbital'
 STAMP="$(date +%Y%m%dT%H%M%S)"
 
-OVERLAYS=(orbital.launcher orbital.account orbital.appearance orbital.worldclock orbital.crash orbital.settings)
+OVERLAYS=(orbital.launcher orbital.account orbital.appearance orbital.worldclock orbital.crash orbital.settings orbital.run)
 LIBS=(orbital.ui)
 WIDGETS=("orbital.dock:left" "orbital.workspaces:center" "orbital.keyboard:right" "orbital.clock:right")
 EXTRA_WIDGETS=(orbital.divider)
