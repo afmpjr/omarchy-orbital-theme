@@ -56,6 +56,7 @@ fi
 systemctl --user reset-failed >/dev/null 2>&1 || true
 
 # 6. Atualizar estado do doctor
+systemctl --user restart omarchy-doctor >/dev/null 2>&1 || true
 omarchy-doctor scan --json >/dev/null 2>&1 || true
 
 DISK_AVAIL=$(df -h / | awk 'NR==2 {print $4}')

@@ -34,6 +34,7 @@ if [[ "$key" == "r" || "$key" == "R" ]]; then
   sudo systemctl reset-failed || true
   
   echo "Atualizando telemetria do omarchy-doctor..."
+  systemctl --user restart omarchy-doctor >/dev/null 2>&1 || true
   omarchy-doctor scan --json >/dev/null 2>&1 || true
   
   echo ""
