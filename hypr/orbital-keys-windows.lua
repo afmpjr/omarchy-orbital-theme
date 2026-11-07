@@ -1,3 +1,4 @@
+-- Packaged copy of ../../hypr/orbital-keys-windows.lua for Settings; keep in sync.
 -- Orbital: Windows-style shortcuts (opt-in: install.sh --windows-keys).
 --
 -- Super is the Windows key. This replaces some Omarchy defaults, so read the list:
@@ -54,12 +55,17 @@ hl.unbind("SUPER + SHIFT + S")
 o.bind("SUPER + SHIFT + S", "Snipping (region screenshot)", "omarchy-capture-screenshot region")
 hl.unbind("SUPER + PERIOD")
 o.bind("SUPER + PERIOD", "Emojis", "omarchy-shell shell toggle omarchy.emojis")
+hl.unbind("SUPER + SPACE")
+o.bind("SUPER + SPACE", "Switch keyboard layout", "hyprctl switchxkblayout all next")
 if o.cmd_present("voxtype") then
   o.bind("SUPER + H", "Toggle dictation", "voxtype record toggle")
 end
 
 -- Windows
 o.bind("ALT + F4", "Close window", hl.dsp.window.close())
+hl.unbind("SUPER + F")
+o.bind("SUPER + F", "Full screen", hl.dsp.window.fullscreen({ mode = "fullscreen" }))
+hl.unbind("F11")
 o.bind("F11", "Full screen", hl.dsp.window.fullscreen({ mode = "fullscreen" }))
 hl.unbind("SUPER + ALT + S")
 o.bind("SUPER + ALT + S", "Toggle scratchpad", hl.dsp.workspace.toggle_special("scratchpad"))
