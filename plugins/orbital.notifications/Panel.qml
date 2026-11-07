@@ -138,19 +138,19 @@ Panel {
       if (matchWaUrl && matchWaUrl[0]) waUrl = matchWaUrl[0]
 
       Quickshell.execDetached(["bash", "-c", '
-        # 1. Try dedicated WhatsApp PWA window
+        # 1. Try dedicated WhatsApp PWA window or active WhatsApp tab
         addr=$(hyprctl clients -j 2>/dev/null | jq -r ".[] | select((.class|test(\"whatsapp\"; \"i\")) or (.title|test(\"whatsapp\"; \"i\"))) | .address" | head -1)
         if [[ -n "$addr" ]]; then
           hyprctl dispatch focuswindow "address:$addr" >/dev/null 2>&1
           exit 0
         fi
-        # 2. Focus Google Chrome / browser where WhatsApp tab resides
-        addr=$(hyprctl clients -j 2>/dev/null | jq -r ".[] | select((.class|test(\"google-chrome|chromium|brave\"; \"i\")) and (.title|test(\"whatsapp\"; \"i\"))) | .address" | head -1)
+        # 2. If any browser window (Chrome, Chromium, Brave) is already open, focus it directly without opening duplicate tabs
+        addr=$(hyprctl clients -j 2>/dev/null | jq -r ".[] | select(.class|test(\"google-chrome|chromium|brave\"; \"i\")) | .address" | head -1)
         if [[ -n "$addr" ]]; then
           hyprctl dispatch focuswindow "address:$addr" >/dev/null 2>&1
           exit 0
         fi
-        # 3. Fallback when browser is closed or WhatsApp is not open: launch URL directly
+        # 3. Only if browser is completely closed: launch WhatsApp URL
         exec xdg-open "' + waUrl + '"
       '])
       root.close()
