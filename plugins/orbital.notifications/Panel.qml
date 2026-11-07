@@ -456,13 +456,37 @@ Panel {
                 }
               }
 
-              Item {
-                width: Style.space(36)
-                height: parent.height
+              // Left: notification avatar / icon slot (displays thumbnail when image is available).
+              Rectangle {
+                id: visualSlot
+                width: Style.space(42)
+                height: Style.space(42)
+                anchors.verticalCenter: parent.verticalCenter
+                radius: Style.space(8)
+                color: modelData.image ? "transparent" : Qt.rgba(255, 255, 255, 0.08)
+                border.width: modelData.image ? 1 : 0
+                border.color: Qt.rgba(255, 255, 255, 0.14)
+                clip: true
 
+                // Image / Screenshot thumbnail avatar
+                Image {
+                  id: avatarThumb
+                  anchors.fill: parent
+                  visible: modelData.image !== ""
+                  source: (modelData.image && modelData.image.indexOf("://") === -1 && modelData.image.charAt(0) === "/")
+                    ? ("file://" + modelData.image)
+                    : modelData.image
+                  fillMode: Image.PreserveAspectCrop
+                  asynchronous: true
+                  cache: true
+                  mipmap: true
+                }
+
+                // App icon fallback when no image exists
                 OrbitalUi.OrbitalIcon {
                   anchors.centerIn: parent
-                  size: 32
+                  size: 26
+                  visible: !modelData.image
                   name: root.iconFile(modelData) ? "" : root.iconName(modelData)
                   source: root.iconFile(modelData)
                   preserveColors: root.iconFile(modelData) !== ""
@@ -480,7 +504,7 @@ Panel {
 
               Item {
                 id: textSlot
-                width: parent.width - 8 - 36 - readSlot.width - dismissSlot.width - thumbSlot.width - parent.spacing * 5
+                width: parent.width - 8 - visualSlot.width - readSlot.width - dismissSlot.width - parent.spacing * 4
                 height: parent.height
 
                 Column {
@@ -534,37 +558,6 @@ Panel {
                   onClicked: {
                     root.activateNotification(modelData)
                   }
-                }
-              }
-
-              Rectangle {
-                id: thumbSlot
-                width: modelData.image ? Style.space(52) : 0
-                visible: modelData.image !== ""
-                height: Style.space(42)
-                anchors.verticalCenter: parent.verticalCenter
-                radius: Style.space(6)
-                color: "transparent"
-                border.width: 1
-                border.color: Qt.rgba(1, 1, 1, 0.12)
-                clip: true
-
-                Image {
-                  anchors.fill: parent
-                  source: (modelData.image && modelData.image.indexOf("://") === -1 && modelData.image.charAt(0) === "/")
-                    ? ("file://" + modelData.image)
-                    : modelData.image
-                  fillMode: Image.PreserveAspectCrop
-                  asynchronous: true
-                  cache: true
-                  mipmap: true
-                }
-
-                MouseArea {
-                  anchors.fill: parent
-                  hoverEnabled: true
-                  cursorShape: Qt.PointingHandCursor
-                  onClicked: root.activateNotification(modelData)
                 }
               }
 
