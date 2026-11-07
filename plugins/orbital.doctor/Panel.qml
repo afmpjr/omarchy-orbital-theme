@@ -110,6 +110,7 @@ Panel {
           Row {
             id: headerRow
             width: parent.width
+            height: Style.space(38)
             spacing: Style.space(10)
 
             OrbitalUi.OrbitalIcon {

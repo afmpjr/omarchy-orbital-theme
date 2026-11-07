@@ -105,8 +105,25 @@ function resolveStatus(doctorState, isStateValid, lastModifiedEpochMs, nowEpochM
   }
 
   // Systemd failed units check
+  // A "warning" verdict from the daemon must not be escalated to "critical"
+  // when every finding is merely warning/info. However, when findings are
+  // absent (e.g. tests populating failed_units directly) or an explicit
+  // critical finding exists, failed units remain critical.
   if (Array.isArray(doctorState.failed_units) && doctorState.failed_units.length > 0) {
-    return "critical";
+    var hasCriticalFinding = false;
+    var hasFindings = Array.isArray(doctorState.findings) && doctorState.findings.length > 0;
+    if (hasFindings) {
+      for (var cf = 0; cf < doctorState.findings.length; cf++) {
+        var cfFinding = doctorState.findings[cf];
+        if (cfFinding && cfFinding.severity === "critical") {
+          hasCriticalFinding = true;
+          break;
+        }
+      }
+    }
+    if (doctorState.status !== "warning" || hasCriticalFinding || !hasFindings) {
+      return "critical";
+    }
   }
 
   // Explicit critical verdict
