@@ -5,6 +5,7 @@ import Quickshell.Io
 import qs.Commons
 import qs.Ui
 import "DoctorModel.js" as Model
+import "I18n.js" as I18n
 import "../orbital.ui" as OrbitalUi
 
 // Panel.qml — Diagnostics flyout popup for omarchy-doctor in the Orbital theme.
@@ -15,6 +16,7 @@ Panel {
   moduleName: "orbital.doctor"
   ipcTarget: "orbital.doctor"
   manageIpc: false
+  Component.onCompleted: Model.setI18n(I18n)
 
   property var anchorItem: null
   property var hostWidget: null
@@ -163,9 +165,9 @@ Panel {
                   var updated = root.doctorState ? root.doctorState.updated_at : null
                   var rel = Model.relativeTime(updated, root.panelNow)
                   var daemon = (root.doctorState && root.doctorState.service && root.doctorState.service.active)
-                    ? ("Daemon ativo (pid " + root.doctorState.service.pid + ")")
-                    : "Daemon inativo"
-                  return "Último check: " + rel + " • " + daemon
+                    ? I18n.t("Daemon active (pid %s)", [root.doctorState.service.pid])
+                    : I18n.t("Daemon inactive")
+                  return I18n.t("Last check: %s • %s", [rel, daemon])
                 }
                 color: "#91A4BB"
                 font.family: tokens.fontFamily
@@ -229,7 +231,7 @@ Panel {
             spacing: Style.space(10)
 
             Text {
-              text: "RECURSOS & PRESSÃO"
+              text: I18n.t("RESOURCES & PRESSURE")
               color: "#60758C"
               font.family: tokens.fontFamily
               font.pixelSize: 11
@@ -274,7 +276,7 @@ Panel {
                     spacing: Style.space(6)
 
                     Text {
-                      text: "Disco Raiz (/)"
+                      text: I18n.t("Root Disk (/)")
                       color: mouseDisk.containsMouse ? "#FFFFFF" : "#F4F8FF"
                       font.family: tokens.fontFamily
                       font.pixelSize: 12
@@ -341,7 +343,7 @@ Panel {
                 Text {
                   anchors.left: parent.left
                   anchors.verticalCenter: parent.verticalCenter
-                  text: "Memória RAM"
+                  text: I18n.t("RAM Memory")
                   color: "#F4F8FF"
                   font.family: tokens.fontFamily
                   font.pixelSize: 12
@@ -380,7 +382,7 @@ Panel {
               // zRAM Subline
               Text {
                 text: {
-                  if (!parent.zramData) return "zRAM: Inativo / Não configurado"
+                  if (!parent.zramData) return I18n.t("zRAM: Inactive / Not configured")
                   var zUsed = Model.formatBytes(parent.zramData.used || parent.zramData.used_bytes)
                   var zTot = Model.formatBytes(parent.zramData.total || parent.zramData.total_bytes)
                   var zPct = Model.formatPercent(parent.zramData.percent_used)
@@ -398,7 +400,7 @@ Panel {
               spacing: Style.space(6)
 
               Text {
-                text: "Pressão do Sistema (PSI avg10)"
+                text: I18n.t("System Pressure (PSI avg10)")
                 color: "#91A4BB"
                 font.family: tokens.fontFamily
                 font.pixelSize: 11
@@ -431,7 +433,7 @@ Panel {
                     anchors.centerIn: parent
                     spacing: 1
                     Text {
-                      text: "I/O PSI"
+                      text: I18n.t("I/O PSI")
                       color: "#60758C"
                       font.pixelSize: 9
                       font.bold: true
@@ -468,7 +470,7 @@ Panel {
                     anchors.centerIn: parent
                     spacing: 1
                     Text {
-                      text: "CPU PSI"
+                      text: I18n.t("CPU PSI")
                       color: "#60758C"
                       font.pixelSize: 9
                       font.bold: true
@@ -505,7 +507,7 @@ Panel {
                     anchors.centerIn: parent
                     spacing: 1
                     Text {
-                      text: "RAM PSI"
+                      text: I18n.t("RAM PSI")
                       color: "#60758C"
                       font.pixelSize: 9
                       font.bold: true
@@ -539,7 +541,7 @@ Panel {
             spacing: Style.space(8)
 
             Text {
-              text: "AÇÕES AUTOMÁTICAS RECENTES"
+              text: I18n.t("RECENT AUTOMATIC ACTIONS")
               color: "#60758C"
               font.family: tokens.fontFamily
               font.pixelSize: 11
@@ -562,7 +564,7 @@ Panel {
               Text {
                 anchors.centerIn: parent
                 width: parent.width - Style.space(20)
-                text: "Nenhuma auto-limpeza necessária. Recursos dentro dos parâmetros."
+                text: I18n.t("No auto-cleanup needed. Resources within parameters.")
                 color: "#60758C"
                 font.family: tokens.fontFamily
                 font.pixelSize: 11
@@ -595,7 +597,7 @@ Panel {
                   }
 
                   Text {
-                    text: modelData.description || modelData.message || "Manutenção automática"
+                    text: modelData.description || modelData.message || I18n.t("Automatic maintenance")
                     color: "#F4F8FF"
                     font.family: tokens.fontFamily
                     font.pixelSize: 11
@@ -639,7 +641,7 @@ Panel {
             spacing: Style.space(6)
 
             Text {
-              text: "INTEGRIDADE & HARDWARE"
+              text: I18n.t("INTEGRITY & HARDWARE")
               color: "#60758C"
               font.family: tokens.fontFamily
               font.pixelSize: 11
@@ -683,7 +685,7 @@ Panel {
                 }
 
                 Text {
-                  text: parent.parent.parent.sysSummary.text + (parent.parent.parent.sysSummary.ok ? "" : " • Clique para agir")
+                  text: parent.parent.parent.sysSummary.text + (parent.parent.parent.sysSummary.ok ? "" : " • " + I18n.t("Click to inspect/resolve"))
                   color: parent.parent.parent.sysSummary.ok ? "#7BC29A" : "#FF8A8A"
                   font.family: tokens.fontFamily
                   font.pixelSize: 11
@@ -779,7 +781,7 @@ Panel {
                 }
 
                 Text {
-                  text: root.isSanitizing ? "Saneando Estação em Segundo Plano..." : "Limpar Agora (Saneamento Completo)"
+                  text: root.isSanitizing ? I18n.t("Cleaning Station in Background...") : I18n.t("Clean Now (Full Sanitization)")
                   color: "#FFFFFF"
                   font.family: tokens.fontFamily
                   font.pixelSize: 12
@@ -829,7 +831,7 @@ Panel {
                   }
 
                   Text {
-                    text: "Abrir Relatório"
+                    text: I18n.t("Open Report")
                     color: "#F4F8FF"
                     font.family: tokens.fontFamily
                     font.pixelSize: 11
@@ -874,7 +876,7 @@ Panel {
                   }
 
                   Text {
-                    text: "Simular Limpeza"
+                    text: I18n.t("Simulate Cleanup")
                     color: "#FFFFFF"
                     font.family: tokens.fontFamily
                     font.pixelSize: 11

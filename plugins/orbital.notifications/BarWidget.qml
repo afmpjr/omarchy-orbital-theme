@@ -4,6 +4,7 @@ import Quickshell.Io
 import qs.Commons
 import qs.Ui
 import "NotificationsModel.js" as Model
+import "I18n.js" as I18n
 import "../orbital.ui" as OrbitalUi
 
 // Bell for the bar. Owns the notification history: it polls omarchy's on-disk
@@ -21,7 +22,7 @@ import "../orbital.ui" as OrbitalUi
 // proxy the stock bar's own Dnd indicator uses.
 BarWidget {
   id: root
-  function tr(s) { return OrbitalUi.OrbitalI18n.t(s) }
+  function tr(s) { return I18n.t(s) }
   moduleName: "orbital.notifications"
 
   readonly property string badgeMode: setting("badge", "Dot")

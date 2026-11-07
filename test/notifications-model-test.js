@@ -419,4 +419,43 @@ check("volume: 5000 entries without stalling", function () {
   console.log("    (5000-entry ingest+trim took " + elapsed + "ms)")
 })
 
+// --- i18n dictionary integrity & resolution tests ---
+var I18n = require(path.join(__dirname, "..", "plugins", "orbital.notifications", "I18n.js"))
+
+check("i18n dictionary integrity and resolution (English default + PT-BR)", function () {
+  var expectedKeys = [
+    "Notifications", "Clear all", "Mark all as read",
+    "All", "Unread", "Do Not Disturb: on", "Do Not Disturb: off",
+    "No notifications yet", "No unread notifications",
+    "Mark as read", "Mark as unread", "Clear", "Open", "Dismiss",
+    "now", "minute", "minutes", "hour", "hours", "day", "days", "week", "weeks", "ago"
+  ]
+
+  for (var i = 0; i < expectedKeys.length; i++) {
+    var k = expectedKeys[i]
+    assert.ok(k in I18n.pt, "Missing Portuguese entry for: " + k)
+    assert.strictEqual(typeof I18n.pt[k], "string", "Portuguese entry must be string: " + k)
+    assert.ok(I18n.pt[k].length > 0, "Portuguese entry must not be empty: " + k)
+
+    // English resolution matches key
+    assert.strictEqual(I18n.t(k, null, "en"), k, "English fallback must match key: " + k)
+    assert.strictEqual(I18n.t(k, null, "C"), k, "Locale 'C' fallback must match key: " + k)
+    assert.strictEqual(I18n.t(k, null, "en_US"), k, "Locale 'en_US' fallback must match key: " + k)
+
+    // Portuguese resolution matches pt dictionary
+    assert.strictEqual(I18n.t(k, null, "pt"), I18n.pt[k], "Portuguese translation failed: " + k)
+    assert.strictEqual(I18n.t(k, null, "pt_BR"), I18n.pt[k], "pt_BR translation failed: " + k)
+  }
+
+  // Active locale check
+  var active = I18n.detectLocale()
+  if (active === "pt") {
+    assert.strictEqual(I18n.t("Notifications"), "Notificações")
+    assert.strictEqual(I18n.t("Clear all"), "Limpar tudo")
+  } else {
+    assert.strictEqual(I18n.t("Notifications"), "Notifications")
+    assert.strictEqual(I18n.t("Clear all"), "Clear all")
+  }
+})
+
 console.log("ok - " + passed + " notification model checks passed")

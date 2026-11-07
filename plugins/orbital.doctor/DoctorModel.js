@@ -2,6 +2,35 @@
 // Kept Qt-free so it can be thoroughly unit tested under Node.js.
 // Complies with the Orbital theme design tokens and failure resilience rules.
 
+var _i18n = null;
+if (typeof require !== "undefined") {
+  try {
+    _i18n = require("./I18n.js");
+  } catch (e) {}
+}
+
+function setI18n(instance) {
+  _i18n = instance;
+}
+
+function getI18n() {
+  return _i18n;
+}
+
+function tr(key, params, locale) {
+  if (_i18n && typeof _i18n.t === "function") {
+    return _i18n.t(key, params, locale);
+  }
+  if (params !== undefined && params !== null) {
+    var args = Array.isArray(params) ? params : [params];
+    var idx = 0;
+    return String(key).replace(/%[sd]/g, function() {
+      return idx < args.length ? String(args[idx++]) : "";
+    });
+  }
+  return key;
+}
+
 /**
  * Parses raw JSON text safely with exception containment.
  * Never throws or crashes the host QML engine on truncated or missing files.
@@ -246,12 +275,15 @@ function formatPercent(value) {
 }
 
 /**
- * Returns a human-friendly relative time string in Portuguese (as per theme language).
+ * Returns a human-friendly relative time string localized to the current locale.
+ * Default canonical language: English ("now", "14s ago", "2m ago", "1h ago", "2d ago").
+ * Localized Portuguese when in pt ("agora", "há 14s", "há 2m", "há 1h", "há 2d").
  * @param {string|number} isoOrTimestamp - ISO 8601 string or epoch milliseconds
  * @param {number} [nowEpochMs] - Current timestamp
- * @returns {string} e.g. "agora", "há 14s", "há 2m", "há 1h", "há 2d"
+ * @param {string} [locale] - Optional locale override ("en" or "pt")
+ * @returns {string} Relative time string
  */
-function relativeTime(isoOrTimestamp, nowEpochMs) {
+function relativeTime(isoOrTimestamp, nowEpochMs, locale) {
   if (!isoOrTimestamp) return "N/D";
   var epoch = typeof isoOrTimestamp === "number" ? isoOrTimestamp : Date.parse(isoOrTimestamp);
   if (isNaN(epoch) || epoch <= 0) return "N/D";
@@ -259,20 +291,21 @@ function relativeTime(isoOrTimestamp, nowEpochMs) {
   var now = (nowEpochMs !== undefined && nowEpochMs !== null) ? Number(nowEpochMs) : Date.now();
   var deltaSec = Math.max(0, Math.floor((now - epoch) / 1000));
 
-  if (deltaSec < 5) return "agora";
-  if (deltaSec < 60) return "há " + deltaSec + "s";
+  if (deltaSec < 5) return tr("now", null, locale);
+  if (deltaSec < 60) return tr("%ss ago", [deltaSec], locale);
   var deltaMin = Math.floor(deltaSec / 60);
-  if (deltaMin < 60) return "há " + deltaMin + "m";
+  if (deltaMin < 60) return tr("%sm ago", [deltaMin], locale);
   var deltaHours = Math.floor(deltaMin / 60);
-  if (deltaHours < 24) return "há " + deltaHours + "h";
+  if (deltaHours < 24) return tr("%sh ago", [deltaHours], locale);
   var deltaDays = Math.floor(deltaHours / 24);
-  return "há " + deltaDays + "d";
+  return tr("%sd ago", [deltaDays], locale);
 }
 
 /**
  * Generates descriptive tooltip text for the bar button hover state.
  * @param {object|null} doctorState - State object
  * @param {string} status - Resolved status
+ * @param {string} [locale] - Optional locale override
  * @returns {string} Tooltip string
  */
 function compactSummary(text) {
@@ -288,38 +321,38 @@ function compactSummary(text) {
   return s;
 }
 
-function tooltipFor(doctorState, status) {
+function tooltipFor(doctorState, status, locale) {
   if (status === "stopped") {
-    return "omarchy-doctor: Monitor Inativo";
+    return tr("omarchy-doctor: Inactive Monitor", null, locale);
   }
   if (status === "stale") {
-    return "omarchy-doctor: Dados Desatualizados";
+    return tr("omarchy-doctor: Data Stale", null, locale);
   }
   if (status === "critical") {
     var critDetail = "";
     if (doctorState) {
       if (Array.isArray(doctorState.failed_units) && doctorState.failed_units.length > 0) {
-        critDetail = doctorState.failed_units.length + " unit(s) em falha";
+        critDetail = tr("%d failed unit(s)", [doctorState.failed_units.length], locale);
       } else if (doctorState.metrics && doctorState.metrics.disk && doctorState.metrics.disk.percent_used >= 90) {
-        critDetail = "Disco em " + Math.round(doctorState.metrics.disk.percent_used) + "%";
+        critDetail = tr("Disk at %s", [Math.round(doctorState.metrics.disk.percent_used) + "%"], locale);
       } else if (doctorState.summary) {
         critDetail = compactSummary(doctorState.summary);
       }
     }
-    return "omarchy-doctor: CRÍTICO (" + (critDetail || "Condição crítica") + ")";
+    return tr("omarchy-doctor: CRITICAL (%s)", [critDetail || tr("Critical condition", null, locale)], locale);
   }
   if (status === "warning") {
     var warnDetail = "";
     if (doctorState) {
       if (doctorState.metrics && doctorState.metrics.disk && doctorState.metrics.disk.percent_used >= 80) {
-        warnDetail = "Disco em " + Math.round(doctorState.metrics.disk.percent_used) + "%";
+        warnDetail = tr("Disk at %s", [Math.round(doctorState.metrics.disk.percent_used) + "%"], locale);
       } else if (doctorState.summary) {
         warnDetail = compactSummary(doctorState.summary);
       }
     }
-    return "omarchy-doctor: Atenção (" + (warnDetail || "Atenção necessária") + ")";
+    return tr("omarchy-doctor: Attention (%s)", [warnDetail || tr("Attention needed", null, locale)], locale);
   }
-  return "omarchy-doctor: Sistema Saudável";
+  return tr("omarchy-doctor: Healthy System", null, locale);
 }
 
 /**
@@ -387,23 +420,25 @@ function diskColor(percent, tokens) {
 /**
  * Generates summary description for systemd units.
  * @param {Array|null} failedUnits - List of failed units
+ * @param {string} [locale] - Optional locale override
  * @returns {{ ok: boolean, text: string, count: number }}
  */
-function systemdStatusSummary(failedUnits) {
+function systemdStatusSummary(failedUnits, locale) {
   var list = Array.isArray(failedUnits) ? failedUnits : [];
   if (list.length === 0) {
     return {
       ok: true,
-      text: "Systemd: 0 units em falha (todas operando)",
+      text: tr("Systemd: 0 failed units (all operational)", null, locale),
       count: 0
     };
   }
+  var unknownName = tr("unknown unit", null, locale);
   var names = list.map(function(u) {
-    return (u && (u.name || u.unit)) ? (u.name || u.unit) : "unit desconhecida";
+    return (u && (u.name || u.unit)) ? (u.name || u.unit) : unknownName;
   }).join(", ");
   return {
     ok: false,
-    text: list.length + " unit(s) em falha: " + names,
+    text: tr("%d failed unit(s): %s", [list.length, names], locale),
     count: list.length
   };
 }
@@ -411,14 +446,15 @@ function systemdStatusSummary(failedUnits) {
 /**
  * Generates summary description for SMART storage health.
  * @param {object|null} smart - SMART metadata
+ * @param {string} [locale] - Optional locale override
  * @returns {{ available: boolean, ok: boolean, text: string }}
  */
-function smartStatusSummary(smart) {
+function smartStatusSummary(smart, locale) {
   if (!smart || smart.available !== true) {
     return {
       available: false,
       ok: true,
-      text: "SMART: Requer root (autorização pendente)"
+      text: tr("SMART: Requires root (permission pending)", null, locale)
     };
   }
   var devices = Array.isArray(smart.devices) ? smart.devices : [];
@@ -426,15 +462,16 @@ function smartStatusSummary(smart) {
     return {
       available: true,
       ok: true,
-      text: "SMART: Nenhum dispositivo detectado"
+      text: tr("SMART: No devices detected", null, locale)
     };
   }
   var failingDevices = [];
   var parts = [];
+  var defaultDiskName = tr("disk", null, locale);
   for (var i = 0; i < devices.length; i++) {
     var dev = devices[i];
     if (!dev) continue;
-    var name = dev.device || (dev.path ? dev.path.replace("/dev/", "") : "disco");
+    var name = dev.device || (dev.path ? dev.path.replace("/dev/", "") : defaultDiskName);
     var health = dev.health || (dev.failing ? "FAILING" : "OK");
     var temp = (dev.temperature || dev.temperature_celsius) ? (dev.temperature || dev.temperature_celsius) + "°C" : "";
     if (dev.failing === true || String(health).toUpperCase() === "FAILING") {
@@ -446,13 +483,13 @@ function smartStatusSummary(smart) {
     return {
       available: true,
       ok: false,
-      text: "ALERTA: Falha física iminente em " + failingDevices.join(", ") + "!"
+      text: tr("WARNING: Imminent physical failure on %s!", [failingDevices.join(", ")], locale)
     };
   }
   return {
     available: true,
     ok: true,
-    text: "Discos Físicos: " + parts.join(" • ")
+    text: tr("Physical Disks: %s", [parts.join(" • ")], locale)
   };
 }
 
@@ -478,22 +515,23 @@ function recentActionIcon(actionType) {
 /**
  * Resolves metadata for the header status pill tag.
  * @param {string} status - Macro status
+ * @param {string} [locale] - Optional locale override
  * @returns {{ text: string, status: string }}
  */
-function badgeInfo(status) {
+function badgeInfo(status, locale) {
   if (status === "ok") {
-    return { text: "SISTEMA SAUDÁVEL", status: "ok" };
+    return { text: tr("SYSTEM HEALTHY", null, locale), status: "ok" };
   }
   if (status === "warning") {
-    return { text: "ATENÇÃO NECESSÁRIA", status: "warning" };
+    return { text: tr("ATTENTION NEEDED", null, locale), status: "warning" };
   }
   if (status === "critical") {
-    return { text: "CONDIÇÃO CRÍTICA", status: "critical" };
+    return { text: tr("CRITICAL CONDITION", null, locale), status: "critical" };
   }
   if (status === "stale") {
-    return { text: "DADOS DESATUALIZADOS", status: "stale" };
+    return { text: tr("DATA STALE", null, locale), status: "stale" };
   }
-  return { text: "MONITOR DESCONECTADO", status: "stopped" };
+  return { text: tr("MONITOR DISCONNECTED", null, locale), status: "stopped" };
 }
 
 // Node.js module export compatibility (for testing without Qt)
@@ -511,6 +549,8 @@ if (typeof module !== "undefined" && module.exports) {
     systemdStatusSummary: systemdStatusSummary,
     smartStatusSummary: smartStatusSummary,
     recentActionIcon: recentActionIcon,
-    badgeInfo: badgeInfo
+    badgeInfo: badgeInfo,
+    setI18n: setI18n,
+    getI18n: getI18n
   };
 }

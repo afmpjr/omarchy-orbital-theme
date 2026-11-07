@@ -3,6 +3,7 @@ import Quickshell
 import qs.Commons
 import qs.Ui
 import "NotificationsModel.js" as Model
+import "I18n.js" as I18n
 import "../orbital.ui" as OrbitalUi
 
 // The notification center popup: the archive newest-first, with the sender,
@@ -11,7 +12,7 @@ import "../orbital.ui" as OrbitalUi
 // it to dismiss or clear. It never touches a service object.
 Panel {
   id: root
-  function tr(s) { return OrbitalUi.OrbitalI18n.t(s) }
+  function tr(s) { return I18n.t(s) }
   moduleName: "orbital.notifications"
   ipcTarget: "orbital.notifications"
   manageIpc: false
@@ -531,6 +532,7 @@ Panel {
                   anchors.fill: parent
                   hoverEnabled: true
                   cursorShape: Qt.PointingHandCursor
+                  Accessible.name: I18n.t("Open")
                   onClicked: {
                     root.activateNotification(modelData)
                   }
@@ -605,6 +607,7 @@ Panel {
                 id: dismissSlot
                 width: Style.space(28)
                 height: parent.height
+                Accessible.name: I18n.t("Dismiss")
 
                 Text {
                   anchors.centerIn: parent

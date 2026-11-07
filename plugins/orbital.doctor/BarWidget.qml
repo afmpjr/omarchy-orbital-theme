@@ -4,6 +4,7 @@ import Quickshell.Io
 import qs.Commons
 import qs.Ui
 import "DoctorModel.js" as Model
+import "I18n.js" as I18n
 import "../orbital.ui" as OrbitalUi
 
 // BarWidget.qml — Compact bar indicator for omarchy-doctor in the Orbital theme.
@@ -11,6 +12,7 @@ import "../orbital.ui" as OrbitalUi
 BarWidget {
   id: root
   moduleName: "orbital.doctor"
+  Component.onCompleted: Model.setI18n(I18n)
 
   readonly property string statePath: {
     var xdg = Quickshell.env("XDG_STATE_HOME")
