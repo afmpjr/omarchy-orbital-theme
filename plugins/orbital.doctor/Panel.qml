@@ -667,13 +667,7 @@ Panel {
                 anchors.fill: parent
                 hoverEnabled: true
                 cursorShape: Qt.PointingHandCursor
-                onClicked: {
-                  if (parent.parent.sysSummary.ok) {
-                    root.runTerminalCommand("systemctl --no-pager; echo ''; read -n 1 -s -r -p 'Pressione qualquer tecla para fechar...'")
-                  } else {
-                    root.runTerminalCommand("systemctl --failed --no-pager; echo ''; systemctl --user --failed --no-pager; echo ''; echo 'Deseja executar reset-failed? Pressione [r] para confirmar ou qualquer outra tecla para sair:'; read -n 1 -r key; echo ''; if [[ $key == 'r' || $key == 'R' ]]; then sudo systemctl reset-failed; systemctl --user reset-failed; echo 'Reset concluido!'; sleep 1; fi")
-                  }
-                }
+                onClicked: root.runTerminalCommand("/mnt/dados/projects/omarchy-orbital-theme/scripts/systemd-inspector.sh")
               }
 
               Row {
