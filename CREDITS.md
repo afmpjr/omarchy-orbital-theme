@@ -17,7 +17,7 @@ interface elements that are not real.
 
 | File | What it shows | Notes |
 |------|---------------|-------|
-| `preview.png` | The shell with the current (blue) theme | A clean-install VM: only the launcher, over `backgrounds/01-orbital-astronaut.png` |
+| `preview.png` | The shell with the current (blue) theme | Desktop with launcher, Run dialog and floating dock over `backgrounds/01-orbital-astronaut.png` |
 | `preview-web/index.html` | Static web mockup of the same look | Self-contained; the wallpaper is a relative path to `backgrounds/01-orbital-astronaut.png`, so it works from a clone with no absolute paths |
 
 There is no lock-screen preview: the lock screen is a separate, unbundled plugin.
