@@ -31,6 +31,23 @@ function parseState(rawText) {
     if (!Array.isArray(parsed.findings)) {
       parsed.findings = [];
     }
+    if (parsed.failed_units.length === 0 && parsed.findings.length > 0) {
+      for (var fi = 0; fi < parsed.findings.length; fi++) {
+        var fObj = parsed.findings[fi];
+        if (fObj && (fObj.id === "failed_services" || fObj.id === "failed_units") && typeof fObj.title === "string") {
+          var colonIdx = fObj.title.indexOf(":");
+          if (colonIdx !== -1) {
+            var rawUnits = fObj.title.slice(colonIdx + 1).split(",");
+            for (var ui = 0; ui < rawUnits.length; ui++) {
+              var cleaned = rawUnits[ui].replace(/\s*\([^)]*\)\s*/g, "").trim();
+              if (cleaned.length > 0) {
+                parsed.failed_units.push({ name: cleaned });
+              }
+            }
+          }
+        }
+      }
+    }
     if (!Array.isArray(parsed.recent_actions)) {
       parsed.recent_actions = [];
     }
@@ -116,9 +133,9 @@ function resolveStatus(doctorState, isStateValid, lastModifiedEpochMs, nowEpochM
   // Resource thresholds: Kernel PSI (Pressure Stall Information) >= 25% is Critical
   var psi = doctorState.metrics && doctorState.metrics.psi;
   if (psi) {
-    var psiCpu = psi.cpu && psi.cpu.some_avg10;
-    var psiMem = psi.memory && psi.memory.some_avg10;
-    var psiIo = psi.io && psi.io.some_avg10;
+    var psiCpu = psi.cpu && ((psi.cpu.some && psi.cpu.some.avg10) || psi.cpu.some_avg10);
+    var psiMem = psi.memory && ((psi.memory.some && psi.memory.some.avg10) || psi.memory.some_avg10);
+    var psiIo = psi.io && ((psi.io.some && psi.io.some.avg10) || psi.io.some_avg10);
     if ((typeof psiCpu === "number" && psiCpu >= 25.0) ||
         (typeof psiMem === "number" && psiMem >= 25.0) ||
         (typeof psiIo === "number" && psiIo >= 25.0)) {
@@ -148,9 +165,9 @@ function resolveStatus(doctorState, isStateValid, lastModifiedEpochMs, nowEpochM
 
   // Warning thresholds: PSI >= 15% is Warning
   if (psi) {
-    var pCpu = psi.cpu && psi.cpu.some_avg10;
-    var pMem = psi.memory && psi.memory.some_avg10;
-    var pIo = psi.io && psi.io.some_avg10;
+    var pCpu = psi.cpu && ((psi.cpu.some && psi.cpu.some.avg10) || psi.cpu.some_avg10);
+    var pMem = psi.memory && ((psi.memory.some && psi.memory.some.avg10) || psi.memory.some_avg10);
+    var pIo = psi.io && ((psi.io.some && psi.io.some.avg10) || psi.io.some_avg10);
     if ((typeof pCpu === "number" && pCpu >= 15.0) ||
         (typeof pMem === "number" && pMem >= 15.0) ||
         (typeof pIo === "number" && pIo >= 15.0)) {
@@ -241,6 +258,19 @@ function relativeTime(isoOrTimestamp, nowEpochMs) {
  * @param {string} status - Resolved status
  * @returns {string} Tooltip string
  */
+function compactSummary(text) {
+  if (!text) return "";
+  var s = String(text).replace(/^Why it is slow:\s*/i, "").trim();
+  var dotIdx = s.indexOf(". Failed units:");
+  if (dotIdx !== -1) {
+    s = s.slice(0, dotIdx);
+  }
+  if (s.length > 64) {
+    return s.slice(0, 61) + "...";
+  }
+  return s;
+}
+
 function tooltipFor(doctorState, status) {
   if (status === "stopped") {
     return "omarchy-doctor: Monitor Inativo";
@@ -256,7 +286,7 @@ function tooltipFor(doctorState, status) {
       } else if (doctorState.metrics && doctorState.metrics.disk && doctorState.metrics.disk.percent_used >= 90) {
         critDetail = "Disco em " + Math.round(doctorState.metrics.disk.percent_used) + "%";
       } else if (doctorState.summary) {
-        critDetail = doctorState.summary;
+        critDetail = compactSummary(doctorState.summary);
       }
     }
     return "omarchy-doctor: CRÍTICO (" + (critDetail || "Condição crítica") + ")";
@@ -267,7 +297,7 @@ function tooltipFor(doctorState, status) {
       if (doctorState.metrics && doctorState.metrics.disk && doctorState.metrics.disk.percent_used >= 80) {
         warnDetail = "Disco em " + Math.round(doctorState.metrics.disk.percent_used) + "%";
       } else if (doctorState.summary) {
-        warnDetail = doctorState.summary;
+        warnDetail = compactSummary(doctorState.summary);
       }
     }
     return "omarchy-doctor: Atenção (" + (warnDetail || "Atenção necessária") + ")";

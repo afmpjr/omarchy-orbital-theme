@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Layouts
 import Quickshell
 import Quickshell.Io
 import qs.Commons
@@ -221,17 +222,22 @@ Panel {
                 ? root.doctorState.metrics.disk : null
               readonly property real diskPct: diskData && typeof diskData.percent_used === "number" ? diskData.percent_used : 0
 
-              Row {
+              Item {
                 width: parent.width
+                height: 18
+
                 Text {
+                  anchors.left: parent.left
+                  anchors.verticalCenter: parent.verticalCenter
                   text: "Disco Raiz (/)"
                   color: "#F4F8FF"
                   font.family: tokens.fontFamily
                   font.pixelSize: 12
                 }
-                Item { width: 1; height: 1; Layout.fillWidth: true }
+
                 Text {
                   anchors.right: parent.right
+                  anchors.verticalCenter: parent.verticalCenter
                   text: {
                     if (!parent.parent.diskData) return "N/D"
                     var used = Model.formatBytes(parent.parent.diskData.used_bytes)
@@ -273,9 +279,13 @@ Panel {
               readonly property var zramData: (root.doctorState && root.doctorState.metrics && root.doctorState.metrics.zram)
                 ? root.doctorState.metrics.zram : null
 
-              Row {
+              Item {
                 width: parent.width
+                height: 18
+
                 Text {
+                  anchors.left: parent.left
+                  anchors.verticalCenter: parent.verticalCenter
                   text: "Memória RAM"
                   color: "#F4F8FF"
                   font.family: tokens.fontFamily
@@ -283,6 +293,7 @@ Panel {
                 }
                 Text {
                   anchors.right: parent.right
+                  anchors.verticalCenter: parent.verticalCenter
                   text: {
                     if (!parent.parent.memData) return "N/D"
                     var used = Model.formatBytes(parent.parent.memData.used || parent.parent.memData.used_bytes)
@@ -353,7 +364,12 @@ Panel {
                   color: Qt.rgba(255, 255, 255, 0.04)
                   border.color: Qt.rgba(255, 255, 255, 0.08)
 
-                  readonly property real ioVal: parent.psiData && parent.psiData.io ? parent.psiData.io.some_avg10 : 0
+                  readonly property real ioVal: {
+                    if (!parent.psiData || !parent.psiData.io) return 0
+                    if (parent.psiData.io.some && typeof parent.psiData.io.some.avg10 === "number") return parent.psiData.io.some.avg10
+                    if (typeof parent.psiData.io.some_avg10 === "number") return parent.psiData.io.some_avg10
+                    return 0
+                  }
                   readonly property color chipColor: Model.psiColor(ioVal, tokens)
 
                   Column {
@@ -385,7 +401,12 @@ Panel {
                   color: Qt.rgba(255, 255, 255, 0.04)
                   border.color: Qt.rgba(255, 255, 255, 0.08)
 
-                  readonly property real cpuVal: parent.psiData && parent.psiData.cpu ? parent.psiData.cpu.some_avg10 : 0
+                  readonly property real cpuVal: {
+                    if (!parent.psiData || !parent.psiData.cpu) return 0
+                    if (parent.psiData.cpu.some && typeof parent.psiData.cpu.some.avg10 === "number") return parent.psiData.cpu.some.avg10
+                    if (typeof parent.psiData.cpu.some_avg10 === "number") return parent.psiData.cpu.some_avg10
+                    return 0
+                  }
                   readonly property color chipColor: Model.psiColor(cpuVal, tokens)
 
                   Column {
@@ -417,7 +438,12 @@ Panel {
                   color: Qt.rgba(255, 255, 255, 0.04)
                   border.color: Qt.rgba(255, 255, 255, 0.08)
 
-                  readonly property real memVal: parent.psiData && parent.psiData.memory ? parent.psiData.memory.some_avg10 : 0
+                  readonly property real memVal: {
+                    if (!parent.psiData || !parent.psiData.memory) return 0
+                    if (parent.psiData.memory.some && typeof parent.psiData.memory.some.avg10 === "number") return parent.psiData.memory.some.avg10
+                    if (typeof parent.psiData.memory.some_avg10 === "number") return parent.psiData.memory.some_avg10
+                    return 0
+                  }
                   readonly property color chipColor: Model.psiColor(memVal, tokens)
 
                   Column {
@@ -522,8 +548,6 @@ Panel {
                     width: parent.width - 150
                     anchors.verticalCenter: parent.verticalCenter
                   }
-
-                  Item { width: 1; height: 1; Layout.fillWidth: true }
 
                   Text {
                     text: "+" + (modelData.freed_human || Model.formatBytes(modelData.freed_bytes))

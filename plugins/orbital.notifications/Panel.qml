@@ -112,43 +112,56 @@ Panel {
     var body = String(entry.body || "")
     var text = summary + " " + body
     var key = String(entry.key || "")
+    var appName = String(entry.app || "").trim()
 
-    // 2. If history JSON exists with omarchy execArgv (e.g. tensaku screenshot editor), invoke it
-    if (key.length > 0) {
+    // 2. Screenshot notification: open tensaku-edit on the image exactly once
+    if (summary.indexOf("Screenshot saved") !== -1 || body.indexOf("Screenshot saved") !== -1 || body.indexOf("tensaku-edit") !== -1) {
       Quickshell.execDetached(["bash", "-c", '
         hist="$HOME/.local/state/omarchy/notifications/history/' + key + '.json"
+        target=""
         if [[ -f "$hist" ]]; then
-          cmd=$(jq -r ".execArgv // empty" "$hist" 2>/dev/null)
-          if [[ -n "$cmd" && "$cmd" != "null" ]]; then
-            parsed=$(python3 -c "import sys, json; args=json.loads(sys.argv[1]); [print(a) for a in args]" "$cmd" 2>/dev/null)
-            if [[ -n "$parsed" ]]; then
-              mapfile -t arr <<<"$parsed"
-              exec "${arr[@]}"
-            fi
-          fi
+          target=$(jq -r ".execArgv // empty" "$hist" 2>/dev/null | jq -r ".[1] // empty" 2>/dev/null)
         fi
+        if [[ -z "$target" || ! -f "$target" ]]; then
+          target=$(ls -t ~/Pictures/screenshot-* 2>/dev/null | head -1)
+        fi
+        [[ -n "$target" ]] && exec tensaku-edit "$target"
       '])
-    }
-
-    // 3. Fallback for screenshot toasts: open tensaku on the latest screenshot
-    if (summary.indexOf("Screenshot saved") !== -1 || body.indexOf("Screenshot saved") !== -1 || body.indexOf("tensaku-edit") !== -1) {
-      Quickshell.execDetached(["bash", "-lc", 'latest=$(ls -t ~/Pictures/screenshot-* 2>/dev/null | head -1); [[ -n "$latest" ]] && exec tensaku-edit "$latest"'])
       root.close()
       return
     }
 
-    // 4. Check for URL in body or summary (e.g. WhatsApp, web links)
+    // 3. WhatsApp notification: focus existing WhatsApp window or browser
+    if (text.match(/whatsapp/i) || appName.match(/whatsapp/i)) {
+      Quickshell.execDetached(["bash", "-c", '
+        # 1. Try dedicated WhatsApp PWA window
+        addr=$(hyprctl clients -j 2>/dev/null | jq -r ".[] | select((.class|test(\"whatsapp\"; \"i\")) or (.title|test(\"whatsapp\"; \"i\"))) | .address" | head -1)
+        if [[ -n "$addr" ]]; then
+          hyprctl dispatch focuswindow "address:$addr" >/dev/null 2>&1
+          exit 0
+        fi
+        # 2. Focus Google Chrome / browser where WhatsApp tab resides
+        addr=$(hyprctl clients -j 2>/dev/null | jq -r ".[] | select((.class|test(\"google-chrome|chromium|brave\"; \"i\"))) | .address" | head -1)
+        if [[ -n "$addr" ]]; then
+          hyprctl dispatch focuswindow "address:$addr" >/dev/null 2>&1
+          exit 0
+        fi
+      '])
+      root.close()
+      return
+    }
+
+    // 4. Application notification: focus existing window or launch app
+    if (appName.length > 0 && appName !== "omarchy-action" && appName !== "omarchy-doctor") {
+      Quickshell.execDetached(["omarchy-launch-or-focus", appName])
+      root.close()
+      return
+    }
+
+    // 5. Explicit external URL link (only for generic/non-browser notifications)
     var matchUrl = text.match(/https?:\/\/[^\s<>"']+/)
     if (matchUrl && matchUrl[0]) {
       Quickshell.execDetached(["xdg-open", matchUrl[0]])
-      root.close()
-      return
-    }
-
-    // 5. Focus app window or launch app (skipping non-app daemons)
-    var appName = String(entry.app || "").trim()
-    if (appName.length > 0 && appName !== "omarchy-action" && appName !== "omarchy-doctor") {
-      Quickshell.execDetached(["omarchy-launch-or-focus", appName])
       root.close()
       return
     }
