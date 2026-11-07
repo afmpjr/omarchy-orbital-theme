@@ -31,12 +31,50 @@ function sanitizeImageRef(value) {
   var s = String(value || "")
   if (!s) return ""
   if (s.indexOf("file://") === 0) {
-    return s.slice(7).charAt(0) === "/" ? s : ""
+    var rest = s.slice(7)
+    return (rest.charAt(0) === "/" && rest.charAt(1) !== "/") ? s : ""
   }
-  if (s.charAt(0) === "/") return s
+  if (s.charAt(0) === "/" && s.charAt(1) !== "/") return s
   if (s.indexOf("://") !== -1) return ""
   if (s.indexOf("/") !== -1 || s.indexOf("\\") !== -1) return ""
   if (/^[A-Za-z0-9._:+-]+$/.test(s)) return s
+  return ""
+}
+
+function isImageFilePath(pathStr) {
+  var s = String(pathStr || "").toLowerCase()
+  if (s.indexOf("://") !== -1 && s.indexOf("file://") !== 0) return false
+  if (s.indexOf("//") === 0) return false
+  var hasExt = s.endsWith(".png") || s.endsWith(".jpg") || s.endsWith(".jpeg") || s.endsWith(".webp") || s.endsWith(".gif") || s.endsWith(".svg")
+  return hasExt && ((s.charAt(0) === "/" && s.charAt(1) !== "/") || s.indexOf("file:///") === 0)
+}
+
+function extractCandidateImage(raw) {
+  if (!raw) return ""
+  var direct = raw.preview || raw.file || ""
+  if (direct && isImageFilePath(direct)) return direct
+
+  if (raw.execArgv) {
+    try {
+      var argv = typeof raw.execArgv === "string" ? JSON.parse(raw.execArgv) : raw.execArgv
+      if (Array.isArray(argv)) {
+        for (var i = 0; i < argv.length; i++) {
+          var item = String(argv[i] || "")
+          if (item && isImageFilePath(item)) return item
+        }
+      }
+    } catch (e) {
+      var m = String(raw.execArgv).match(/(?:^|[\s"'\[])(\/[^/\s"'\\][^\s"'\\]*\.(png|jpe?g|webp|gif|svg))/i)
+      if (m && m[1]) return m[1]
+    }
+  }
+
+  var text = (raw.body || "") + " " + (raw.summary || "")
+  var fileMatch = text.match(/file:\/\/(\/[^/\s"'\)][^\s"'\)]*\.(png|jpe?g|webp|gif|svg))/i)
+  if (fileMatch && fileMatch[1]) return fileMatch[1]
+  var pathMatch = text.match(/(?:^|[\s"'])(\/[^/\s"'\)][^\s"'\)]*\.(png|jpe?g|webp|gif|svg))/i)
+  if (pathMatch && pathMatch[1]) return pathMatch[1]
+
   return ""
 }
 
@@ -69,9 +107,9 @@ function normalizeEntry(raw) {
   }
   entry.key = rawKey || entryKey(entry)
   // The third-party archive kept a separate preview/file pair for
-  // picture-about notifications; when the canonical image is empty but a
-  // preview survived, the preview is the picture (sanitized like any other).
-  if (!entry.image) entry.image = sanitizeImageRef(v.preview || v.file || "")
+  // picture-about notifications; when the canonical image is empty,
+  // extractCandidateImage inspects preview, file, and execArgv safely.
+  if (!entry.image) entry.image = sanitizeImageRef(extractCandidateImage(v))
   return entry
 }
 
@@ -512,11 +550,13 @@ function relativeParts(timestampMs, nowMs) {
 // consumer line-addressable).
 function serializeArchive(entries) {
   return (Array.isArray(entries) ? entries : []).map(function (e) {
-    return JSON.stringify({
+    var out = {
       key: e.key, app: e.app, appIcon: e.appIcon, summary: e.summary,
       body: e.body, image: e.image, glyph: e.glyph, urgency: e.urgency,
       timestamp: e.timestamp, originalId: e.originalId
-    })
+    }
+    if (e.execArgv) out.execArgv = e.execArgv
+    return JSON.stringify(out)
   }).join("\n") + "\n"
 }
 

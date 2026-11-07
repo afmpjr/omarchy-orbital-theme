@@ -30,6 +30,21 @@ check("normalize third-party archive shape keeps preview as image", function () 
   assert.strictEqual(e.image, "file:///tmp/p.png")
 })
 
+check("normalize extracts screenshot image from execArgv safely without leaking execArgv", function () {
+  var e = Model.normalizeEntry({
+    id: 9,
+    originalId: 9,
+    app: "omarchy-action",
+    summary: "Screenshot saved to clipboard and file",
+    body: "Edit with Super + Alt + ,",
+    image: "",
+    execArgv: '["tensaku-edit", "/home/afmpjr/Pictures/screenshot-2026-11-07_15-28-40.png"]',
+    timestamp: 1794065321323
+  })
+  assert.strictEqual(e.image, "/home/afmpjr/Pictures/screenshot-2026-11-07_15-28-40.png")
+  assert.strictEqual(e.execArgv, undefined, "execArgv must be dropped from canonical entry")
+})
+
 check("normalize drops malformed timestamps and urgencies", function () {
   var e = Model.normalizeEntry({ summary: "x", timestamp: "junk", urgency: "high" })
   assert.strictEqual(e.timestamp, 0)

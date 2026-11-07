@@ -3,7 +3,6 @@ import Quickshell
 import qs.Commons
 import qs.Ui
 import "NotificationsModel.js" as Model
-import "I18n.js" as I18n
 import "../orbital.ui" as OrbitalUi
 
 // The notification center popup: the archive newest-first, with the sender,
@@ -12,7 +11,7 @@ import "../orbital.ui" as OrbitalUi
 // it to dismiss or clear. It never touches a service object.
 Panel {
   id: root
-  function tr(s) { return I18n.t(s) }
+  function tr(s) { return OrbitalUi.OrbitalI18n.t(s) }
   moduleName: "orbital.notifications"
   ipcTarget: "orbital.notifications"
   manageIpc: false
@@ -532,25 +531,33 @@ Panel {
                   anchors.fill: parent
                   hoverEnabled: true
                   cursorShape: Qt.PointingHandCursor
-                  Accessible.name: I18n.t("Open")
                   onClicked: {
                     root.activateNotification(modelData)
                   }
                 }
               }
 
-              Item {
+              Rectangle {
                 id: thumbSlot
                 width: modelData.image ? Style.space(52) : 0
                 visible: modelData.image !== ""
-                height: parent.height
+                height: Style.space(42)
+                anchors.verticalCenter: parent.verticalCenter
+                radius: Style.space(6)
+                color: "transparent"
+                border.width: 1
+                border.color: Qt.rgba(1, 1, 1, 0.12)
+                clip: true
 
                 Image {
                   anchors.fill: parent
-                  source: modelData.image
+                  source: (modelData.image && modelData.image.indexOf("://") === -1 && modelData.image.charAt(0) === "/")
+                    ? ("file://" + modelData.image)
+                    : modelData.image
                   fillMode: Image.PreserveAspectCrop
                   asynchronous: true
                   cache: true
+                  mipmap: true
                 }
 
                 MouseArea {
@@ -607,7 +614,6 @@ Panel {
                 id: dismissSlot
                 width: Style.space(28)
                 height: parent.height
-                Accessible.name: I18n.t("Dismiss")
 
                 Text {
                   anchors.centerIn: parent
