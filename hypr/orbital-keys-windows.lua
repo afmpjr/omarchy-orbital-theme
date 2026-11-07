@@ -31,7 +31,9 @@ o.bind("SUPER + ALT + P", "Pseudo window", hl.dsp.window.pseudo())
 hl.unbind("SUPER + CTRL + D")
 o.bind("SUPER + CTRL + D", "New empty workspace", hl.dsp.focus({ workspace = "empty" }))
 hl.unbind("CTRL + ALT + DELETE")
-o.bind("CTRL + ALT + DELETE", "System menu", "omarchy-menu toggle system")
+o.bind("CTRL + ALT + DELETE", "Task Manager (btop)", { tui = "btop" })
+hl.unbind("CTRL + SHIFT + ESCAPE")
+o.bind("CTRL + SHIFT + ESCAPE", "Task Manager (btop)", { tui = "btop" })
 o.bind("CTRL + SHIFT + ALT + DELETE", "Close all windows", "omarchy-hyprland-window-close-all")
 
 -- Notification center, only when that plugin is installed
