@@ -75,3 +75,13 @@ hl.unbind("SUPER + ALT + S")
 o.bind("SUPER + ALT + S", "Toggle scratchpad", hl.dsp.workspace.toggle_special("scratchpad"))
 hl.unbind("SUPER + SHIFT + ALT + S")
 o.bind("SUPER + SHIFT + ALT + S", "Move window to scratchpad", hl.dsp.window.move({ workspace = "special:scratchpad", follow = false }))
+
+-- Fast, low-latency audio volume via Orbital's native controller
+if o.cmd_present("orbital-audio") then
+  hl.unbind("XF86AudioRaiseVolume")
+  hl.unbind("XF86AudioLowerVolume")
+  hl.unbind("XF86AudioMute")
+  o.bind("XF86AudioRaiseVolume", "Volume up", "orbital-audio raise", { locked = true, repeating = true })
+  o.bind("XF86AudioLowerVolume", "Volume down", "orbital-audio lower", { locked = true, repeating = true })
+  o.bind("XF86AudioMute", "Mute", "orbital-audio mute-toggle", { locked = true })
+end

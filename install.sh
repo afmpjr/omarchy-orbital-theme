@@ -48,16 +48,18 @@ OVERLAYS=(orbital.launcher orbital.account orbital.appearance orbital.worldclock
 LIBS=(orbital.ui)
 WIDGETS=("orbital.dock:left" "orbital.workspaces:center" "orbital.keyboard:right" "orbital.clock:right")
 EXTRA_WIDGETS=(orbital.divider)
+DOCTOR_ID="orbital.doctor"
 # service+overlay, not a bar widget: bundled because it is part of the Orbital lock screen.
 LOCKSCREEN=(orbital.lockscreen)
 BAR_IDS=(orbital.floating-bar orbital.bar)
 
-DRY=0 RESTART=1 BAR=0 UNINSTALL=0 FULL=0 KBLAYOUTS='' LAUNCHER_KEY=1 ALT_SHIFT=1 GESTURES=1 KEEP_BAR=0 WINDOWS_KEYS=0 REFRESH_THEME=0 THEME_TARGET='' TERM_FIX=0 ACTIVATE_THEME=0
+DRY=0 RESTART=1 BAR=0 UNINSTALL=0 FULL=0 KBLAYOUTS='' LAUNCHER_KEY=1 ALT_SHIFT=1 GESTURES=1 KEEP_BAR=0 WINDOWS_KEYS=0 REFRESH_THEME=0 THEME_TARGET='' TERM_FIX=0 ACTIVATE_THEME=0 DOCTOR=0
 while (( $# )); do
   a=$1; shift
   case $a in
     --dry-run) DRY=1 ;; --no-restart) RESTART=0 ;; --bar-widgets) BAR=1 ;; --full) FULL=1; BAR=1 ;;
     --no-launcher-key) LAUNCHER_KEY=0 ;; --no-alt-shift) ALT_SHIFT=0 ;; --no-gestures) GESTURES=0 ;; --keep-bar) KEEP_BAR=1 ;; --windows-keys) WINDOWS_KEYS=1 ;; --refresh-theme) REFRESH_THEME=1 ;;
+    --doctor) DOCTOR=1 ;; --no-doctor) DOCTOR=0 ;;
     --theme-dir) THEME_TARGET="${1:?--theme-dir needs a folder}"; shift ;; --fix-terminal-shortcuts) TERM_FIX=1 ;;
     --keyboard-layouts) KBLAYOUTS="${1:?--keyboard-layouts needs a list, e.g. us,br}"; shift ;; --uninstall) UNINSTALL=1 ;;
     --setup) exec "$REPO/bin/orbital-setup" ;;
@@ -94,8 +96,8 @@ guided_setup() {
   local UPGRADE=0
   orbital_detected && UPGRADE=1
   local -a selected_args=()
-  local -a full_options=('Super+S launcher' 'Alt+Shift layout switching' '4-finger workspace gestures' 'Free Ctrl+Enter in Ghostty')
-  local -a standard_options=('Windows-style shortcuts' 'Free Ctrl+Enter in Ghostty')
+  local -a full_options=('Super+S launcher' 'Alt+Shift layout switching' '4-finger workspace gestures' 'Free Ctrl+Enter in Ghostty' 'Health diagnostics (orbital.doctor)')
+  local -a standard_options=('Windows-style shortcuts' 'Free Ctrl+Enter in Ghostty' 'Health diagnostics (orbital.doctor)')
 
   if ! command -v gum >/dev/null 2>&1; then
     echo "This guided installer needs gum (included with Omarchy)." >&2
@@ -157,28 +159,34 @@ guided_setup() {
           (( ALT_SHIFT )) && selected+="${selected:+,}Alt+Shift layout switching"
           (( GESTURES )) && selected+="${selected:+,}4-finger workspace gestures"
           (( TERM_FIX )) && selected+="${selected:+,}Free Ctrl+Enter in Ghostty"
+          (( DOCTOR )) && selected+="${selected:+,}Health diagnostics (orbital.doctor)"
           selected_args=(); [[ -n $selected ]] && selected_args=(--selected "$selected")
-          choice="$(gum choose --no-limit --height 8 --header "$header" "${selected_args[@]}" "${full_options[@]}")" && status=0 || status=$?
+          choice="$(gum choose --no-limit --height 9 --header "$header" "${selected_args[@]}" "${full_options[@]}")" && status=0 || status=$?
         if (( status != 0 )); then ((step--)); continue; fi
           grep -qxF 'Super+S launcher' <<<"$choice"; LAUNCHER_KEY=$?
           grep -qxF 'Alt+Shift layout switching' <<<"$choice"; ALT_SHIFT=$?
           grep -qxF '4-finger workspace gestures' <<<"$choice"; GESTURES=$?
           grep -qxF 'Free Ctrl+Enter in Ghostty' <<<"$choice"; TERM_FIX=$?
+          grep -qxF 'Health diagnostics (orbital.doctor)' <<<"$choice"; DOCTOR=$?
           (( LAUNCHER_KEY == 0 )) && LAUNCHER_KEY=1 || LAUNCHER_KEY=0
           (( ALT_SHIFT == 0 )) && ALT_SHIFT=1 || ALT_SHIFT=0
           (( GESTURES == 0 )) && GESTURES=1 || GESTURES=0
           (( TERM_FIX == 0 )) && TERM_FIX=1 || TERM_FIX=0
+          (( DOCTOR == 0 )) && DOCTOR=1 || DOCTOR=0
         else
           selected=''
           (( WINDOWS_KEYS )) && selected='Windows-style shortcuts'
           (( TERM_FIX )) && selected+="${selected:+,}Free Ctrl+Enter in Ghostty"
+          (( DOCTOR )) && selected+="${selected:+,}Health diagnostics (orbital.doctor)"
           selected_args=(); [[ -n $selected ]] && selected_args=(--selected "$selected")
-          choice="$(gum choose --no-limit --height 6 --header "$header" "${selected_args[@]}" "${standard_options[@]}")" && status=0 || status=$?
+          choice="$(gum choose --no-limit --height 7 --header "$header" "${selected_args[@]}" "${standard_options[@]}")" && status=0 || status=$?
         if (( status != 0 )); then ((step--)); continue; fi
           grep -qxF 'Windows-style shortcuts' <<<"$choice"; WINDOWS_KEYS=$?
           grep -qxF 'Free Ctrl+Enter in Ghostty' <<<"$choice"; TERM_FIX=$?
+          grep -qxF 'Health diagnostics (orbital.doctor)' <<<"$choice"; DOCTOR=$?
           (( WINDOWS_KEYS == 0 )) && WINDOWS_KEYS=1 || WINDOWS_KEYS=0
           (( TERM_FIX == 0 )) && TERM_FIX=1 || TERM_FIX=0
+          (( DOCTOR == 0 )) && DOCTOR=1 || DOCTOR=0
         fi
         ;;
       3)
@@ -440,7 +448,7 @@ restore_shell_json() {
 
 uninstall() {
   say "Removing Orbital plugins, Hyprland hook and crash drop-in"
-  for id in "${OVERLAYS[@]}" "${LIBS[@]}" "${BAR_IDS[@]}" "${EXTRA_WIDGETS[@]}" "${WIDGETS[@]%%:*}" "${LOCKSCREEN[@]}" "$NOTIF_ID"; do
+  for id in "${OVERLAYS[@]}" "${LIBS[@]}" "${BAR_IDS[@]}" "${EXTRA_WIDGETS[@]}" "${WIDGETS[@]%%:*}" "${LOCKSCREEN[@]}" "$NOTIF_ID" "$DOCTOR_ID"; do
     have_omarchy && run omarchy plugin disable "$id" 2>/dev/null || true
     run rm -rf "$PLUGINS/$id"
   done
@@ -464,6 +472,7 @@ uninstall() {
   run rm -f "$DROPIN/orbital.conf"
   run rm -f "$HOME/.local/state/omarchy/orbital-widgets-lock"
   run rm -f "$HOME/.local/share/applications/orbital-settings.desktop"
+  run rm -f "$HOME/.local/bin/orbital-audio"
   # Complete removal: switch themes, drop the Orbital copy, put shell.json back.
   if [[ -d $THEME_DIR ]] || omarchy theme list 2>/dev/null | grep -qi '^orbital$'; then
     local replacement=""
@@ -519,6 +528,7 @@ desktop_id() { # first installed .desktop among candidates
 NOTIF_ID="orbital.notifications"
 LEGACY_NOTIF_ID="jankeesvw.notification-center"
 bell_present() { [[ -d $PLUGINS/$NOTIF_ID ]]; }
+doctor_present() { [[ -d $PLUGINS/$DOCTOR_ID ]]; }
 ensure_notification_bell() {
   if bell_present; then return 0; fi
   warn "the notification bell ($NOTIF_ID) is not installed; the bar is written without it"
@@ -572,7 +582,10 @@ full_shell_json() {
   run cp "$sj" "$sj.bak-orbital-$STAMP"
   if (( DRY )); then return 0; fi
   tmp="$(mktemp)"
-  if ! jq --argjson keep "$( (( KEEP_BAR )) && echo true || echo false )" --argjson bell "$( bell_present && echo true || echo false )" --arg bellid "$NOTIF_ID" --arg legacyid "$LEGACY_NOTIF_ID" '
+  if ! jq --argjson keep "$( (( KEEP_BAR )) && echo true || echo false )" \
+          --argjson bell "$( bell_present && echo true || echo false )" \
+          --argjson doc "$( (( DOCTOR )) && doctor_present && echo true || echo false )" \
+          --arg bellid "$NOTIF_ID" --arg docid "$DOCTOR_ID" --arg legacyid "$LEGACY_NOTIF_ID" '
       .bar = (.bar // {}) |
       (if $keep then . else
         .bar.id = "orbital.floating-bar" | .bar.position = "bottom" | .bar.transparent = false |
@@ -588,9 +601,10 @@ full_shell_json() {
         right:  ( ($right | map(select(.id == "omarchy.tray")))
                 + $ind
                  + ($right | map(select(.id != "omarchy.tray" and .id != "omarchy.indicators"
-                                         and .id != "orbital.divider" and .id != "orbital.keyboard" and .id != "orbital.clock" and .id != "omarchy.clock" and .id != $bellid and .id != $legacyid)))
+                                         and .id != "orbital.divider" and .id != "orbital.keyboard" and .id != "orbital.clock" and .id != "omarchy.clock" and .id != $bellid and .id != $legacyid and .id != $docid)))
                 + [{id: "orbital.keyboard"}, {id: "orbital.divider"},
                    {id: "orbital.clock", format: "HH:mm", formatAlt: "d MMMM '"'"'W'"'"'ww yyyy", verticalFormat: "HH\n—\nmm"}]
+                + (if $doc then [{id: $docid}] else [] end)
                 + (if $bell then [{id: $bellid}] else [] end) )
       }
     ' "$sj" > "$tmp"; then
@@ -1035,6 +1049,9 @@ apply_enable() {
   elif in_bar "$NOTIF_ID"; then
     warn "the bar names $NOTIF_ID but it is not installed; the bell stays empty"
   fi
+  if (( DOCTOR )) && doctor_present; then
+    enable_best_effort "$DOCTOR_ID" || true
+  fi
   # The theme ships its own bar, so use it: without this the plugins install but the user keeps
   # Omarchy's stock bar. Reverting is one command, printed below.
   TOUCHED_SHELL_JSON=1
@@ -1059,10 +1076,14 @@ apply_enable() {
   if (( FULL )); then echo "    Bar layout already written by --full."; return 0; fi
   if (( DRY )); then
     for w in "${WIDGETS[@]}" "${EXTRA_WIDGETS[@]}"; do echo "    [dry-run] place ${w%%:*} in the bar (${w##*:})"; done
+    (( DOCTOR )) && doctor_present && echo "    [dry-run] place $DOCTOR_ID in the bar (right)"
     return 0
   fi
   for w in "${WIDGETS[@]}"; do place_verified "${w%%:*}" "${w##*:}" || return 1; done
   for id in "${EXTRA_WIDGETS[@]}"; do place_verified "$id" right || return 1; done
+  if (( DOCTOR )) && doctor_present; then
+    place_verified "$DOCTOR_ID" right || return 1
+  fi
   # `enable --section` inserts at the START of a section; right-hand widgets belong at the end
   # (keyboard, divider, clock), so move them there.
   local n; n="$(jq '.bar.layout.right | length' "$SJ" 2>/dev/null || echo 0)"
@@ -1113,11 +1134,28 @@ install_settings_desktop() {
   cp "$REPO/orbital-settings.desktop" "$dst" || { problem "could not install the settings menu entry"; return 1; }
 }
 
+# Fast audio controller for Fn+volume shortcuts.
+install_audio_controller() {
+  local src="$REPO/bin/orbital-audio"
+  local dst="$HOME/.local/bin/orbital-audio"
+  [[ -f $src ]] || return 0
+  say "Fast audio controller ($dst)"
+  if (( DRY )); then
+    echo "    [dry-run] install $src -> $dst"
+    return 0
+  fi
+  ensure_dir "$HOME/.local/bin" || { problem "could not create $HOME/.local/bin"; return 1; }
+  snapshot "$dst"
+  cp "$src" "$dst" || { problem "could not install orbital-audio"; return 1; }
+  chmod +x "$dst" || true
+}
+
 apply_extras() {
   if (( FULL )); then full_setup || return 1; elif (( TERM_FIX )); then terminal_shortcuts || return 1; fi
   windows_keys_setup || return 1
   widgets_lock_setup || return 1
   install_settings_desktop || return 1
+  install_audio_controller || return 1
   (( DRY )) || hyprctl reload >/dev/null 2>&1 || warn "'hyprctl reload' did not answer; the new glass/borders load on the next Hyprland reload"
 }
 
@@ -1138,6 +1176,7 @@ verify_all() {
   local try missing
   local -a need=("${OVERLAYS[@]}" "${LOCKSCREEN[@]}")
   (( BAR )) && need+=("${EXTRA_WIDGETS[@]}" "${WIDGETS[@]%%:*}")
+  (( DOCTOR )) && need+=("$DOCTOR_ID")
   for try in $(seq 1 15); do
     list="$(omarchy plugin list 2>/dev/null || true)"; missing=()
     for id in "${need[@]}"; do

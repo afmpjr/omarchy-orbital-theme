@@ -100,6 +100,35 @@ Panel {
     root.controller.hide()
   }
 
+  function activateNotification(entry) {
+    if (!entry) return
+
+    // 1. Mark as read
+    if (root.hostWidget && typeof root.hostWidget.markRead === "function") {
+      root.hostWidget.markRead(entry.key)
+    }
+
+    // 2. Check for URL in body or summary
+    var text = String((entry.body || "") + " " + (entry.summary || ""))
+    var matchUrl = text.match(/https?:\/\/[^\s<>"']+/)
+    if (matchUrl && matchUrl[0]) {
+      Quickshell.execDetached(["xdg-open", matchUrl[0]])
+      root.close()
+      return
+    }
+
+    // 3. Focus app window or launch app
+    var appName = String(entry.app || "").trim()
+    if (appName.length > 0) {
+      Quickshell.execDetached(["omarchy-launch-or-focus", appName])
+      root.close()
+      return
+    }
+
+    // 4. Fallback: close panel
+    root.close()
+  }
+
   function toggle() {
     if (root.opened) root.close()
     else root.open()
@@ -381,6 +410,13 @@ Panel {
                   tint: root.contentForeground
                   opacity: rowUnread ? 1.0 : 0.55
                 }
+
+                MouseArea {
+                  anchors.fill: parent
+                  hoverEnabled: true
+                  cursorShape: Qt.PointingHandCursor
+                  onClicked: root.activateNotification(modelData)
+                }
               }
 
               Item {
@@ -429,15 +465,15 @@ Panel {
                   }
                 }
 
-                // Clicking the body marks an unread row read; read rows keep
-                // the default cursor so the control reads as already settled.
+                // Clicking the body activates the notification: focuses app or opens link,
+                // marks row read, and closes panel.
                 MouseArea {
                   id: bodyMouse
                   anchors.fill: parent
                   hoverEnabled: true
-                  cursorShape: rowUnread ? Qt.PointingHandCursor : Qt.ArrowCursor
+                  cursorShape: Qt.PointingHandCursor
                   onClicked: {
-                    if (rowUnread) toggleRowRead()
+                    root.activateNotification(modelData)
                   }
                 }
               }
@@ -454,6 +490,13 @@ Panel {
                   fillMode: Image.PreserveAspectCrop
                   asynchronous: true
                   cache: true
+                }
+
+                MouseArea {
+                  anchors.fill: parent
+                  hoverEnabled: true
+                  cursorShape: Qt.PointingHandCursor
+                  onClicked: root.activateNotification(modelData)
                 }
               }
 

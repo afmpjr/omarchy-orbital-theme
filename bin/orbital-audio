@@ -1,0 +1,72 @@
+#!/usr/bin/env bash
+# orbital:summary=Fast, low-latency audio output volume and mute controller for Orbital theme
+# orbital:args=<raise|lower|mute-toggle|+N|-N>
+
+set -euo pipefail
+
+action="${1:-}"
+
+if [[ -z $action ]]; then
+  echo "Usage: orbital-audio <raise|lower|mute-toggle|+N|-N>" >&2
+  exit 1
+fi
+
+# Fallback to standard omarchy-audio-output-volume if wpctl is unavailable
+if ! command -v wpctl >/dev/null 2>&1; then
+  exec omarchy-audio-output-volume "$action"
+fi
+
+step="5%"
+
+case "$action" in
+  raise)
+    wpctl set-volume -l 1.0 @DEFAULT_AUDIO_SINK@ "${step}+"
+    ;;
+  lower)
+    wpctl set-volume -l 1.0 @DEFAULT_AUDIO_SINK@ "${step}-"
+    ;;
+  mute-toggle)
+    # Debounce rapid mute bounces (200ms)
+    runtime_dir="${XDG_RUNTIME_DIR:-/tmp}"
+    debounce_file="$runtime_dir/orbital-audio-mute-toggle.last"
+    now=$(date +%s%3N 2>/dev/null || date +%s)
+    last=0
+    [[ -r $debounce_file ]] && read -r last <"$debounce_file" || true
+    if ((now - last < 200)); then
+      exit 0
+    fi
+    printf '%s\n' "$now" >"$debounce_file"
+    wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle
+    ;;
+  +*)
+    val="${action#+}"
+    wpctl set-volume -l 1.0 @DEFAULT_AUDIO_SINK@ "${val}%+"
+    ;;
+  -*)
+    val="${action#-}"
+    wpctl set-volume -l 1.0 @DEFAULT_AUDIO_SINK@ "${val}%-"
+    ;;
+  *)
+    echo "Unknown volume action: $action" >&2
+    exit 1
+    ;;
+esac
+
+# Read current state rapidly
+vol_info=$(wpctl get-volume @DEFAULT_AUDIO_SINK@ 2>/dev/null || true)
+read -r _ vol muted <<<"${vol_info}"
+
+percent=$(awk -v v="${vol:-0}" 'BEGIN { printf "%d", (v * 100) + 0.5 }')
+((percent <= 100)) || percent=100
+((percent >= 0)) || percent=0
+
+if [[ -n $muted || ${percent:-0} -eq 0 ]]; then
+  icon="volume-muted"
+else
+  icon="volume-high"
+fi
+
+# Show OSD asynchronously in detached background process so keyboard returns instantly (<15ms)
+if command -v omarchy-osd >/dev/null 2>&1; then
+  (omarchy-osd -i "$icon" -p "${percent:-0}" >/dev/null 2>&1 &)
+fi

@@ -52,3 +52,13 @@ hl.animation({ leaf = "layers", enabled = true, speed = 3, bezier = "orbitalSnap
 -- With workspace_wraparound on, Hyprland treats "first -> a later workspace"
 -- as a wrap and reverses the slide; off keeps the direction consistent.
 hl.config({ animations = { workspace_wraparound = false } })
+
+-- Fast, low-latency audio volume via Orbital's native controller (<15ms)
+if o.cmd_present("orbital-audio") then
+  hl.unbind("XF86AudioRaiseVolume")
+  hl.unbind("XF86AudioLowerVolume")
+  hl.unbind("XF86AudioMute")
+  o.bind("XF86AudioRaiseVolume", "Volume up", "orbital-audio raise", { locked = true, repeating = true })
+  o.bind("XF86AudioLowerVolume", "Volume down", "orbital-audio lower", { locked = true, repeating = true })
+  o.bind("XF86AudioMute", "Mute", "orbital-audio mute-toggle", { locked = true })
+end
