@@ -51,6 +51,10 @@ BarWidget {
     if (panelLoader.item) panelLoader.item.toggle()
   }
 
+  function reload() {
+    stateFile.reload()
+  }
+
   function closeForPopoutSwitch() {
     if (panelLoader.item && typeof panelLoader.item.closeForPopoutSwitch === "function") {
       panelLoader.item.closeForPopoutSwitch()

@@ -63,6 +63,29 @@ Panel {
     command: []
   }
 
+  property bool isSanitizing: false
+
+  Process {
+    id: sanitizerProc
+    command: ["/mnt/dados/projects/omarchy-orbital-theme/scripts/sanitize-station.sh"]
+    onStarted: {
+      root.isSanitizing = true
+    }
+    onExited: function(exitCode, exitStatus) {
+      root.isSanitizing = false
+      if (root.hostWidget && typeof root.hostWidget.reload === "function") {
+        root.hostWidget.reload()
+      }
+    }
+  }
+
+  function startBackgroundSanitization() {
+    if (root.isSanitizing) return
+    root.isSanitizing = true
+    sanitizerProc.running = false
+    sanitizerProc.running = true
+  }
+
   OrbitalUi.OrbitalTokens { id: tokens }
 
   KeyboardPanel {
@@ -75,7 +98,7 @@ Panel {
     focusTarget: keyCatcher
 
     contentWidth: panel.fittedContentWidth(Style.space(440))
-    contentHeight: panel.fittedContentHeight(Math.min(Style.space(580), scrollColumn.implicitHeight + tokens.padding * 2))
+    contentHeight: panel.fittedContentHeight(Math.min(Style.space(700), scrollColumn.implicitHeight + tokens.padding * 2))
 
     Item {
       id: keyCatcher
@@ -214,56 +237,87 @@ Panel {
               font.letterSpacing: 0.5
             }
 
-            // Disk Section
-            Column {
+            // Disk Section (Clickable: Opens Full Storage Inspection)
+            Rectangle {
+              id: diskSectionBox
               width: parent.width
-              spacing: Style.space(4)
+              height: Style.space(38)
+              radius: Style.space(6)
+              color: mouseDisk.containsMouse ? Qt.rgba(255, 255, 255, 0.05) : "transparent"
+              border.color: mouseDisk.containsMouse ? Qt.rgba(255, 255, 255, 0.16) : "transparent"
+              border.width: 1
 
               readonly property var diskData: (root.doctorState && root.doctorState.metrics && root.doctorState.metrics.disk)
                 ? root.doctorState.metrics.disk : null
               readonly property real diskPct: diskData && typeof diskData.percent_used === "number" ? diskData.percent_used : 0
 
-              Item {
-                width: parent.width
-                height: 18
-
-                Text {
-                  anchors.left: parent.left
-                  anchors.verticalCenter: parent.verticalCenter
-                  text: "Disco Raiz (/)"
-                  color: "#F4F8FF"
-                  font.family: tokens.fontFamily
-                  font.pixelSize: 12
-                }
-
-                Text {
-                  anchors.right: parent.right
-                  anchors.verticalCenter: parent.verticalCenter
-                  text: {
-                    if (!parent.parent.diskData) return "N/D"
-                    var used = Model.formatBytes(parent.parent.diskData.used_bytes)
-                    var tot = Model.formatBytes(parent.parent.diskData.total_bytes)
-                    var pct = Model.formatPercent(parent.parent.diskPct)
-                    return used + " / " + tot + " (" + pct + ")"
-                  }
-                  color: "#91A4BB"
-                  font.family: "JetBrainsMono Nerd Font, monospace"
-                  font.pixelSize: 11
-                }
+              MouseArea {
+                id: mouseDisk
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: root.runTerminalCommand("omarchy-doctor scan --full")
               }
 
-              // Disk Progress Track
-              Rectangle {
-                width: parent.width
-                height: 6
-                radius: 3
-                color: Qt.rgba(255, 255, 255, 0.08)
+              Column {
+                anchors.fill: parent
+                anchors.margins: Style.space(4)
+                spacing: Style.space(4)
 
+                Item {
+                  width: parent.width
+                  height: 18
+
+                  Row {
+                    anchors.left: parent.left
+                    anchors.verticalCenter: parent.verticalCenter
+                    spacing: Style.space(6)
+
+                    Text {
+                      text: "Disco Raiz (/)"
+                      color: mouseDisk.containsMouse ? "#FFFFFF" : "#F4F8FF"
+                      font.family: tokens.fontFamily
+                      font.pixelSize: 12
+                      font.bold: mouseDisk.containsMouse
+                    }
+
+                    OrbitalUi.OrbitalIcon {
+                      size: 12
+                      name: "view-more-symbolic"
+                      tint: mouseDisk.containsMouse ? "#39A9FF" : Qt.rgba(255, 255, 255, 0.25)
+                      anchors.verticalCenter: parent.verticalCenter
+                    }
+                  }
+
+                  Text {
+                    anchors.right: parent.right
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: {
+                      if (!diskSectionBox.diskData) return "N/D"
+                      var used = Model.formatBytes(diskSectionBox.diskData.used_bytes)
+                      var tot = Model.formatBytes(diskSectionBox.diskData.total_bytes)
+                      var pct = Model.formatPercent(diskSectionBox.diskPct)
+                      return used + " / " + tot + " (" + pct + ")"
+                    }
+                    color: mouseDisk.containsMouse ? "#FFFFFF" : "#91A4BB"
+                    font.family: "JetBrainsMono Nerd Font, monospace"
+                    font.pixelSize: 11
+                  }
+                }
+
+                // Disk Progress Track
                 Rectangle {
-                  height: parent.height
+                  width: parent.width
+                  height: 6
                   radius: 3
-                  width: Math.min(parent.width, Math.max(0, parent.width * (parent.parent.diskPct / 100.0)))
-                  color: Model.diskColor(parent.parent.diskPct, tokens)
+                  color: Qt.rgba(255, 255, 255, 0.08)
+
+                  Rectangle {
+                    height: parent.height
+                    radius: 3
+                    width: Math.min(parent.width, Math.max(0, parent.width * (diskSectionBox.diskPct / 100.0)))
+                    color: Model.diskColor(diskSectionBox.diskPct, tokens)
+                  }
                 }
               }
             }
@@ -593,15 +647,34 @@ Panel {
               font.letterSpacing: 0.5
             }
 
-            // Systemd Status Card
+            // Systemd Status Card (Clickable: Inspects / Resets Failed Units)
             readonly property var sysSummary: Model.systemdStatusSummary(root.doctorState ? root.doctorState.failed_units : [])
 
             Rectangle {
+              id: sysStatusBox
               width: parent.width
               height: Style.space(32)
               radius: Style.space(6)
-              color: parent.sysSummary.ok ? Qt.rgba(123, 194, 154, 0.08) : Qt.rgba(232, 106, 106, 0.14)
-              border.color: parent.sysSummary.ok ? Qt.rgba(123, 194, 154, 0.25) : Qt.rgba(232, 106, 106, 0.45)
+              color: mouseSys.containsMouse
+                ? (parent.sysSummary.ok ? Qt.rgba(123, 194, 154, 0.16) : Qt.rgba(232, 106, 106, 0.24))
+                : (parent.sysSummary.ok ? Qt.rgba(123, 194, 154, 0.08) : Qt.rgba(232, 106, 106, 0.14))
+              border.color: mouseSys.containsMouse
+                ? (parent.sysSummary.ok ? "#7BC29A" : "#FF8A8A")
+                : (parent.sysSummary.ok ? Qt.rgba(123, 194, 154, 0.25) : Qt.rgba(232, 106, 106, 0.45))
+
+              MouseArea {
+                id: mouseSys
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: {
+                  if (parent.parent.sysSummary.ok) {
+                    root.runTerminalCommand("systemctl --no-pager; echo ''; read -n 1 -s -r -p 'Pressione qualquer tecla para fechar...'")
+                  } else {
+                    root.runTerminalCommand("systemctl --failed --no-pager; echo ''; systemctl --user --failed --no-pager; echo ''; echo 'Deseja executar reset-failed? Pressione [r] para confirmar ou qualquer outra tecla para sair:'; read -n 1 -r key; echo ''; if [[ $key == 'r' || $key == 'R' ]]; then sudo systemctl reset-failed; systemctl --user reset-failed; echo 'Reset concluido!'; sleep 1; fi")
+                  }
+                }
+              }
 
               Row {
                 anchors.fill: parent
@@ -616,7 +689,7 @@ Panel {
                 }
 
                 Text {
-                  text: parent.parent.parent.sysSummary.text
+                  text: parent.parent.parent.sysSummary.text + (parent.parent.parent.sysSummary.ok ? "" : " • Clique para agir")
                   color: parent.parent.parent.sysSummary.ok ? "#7BC29A" : "#FF8A8A"
                   font.family: tokens.fontFamily
                   font.pixelSize: 11
@@ -671,99 +744,149 @@ Panel {
           }
 
           // -------------------------------------------------------------
-          // Bloco 5: Footer & Atalhos de Ação Segura (Terminal Dedicado)
-          // STRICT RULE: No direct cleanups in GUI. Safe terminal shortcuts only.
+          // Bloco 5: Footer & Ações Efetivas da Estação (Sob-Demanda)
           // -------------------------------------------------------------
-          Row {
+          Column {
             width: parent.width
-            spacing: Style.space(10)
+            spacing: Style.space(8)
 
-            // Button 1: Abrir Relatório (Scan Full in Terminal)
+            // Button 0: Limpar Agora (Destaque — Saneamento Seguro em Segundo Plano)
             Rectangle {
-              id: btnReport
-              width: (parent.width - Style.space(10)) / 2
+              id: btnCleanNow
+              width: parent.width
               height: Style.space(36)
               radius: Style.space(8)
-              color: mouseReport.containsMouse ? Qt.rgba(255, 255, 255, 0.10) : Qt.rgba(255, 255, 255, 0.06)
-              border.color: btnReport.activeFocus ? "#39A9FF" : (mouseReport.containsMouse ? Qt.rgba(255, 255, 255, 0.28) : Qt.rgba(255, 255, 255, 0.16))
-              border.width: btnReport.activeFocus ? 2 : 1
+              color: root.isSanitizing ? Qt.rgba(57, 169, 255, 0.20) : (mouseCleanNow.containsMouse ? "#4DB3FF" : "#39A9FF")
+              border.color: btnCleanNow.activeFocus ? "#FFFFFF" : Qt.rgba(255, 255, 255, 0.40)
+              border.width: btnCleanNow.activeFocus ? 2 : 1
               activeFocusOnTab: true
 
-              Keys.onReturnPressed: root.runTerminalCommand("omarchy-doctor scan --full")
-              Keys.onEnterPressed: root.runTerminalCommand("omarchy-doctor scan --full")
-              Keys.onSpacePressed: root.runTerminalCommand("omarchy-doctor scan --full")
+              Keys.onReturnPressed: root.startBackgroundSanitization()
+              Keys.onEnterPressed: root.startBackgroundSanitization()
+              Keys.onSpacePressed: root.startBackgroundSanitization()
 
               MouseArea {
-                id: mouseReport
+                id: mouseCleanNow
                 anchors.fill: parent
                 hoverEnabled: true
-                cursorShape: Qt.PointingHandCursor
-                onClicked: root.runTerminalCommand("omarchy-doctor scan --full")
+                cursorShape: root.isSanitizing ? Qt.WaitCursor : Qt.PointingHandCursor
+                onClicked: root.startBackgroundSanitization()
               }
 
               Row {
                 anchors.centerIn: parent
-                spacing: Style.space(6)
+                spacing: Style.space(8)
 
                 OrbitalUi.OrbitalIcon {
                   size: 16
-                  name: "text-x-generic-symbolic"
-                  tint: "#F4F8FF"
+                  name: root.isSanitizing ? "process-working-symbolic" : "emblem-default-symbolic"
+                  tint: "#FFFFFF"
                   anchors.verticalCenter: parent.verticalCenter
                 }
 
                 Text {
-                  text: "Abrir Relatório"
-                  color: "#F4F8FF"
+                  text: root.isSanitizing ? "Saneando Estação em Segundo Plano..." : "Limpar Agora (Saneamento Completo)"
+                  color: "#FFFFFF"
                   font.family: tokens.fontFamily
-                  font.pixelSize: 11
+                  font.pixelSize: 12
                   font.bold: true
                   anchors.verticalCenter: parent.verticalCenter
                 }
               }
             }
 
-            // Button 2: Simular Limpeza (Dry-Run in Terminal)
-            Rectangle {
-              id: btnDryRun
-              width: (parent.width - Style.space(10)) / 2
-              height: Style.space(36)
-              radius: Style.space(8)
-              color: mouseDryRun.containsMouse ? Qt.rgba(57, 169, 255, 0.26) : Qt.rgba(57, 169, 255, 0.16)
-              border.color: btnDryRun.activeFocus ? "#FFFFFF" : (mouseDryRun.containsMouse ? "#5BC0FF" : Qt.rgba(57, 169, 255, 0.55))
-              border.width: btnDryRun.activeFocus ? 2 : 1
-              activeFocusOnTab: true
+            // Secondary Buttons Row: Abrir Relatório & Simular Limpeza
+            Row {
+              width: parent.width
+              spacing: Style.space(10)
 
-              Keys.onReturnPressed: root.runTerminalCommand("omarchy-doctor fix --dry-run")
-              Keys.onEnterPressed: root.runTerminalCommand("omarchy-doctor fix --dry-run")
-              Keys.onSpacePressed: root.runTerminalCommand("omarchy-doctor fix --dry-run")
+              // Button 1: Abrir Relatório (Scan Full in Terminal)
+              Rectangle {
+                id: btnReport
+                width: (parent.width - Style.space(10)) / 2
+                height: Style.space(34)
+                radius: Style.space(8)
+                color: mouseReport.containsMouse ? Qt.rgba(255, 255, 255, 0.10) : Qt.rgba(255, 255, 255, 0.06)
+                border.color: btnReport.activeFocus ? "#39A9FF" : (mouseReport.containsMouse ? Qt.rgba(255, 255, 255, 0.28) : Qt.rgba(255, 255, 255, 0.16))
+                border.width: btnReport.activeFocus ? 2 : 1
+                activeFocusOnTab: true
 
-              MouseArea {
-                id: mouseDryRun
-                anchors.fill: parent
-                hoverEnabled: true
-                cursorShape: Qt.PointingHandCursor
-                onClicked: root.runTerminalCommand("omarchy-doctor fix --dry-run")
-              }
+                Keys.onReturnPressed: root.runTerminalCommand("omarchy-doctor scan --full")
+                Keys.onEnterPressed: root.runTerminalCommand("omarchy-doctor scan --full")
+                Keys.onSpacePressed: root.runTerminalCommand("omarchy-doctor scan --full")
 
-              Row {
-                anchors.centerIn: parent
-                spacing: Style.space(6)
-
-                OrbitalUi.OrbitalIcon {
-                  size: 16
-                  name: "system-run-symbolic"
-                  tint: "#FFFFFF"
-                  anchors.verticalCenter: parent.verticalCenter
+                MouseArea {
+                  id: mouseReport
+                  anchors.fill: parent
+                  hoverEnabled: true
+                  cursorShape: Qt.PointingHandCursor
+                  onClicked: root.runTerminalCommand("omarchy-doctor scan --full")
                 }
 
-                Text {
-                  text: "Simular Limpeza"
-                  color: "#FFFFFF"
-                  font.family: tokens.fontFamily
-                  font.pixelSize: 11
-                  font.bold: true
-                  anchors.verticalCenter: parent.verticalCenter
+                Row {
+                  anchors.centerIn: parent
+                  spacing: Style.space(6)
+
+                  OrbitalUi.OrbitalIcon {
+                    size: 16
+                    name: "text-x-generic-symbolic"
+                    tint: "#F4F8FF"
+                    anchors.verticalCenter: parent.verticalCenter
+                  }
+
+                  Text {
+                    text: "Abrir Relatório"
+                    color: "#F4F8FF"
+                    font.family: tokens.fontFamily
+                    font.pixelSize: 11
+                    font.bold: true
+                    anchors.verticalCenter: parent.verticalCenter
+                  }
+                }
+              }
+
+              // Button 2: Simular Limpeza (Dry-Run in Terminal)
+              Rectangle {
+                id: btnDryRun
+                width: (parent.width - Style.space(10)) / 2
+                height: Style.space(34)
+                radius: Style.space(8)
+                color: mouseDryRun.containsMouse ? Qt.rgba(57, 169, 255, 0.26) : Qt.rgba(57, 169, 255, 0.16)
+                border.color: btnDryRun.activeFocus ? "#FFFFFF" : (mouseDryRun.containsMouse ? "#5BC0FF" : Qt.rgba(57, 169, 255, 0.55))
+                border.width: btnDryRun.activeFocus ? 2 : 1
+                activeFocusOnTab: true
+
+                Keys.onReturnPressed: root.runTerminalCommand("omarchy-doctor fix --dry-run")
+                Keys.onEnterPressed: root.runTerminalCommand("omarchy-doctor fix --dry-run")
+                Keys.onSpacePressed: root.runTerminalCommand("omarchy-doctor fix --dry-run")
+
+                MouseArea {
+                  id: mouseDryRun
+                  anchors.fill: parent
+                  hoverEnabled: true
+                  cursorShape: Qt.PointingHandCursor
+                  onClicked: root.runTerminalCommand("omarchy-doctor fix --dry-run")
+                }
+
+                Row {
+                  anchors.centerIn: parent
+                  spacing: Style.space(6)
+
+                  OrbitalUi.OrbitalIcon {
+                    size: 16
+                    name: "system-run-symbolic"
+                    tint: "#FFFFFF"
+                    anchors.verticalCenter: parent.verticalCenter
+                  }
+
+                  Text {
+                    text: "Simular Limpeza"
+                    color: "#FFFFFF"
+                    font.family: tokens.fontFamily
+                    font.pixelSize: 11
+                    font.bold: true
+                    anchors.verticalCenter: parent.verticalCenter
+                  }
                 }
               }
             }
