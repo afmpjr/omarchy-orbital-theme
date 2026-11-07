@@ -66,26 +66,31 @@ selected-border-alpha = 0.9
 # Style.cornerRadius (mirrors Hyprland decoration:rounding). A plugin that
 # is missing or disabled cannot break another: each one only reads tokens.
 [menu]
-background = "#0A1422"
-background-alpha = 0.72
-text = "#F4F8FF"
-border = "rgba(255,255,255,0.16)"
+background = "#050C16"
+background-alpha = 0.88
+text = "#FFFFFF"
+border = "rgba(57,169,255,0.35)"
 border-width = 1
+selected-background = "#39A9FF"
+selected-background-alpha = 0.22
+selected-text = "#FFFFFF"
+selected-border = "#39A9FF"
+selected-border-alpha = 0.90
 
 [popups]
-background = "#0A1422"
-background-alpha = 0.72
-text = "#F4F8FF"
-border = "rgba(255,255,255,0.16)"
+background = "#050C16"
+background-alpha = 0.88
+text = "#FFFFFF"
+border = "rgba(57,169,255,0.35)"
 border-width = 1
 
 # Notification toasts read this section (NotificationCard). Same glass card as
 # the popups above, so toasts, launcher and modals share one look; the crash
 # glyph/countdown tint comes from Color.urgent / accent.
 [notifications]
-background = "#0A1422"
-background-alpha = 0.72
-text = "#F4F8FF"
-border = "rgba(255,255,255,0.16)"
+background = "#050C16"
+background-alpha = 0.88
+text = "#FFFFFF"
+border = "rgba(57,169,255,0.35)"
 border-width = 1
-countdown = "accent"
+countdown = "#39A9FF"

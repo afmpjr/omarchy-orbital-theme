@@ -108,8 +108,36 @@ Panel {
       root.hostWidget.markRead(entry.key)
     }
 
-    // 2. Check for URL in body or summary
-    var text = String((entry.body || "") + " " + (entry.summary || ""))
+    var summary = String(entry.summary || "")
+    var body = String(entry.body || "")
+    var text = summary + " " + body
+    var key = String(entry.key || "")
+
+    // 2. If history JSON exists with omarchy execArgv (e.g. tensaku screenshot editor), invoke it
+    if (key.length > 0) {
+      Quickshell.execDetached(["bash", "-c", '
+        hist="$HOME/.local/state/omarchy/notifications/history/' + key + '.json"
+        if [[ -f "$hist" ]]; then
+          cmd=$(jq -r ".execArgv // empty" "$hist" 2>/dev/null)
+          if [[ -n "$cmd" && "$cmd" != "null" ]]; then
+            parsed=$(python3 -c "import sys, json; args=json.loads(sys.argv[1]); [print(a) for a in args]" "$cmd" 2>/dev/null)
+            if [[ -n "$parsed" ]]; then
+              mapfile -t arr <<<"$parsed"
+              exec "${arr[@]}"
+            fi
+          fi
+        fi
+      '])
+    }
+
+    // 3. Fallback for screenshot toasts: open tensaku on the latest screenshot
+    if (summary.indexOf("Screenshot saved") !== -1 || body.indexOf("Screenshot saved") !== -1 || body.indexOf("tensaku-edit") !== -1) {
+      Quickshell.execDetached(["bash", "-lc", 'latest=$(ls -t ~/Pictures/screenshot-* 2>/dev/null | head -1); [[ -n "$latest" ]] && exec tensaku-edit "$latest"'])
+      root.close()
+      return
+    }
+
+    // 4. Check for URL in body or summary (e.g. WhatsApp, web links)
     var matchUrl = text.match(/https?:\/\/[^\s<>"']+/)
     if (matchUrl && matchUrl[0]) {
       Quickshell.execDetached(["xdg-open", matchUrl[0]])
@@ -117,15 +145,15 @@ Panel {
       return
     }
 
-    // 3. Focus app window or launch app
+    // 5. Focus app window or launch app (skipping non-app daemons)
     var appName = String(entry.app || "").trim()
-    if (appName.length > 0) {
+    if (appName.length > 0 && appName !== "omarchy-action" && appName !== "omarchy-doctor") {
       Quickshell.execDetached(["omarchy-launch-or-focus", appName])
       root.close()
       return
     }
 
-    // 4. Fallback: close panel
+    // 6. Fallback: close panel
     root.close()
   }
 

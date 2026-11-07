@@ -26,7 +26,6 @@ case "$action" in
     wpctl set-volume -l 1.0 @DEFAULT_AUDIO_SINK@ "${step}-"
     ;;
   mute-toggle)
-    # Debounce rapid mute bounces (200ms)
     runtime_dir="${XDG_RUNTIME_DIR:-/tmp}"
     debounce_file="$runtime_dir/orbital-audio-mute-toggle.last"
     now=$(date +%s%3N 2>/dev/null || date +%s)
@@ -52,21 +51,17 @@ case "$action" in
     ;;
 esac
 
-# Read current state rapidly
-vol_info=$(wpctl get-volume @DEFAULT_AUDIO_SINK@ 2>/dev/null || true)
-read -r _ vol muted <<<"${vol_info}"
-
-percent=$(awk -v v="${vol:-0}" 'BEGIN { printf "%d", (v * 100) + 0.5 }')
-((percent <= 100)) || percent=100
-((percent >= 0)) || percent=0
-
-if [[ -n $muted || ${percent:-0} -eq 0 ]]; then
-  icon="volume-muted"
-else
-  icon="volume-high"
-fi
-
-# Show OSD asynchronously in detached background process so keyboard returns instantly (<15ms)
-if command -v omarchy-osd >/dev/null 2>&1; then
-  (omarchy-osd -i "$icon" -p "${percent:-0}" >/dev/null 2>&1 &)
-fi
+# Dispatch OSD update completely detached in background (<15ms return for caller)
+setsid -f bash -c "
+  vol_info=\$(wpctl get-volume @DEFAULT_AUDIO_SINK@ 2>/dev/null || true)
+  read -r _ vol muted <<<\"\${vol_info}\"
+  percent=\$(awk -v v=\"\${vol:-0}\" 'BEGIN { printf \"%d\", (v * 100) + 0.5 }')
+  ((percent <= 100)) || percent=100
+  ((percent >= 0)) || percent=0
+  if [[ -n \$muted || \${percent:-0} -eq 0 ]]; then
+    icon=\"volume-muted\"
+  else
+    icon=\"volume-high\"
+  fi
+  qs ipc -n -p \"\${OMARCHY_PATH:-/usr/share/omarchy}/shell\" call -- osd show \"{\\\"icon\\\":\\\"\$icon\\\",\\\"value\\\":\$percent}\" >/dev/null 2>&1 || omarchy-osd -i \"\$icon\" -p \"\$percent\" >/dev/null 2>&1
+" </dev/null >/dev/null 2>&1
