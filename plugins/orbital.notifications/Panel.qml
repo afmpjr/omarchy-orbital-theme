@@ -151,17 +151,35 @@ Panel {
       return
     }
 
-    // 4. Application notification: focus existing window or launch app
-    if (appName.length > 0 && appName !== "omarchy-action" && appName !== "omarchy-doctor") {
-      Quickshell.execDetached(["omarchy-launch-or-focus", appName])
+    // 4. Omarchy Doctor notification: open doctor diagnostics panel
+    if (appName.match(/doctor/i) || text.match(/omarchy-doctor/i)) {
+      Quickshell.execDetached(["omarchy-shell", "orbital.doctor", "open"])
       root.close()
       return
     }
 
-    // 5. Explicit external URL link (only for generic/non-browser notifications)
+    // 5. System internal notifications: close panel cleanly without launching dummy commands
+    if (appName === "omarchy-action" || appName === "omarchy" || appName.startsWith("omarchy-")) {
+      root.close()
+      return
+    }
+
+    // 6. Explicit external URL link (only for generic/non-browser notifications)
     var matchUrl = text.match(/https?:\/\/[^\s<>"']+/)
     if (matchUrl && matchUrl[0]) {
       Quickshell.execDetached(["xdg-open", matchUrl[0]])
+      root.close()
+      return
+    }
+
+    // 7. Application notification: focus existing window or launch app safely
+    if (appName.length > 0) {
+      var targetPattern = appName
+      if (appName.match(/chrome/i)) targetPattern = "google-chrome"
+      else if (appName.match(/code/i)) targetPattern = "code"
+      else if (appName.match(/terminal|foot/i)) targetPattern = "foot"
+
+      Quickshell.execDetached(["omarchy-launch-or-focus", targetPattern])
       root.close()
       return
     }
