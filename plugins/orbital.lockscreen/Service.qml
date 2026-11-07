@@ -1291,7 +1291,11 @@ echo "$out"
     path: root.stateHome + "/omarchy/current/theme.name"
     watchChanges: true
     printErrors: false
-    onLoaded: { root.bootCurrentTheme = String(text()).trim(); root.maybeResyncBoot() }
+    onLoaded: {
+      root.bootCurrentTheme = String(text()).trim()
+      root.maybeResyncBoot()
+      root.refreshBootPreviews()
+    }
     onLoadFailed: root.bootCurrentTheme = ""
     onFileChanged: reload()
   }

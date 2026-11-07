@@ -194,7 +194,9 @@ Item {
   readonly property string bootCurrentTheme: service && service.bootCurrentTheme !== undefined ? service.bootCurrentTheme : ""
 
   function bootCardPreview(id) {
+    if (!bootCurrentTheme || !id) return ""
     var fileId = String(id).split(":").join("-")
+    if (fileId === "custom-" || fileId.endsWith("-")) return ""
     return "file://" + Quickshell.env("HOME") + "/.local/state/omarchy/lock-explorer-boot-previews/" + fileId + "-" + bootCurrentTheme + ".png?v=" + bootPreviewsVersion
   }
 
@@ -2141,7 +2143,9 @@ Item {
                         Image {
                           id: editorLockPreview
                           anchors.fill: parent; anchors.margins: 1
-                          source: "file://" + Quickshell.env("HOME") + "/.local/state/omarchy/lock-explorer-boot-previews/custom-" + root.bootEditing + "-lock-" + root.bootCurrentTheme + ".png?v=" + root.bootPreviewsVersion
+                          source: (root.bootEditing.length > 0 && root.bootCurrentTheme.length > 0)
+                            ? ("file://" + Quickshell.env("HOME") + "/.local/state/omarchy/lock-explorer-boot-previews/custom-" + root.bootEditing + "-lock-" + root.bootCurrentTheme + ".png?v=" + root.bootPreviewsVersion)
+                            : ""
                           fillMode: Image.PreserveAspectCrop
                           asynchronous: true
                           cache: false
