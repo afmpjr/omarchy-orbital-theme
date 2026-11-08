@@ -55,6 +55,7 @@ var pt = {
   // Action Buttons
   "Clean Now (Full Sanitization)": "Limpar Agora (Saneamento Completo)",
   "Cleaning Station in Background...": "Saneando Estação em Segundo Plano...",
+  "Diagnose with AI": "Diagnosticar com IA",
   "Open Report": "Abrir Relatório",
   "Simulate Cleanup": "Simular Limpeza",
 

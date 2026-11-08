@@ -791,6 +791,51 @@ Panel {
               }
             }
 
+            // Button 1: Diagnosticar com IA (Ação Inteligente com Agente Padrão)
+            Rectangle {
+              id: btnDiagnose
+              width: parent.width
+              height: Style.space(34)
+              radius: Style.space(8)
+              color: mouseDiagnose.containsMouse ? Qt.rgba(57, 169, 255, 0.22) : Qt.rgba(57, 169, 255, 0.12)
+              border.color: btnDiagnose.activeFocus ? "#FFFFFF" : (mouseDiagnose.containsMouse ? "#5BC0FF" : Qt.rgba(57, 169, 255, 0.45))
+              border.width: btnDiagnose.activeFocus ? 2 : 1
+              activeFocusOnTab: true
+
+              Keys.onReturnPressed: root.runTerminalCommand("omarchy-agent-doctor")
+              Keys.onEnterPressed: root.runTerminalCommand("omarchy-agent-doctor")
+              Keys.onSpacePressed: root.runTerminalCommand("omarchy-agent-doctor")
+
+              MouseArea {
+                id: mouseDiagnose
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: root.runTerminalCommand("omarchy-agent-doctor")
+              }
+
+              Row {
+                anchors.centerIn: parent
+                spacing: Style.space(8)
+
+                OrbitalUi.OrbitalIcon {
+                  size: 16
+                  name: "system-search-symbolic"
+                  tint: "#39A9FF"
+                  anchors.verticalCenter: parent.verticalCenter
+                }
+
+                Text {
+                  text: I18n.t("Diagnose with AI")
+                  color: "#FFFFFF"
+                  font.family: tokens.fontFamily
+                  font.pixelSize: 12
+                  font.bold: true
+                  anchors.verticalCenter: parent.verticalCenter
+                }
+              }
+            }
+
             // Secondary Buttons Row: Abrir Relatório & Simular Limpeza
             Row {
               width: parent.width
@@ -807,16 +852,16 @@ Panel {
                 border.width: btnReport.activeFocus ? 2 : 1
                 activeFocusOnTab: true
 
-                Keys.onReturnPressed: root.runTerminalCommand("omarchy-doctor scan --full")
-                Keys.onEnterPressed: root.runTerminalCommand("omarchy-doctor scan --full")
-                Keys.onSpacePressed: root.runTerminalCommand("omarchy-doctor scan --full")
+                Keys.onReturnPressed: root.runTerminalCommand("omarchy-doctor-view scan --full")
+                Keys.onEnterPressed: root.runTerminalCommand("omarchy-doctor-view scan --full")
+                Keys.onSpacePressed: root.runTerminalCommand("omarchy-doctor-view scan --full")
 
                 MouseArea {
                   id: mouseReport
                   anchors.fill: parent
                   hoverEnabled: true
                   cursorShape: Qt.PointingHandCursor
-                  onClicked: root.runTerminalCommand("omarchy-doctor scan --full")
+                  onClicked: root.runTerminalCommand("omarchy-doctor-view scan --full")
                 }
 
                 Row {
