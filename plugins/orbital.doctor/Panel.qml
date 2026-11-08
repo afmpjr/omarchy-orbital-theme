@@ -60,10 +60,16 @@ Panel {
     }
   }
 
+  // Dynamic resolution of doctor helper scripts across installed plugins, PATH, and dev fallback
+  function resolveDoctorScriptCmd(scriptName, args) {
+    var extra = args ? " " + args : ""
+    return 'cmd=$(p="$HOME/.config/omarchy/plugins/orbital.doctor/' + scriptName + '"; if [[ -x "$p" ]]; then echo "$p"; elif command -v ' + scriptName + ' >/dev/null 2>&1; then command -v ' + scriptName + '; elif [[ -x "/mnt/dados/projects/omarchy-orbital-theme/scripts/' + scriptName + '" ]]; then echo "/mnt/dados/projects/omarchy-orbital-theme/scripts/' + scriptName + '"; else echo "' + scriptName + '"; fi); exec "$cmd"' + extra
+  }
+
   // Direct AI agent diagnosis launch (exact orbital.crash pattern: Quickshell.execDetached without intermediary presentation terminal)
   function diagnoseWithAi() {
     root.close()
-    Quickshell.execDetached(["omarchy-agent-doctor"])
+    Quickshell.execDetached(["bash", "-c", root.resolveDoctorScriptCmd("omarchy-agent-doctor.sh")])
   }
 
   Process {
@@ -75,7 +81,7 @@ Panel {
 
   Process {
     id: sanitizerProc
-    command: ["/mnt/dados/projects/omarchy-orbital-theme/scripts/sanitize-station.sh"]
+    command: ["bash", "-c", root.resolveDoctorScriptCmd("sanitize-station.sh")]
     onStarted: {
       root.isSanitizing = true
     }
@@ -675,7 +681,7 @@ Panel {
                 anchors.fill: parent
                 hoverEnabled: true
                 cursorShape: Qt.PointingHandCursor
-                onClicked: root.runTerminalCommand("/mnt/dados/projects/omarchy-orbital-theme/scripts/systemd-inspector.sh")
+                onClicked: root.runTerminalCommand(root.resolveDoctorScriptCmd("systemd-inspector.sh"))
               }
 
               Row {
@@ -858,16 +864,16 @@ Panel {
                 border.width: btnReport.activeFocus ? 2 : 1
                 activeFocusOnTab: true
 
-                Keys.onReturnPressed: root.runTerminalCommand("omarchy-doctor-view scan --full")
-                Keys.onEnterPressed: root.runTerminalCommand("omarchy-doctor-view scan --full")
-                Keys.onSpacePressed: root.runTerminalCommand("omarchy-doctor-view scan --full")
+                Keys.onReturnPressed: root.runTerminalCommand(root.resolveDoctorScriptCmd("omarchy-doctor-view.sh", "scan --full"))
+                Keys.onEnterPressed: root.runTerminalCommand(root.resolveDoctorScriptCmd("omarchy-doctor-view.sh", "scan --full"))
+                Keys.onSpacePressed: root.runTerminalCommand(root.resolveDoctorScriptCmd("omarchy-doctor-view.sh", "scan --full"))
 
                 MouseArea {
                   id: mouseReport
                   anchors.fill: parent
                   hoverEnabled: true
                   cursorShape: Qt.PointingHandCursor
-                  onClicked: root.runTerminalCommand("omarchy-doctor-view scan --full")
+                  onClicked: root.runTerminalCommand(root.resolveDoctorScriptCmd("omarchy-doctor-view.sh", "scan --full"))
                 }
 
                 Row {

@@ -832,7 +832,7 @@ apply_plugins() {
       snapshot "$PLUGINS/$id"
       cp -r "$d" "$PLUGINS/$id" || { problem "could not copy plugins/$id into $PLUGINS"; return 1; }
     fi
-    chmod +x "$PLUGINS/$id"/orbital-* 2>/dev/null || true
+    chmod +x "$PLUGINS/$id"/orbital-* "$PLUGINS/$id"/omarchy-* "$PLUGINS/$id"/*.sh 2>/dev/null || true
   done
   # A copy that silently lost a file is exactly the "installed but broken" case we must not ship.
   for d in "$REPO"/plugins/*/; do
