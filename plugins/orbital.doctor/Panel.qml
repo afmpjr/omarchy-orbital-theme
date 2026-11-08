@@ -60,6 +60,12 @@ Panel {
     }
   }
 
+  // Direct AI agent diagnosis launch (exact orbital.crash pattern: Quickshell.execDetached without intermediary presentation terminal)
+  function diagnoseWithAi() {
+    root.close()
+    Quickshell.execDetached(["omarchy-agent-doctor"])
+  }
+
   Process {
     id: runnerProc
     command: []
@@ -802,16 +808,16 @@ Panel {
               border.width: btnDiagnose.activeFocus ? 2 : 1
               activeFocusOnTab: true
 
-              Keys.onReturnPressed: root.runTerminalCommand("omarchy-agent-doctor")
-              Keys.onEnterPressed: root.runTerminalCommand("omarchy-agent-doctor")
-              Keys.onSpacePressed: root.runTerminalCommand("omarchy-agent-doctor")
+              Keys.onReturnPressed: root.diagnoseWithAi()
+              Keys.onEnterPressed: root.diagnoseWithAi()
+              Keys.onSpacePressed: root.diagnoseWithAi()
 
               MouseArea {
                 id: mouseDiagnose
                 anchors.fill: parent
                 hoverEnabled: true
                 cursorShape: Qt.PointingHandCursor
-                onClicked: root.runTerminalCommand("omarchy-agent-doctor")
+                onClicked: root.diagnoseWithAi()
               }
 
               Row {
