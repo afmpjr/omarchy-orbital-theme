@@ -268,6 +268,54 @@ check("correctly parses authorized SMART devices and detects hardware failures",
     "ALERTA: Falha física iminente em sda!");
 });
 
+// 8b. Multi-disk SMART attribute warnings (sda OK + sdb CRC/Load_Cycle alerts)
+check("lists all physical disks and flags SMART attribute warnings", function() {
+  var smartWithWarn = {
+    available: true,
+    devices: [
+      {
+        device: "sda",
+        path: "/dev/sda",
+        health: "PASSED",
+        failing: false,
+        warning: false,
+        temperature: "40 °C",
+        temperature_celsius: 40,
+        alerts: []
+      },
+      {
+        device: "sdb",
+        path: "/dev/sdb",
+        health: "PASSED",
+        failing: false,
+        warning: true,
+        temperature: "35 °C",
+        temperature_celsius: 35,
+        alerts: [
+          { attribute: "UDMA_CRC_Error_Count", raw_value: 46, delta: 1 },
+          { attribute: "Load_Cycle_Count", raw_value: 260390 }
+        ]
+      }
+    ]
+  };
+  var summaryEn = Model.smartStatusSummary(smartWithWarn, "en");
+  assert.strictEqual(summaryEn.available, true);
+  assert.strictEqual(summaryEn.ok, false);
+  assert.strictEqual(summaryEn.warning, true);
+  assert.strictEqual(summaryEn.critical, false);
+  assert.strictEqual(summaryEn.devices.length, 2);
+  assert.strictEqual(summaryEn.devices[0].device, "sda");
+  assert.strictEqual(summaryEn.devices[0].ok, true);
+  assert.strictEqual(summaryEn.devices[0].line, "/dev/sda (PASSED, 40 °C)");
+  assert.strictEqual(summaryEn.devices[1].device, "sdb");
+  assert.strictEqual(summaryEn.devices[1].warning, true);
+  assert.ok(summaryEn.devices[1].line.indexOf("UDMA_CRC_Error_Count=46 (+1)") !== -1);
+  assert.ok(summaryEn.devices[1].line.indexOf("Load_Cycle_Count=260390") !== -1);
+  assert.ok(summaryEn.text.indexOf("/dev/sda") !== -1);
+  assert.ok(summaryEn.text.indexOf("/dev/sdb") !== -1);
+  assert.strictEqual(Model.smartStatusSummary(smartWithWarn, "pt").text.indexOf("Alerta SMART:"), 0);
+});
+
 // 9. PSI (Pressure Stall Information) Graded Color & Thresholds
 check("evaluates PSI values and returns proper graded colors", function() {
   var tokens = { dark_fg: "#91A4BB", yellow: "#D9B66A", dangerBase: "#E86A6A" };

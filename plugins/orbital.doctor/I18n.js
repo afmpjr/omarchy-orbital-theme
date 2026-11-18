@@ -67,6 +67,7 @@ var pt = {
 
   // SMART status
   "Physical Disks: %s": "Discos Físicos: %s",
+  "SMART Alert: %s": "Alerta SMART: %s",
   "WARNING: Imminent physical failure on %s!": "ALERTA: Falha física iminente em %s!",
   "SMART: Requires root (permission pending)": "SMART: Requer root (autorização pendente)",
   "SMART: No devices detected": "SMART: Nenhum dispositivo detectado",
