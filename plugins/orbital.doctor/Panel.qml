@@ -649,6 +649,7 @@ Panel {
           // Bloco 4: Integridade & Hardware (Systemd + SMART)
           // -------------------------------------------------------------
           Column {
+            id: integrityColumn
             width: parent.width
             spacing: Style.space(6)
 
@@ -711,35 +712,83 @@ Panel {
 
             // SMART Storage Card
             readonly property var smartSummary: Model.smartStatusSummary(root.doctorState ? root.doctorState.smart : null)
+            readonly property bool smartHasDevices: smartSummary.devices && smartSummary.devices.length > 0
 
             Rectangle {
+              id: smartCardBox
               width: parent.width
-              height: Style.space(32)
+              height: Math.max(Style.space(32), smartCardColumn.implicitHeight + Style.space(16))
               radius: Style.space(6)
-              color: parent.smartSummary.ok ? Qt.rgba(255, 255, 255, 0.04) : Qt.rgba(232, 106, 106, 0.14)
-              border.color: parent.smartSummary.ok ? Qt.rgba(255, 255, 255, 0.08) : Qt.rgba(232, 106, 106, 0.45)
+              color: integrityColumn.smartSummary.critical
+                ? Qt.rgba(232, 106, 106, 0.14)
+                : (integrityColumn.smartSummary.warning ? Qt.rgba(217, 182, 106, 0.12) : Qt.rgba(255, 255, 255, 0.04))
+              border.color: integrityColumn.smartSummary.critical
+                ? Qt.rgba(232, 106, 106, 0.45)
+                : (integrityColumn.smartSummary.warning ? Qt.rgba(217, 182, 106, 0.45) : Qt.rgba(255, 255, 255, 0.08))
 
-              Row {
-                anchors.fill: parent
-                anchors.margins: Style.space(8)
-                spacing: Style.space(8)
+              Column {
+                id: smartCardColumn
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.verticalCenter: parent.verticalCenter
+                anchors.leftMargin: Style.space(8)
+                anchors.rightMargin: Style.space(8)
+                spacing: Style.space(4)
 
-                OrbitalUi.OrbitalIcon {
-                  size: 16
-                  name: parent.parent.parent.smartSummary.available ? "drive-harddisk-symbolic" : "system-lock-screen-symbolic"
-                  tint: parent.parent.parent.smartSummary.ok ? (parent.parent.parent.smartSummary.available ? "#7BC29A" : "#91A4BB") : "#FF8A8A"
-                  anchors.verticalCenter: parent.verticalCenter
+                Row {
+                  visible: !integrityColumn.smartHasDevices
+                  width: parent.width
+                  spacing: Style.space(8)
+
+                  OrbitalUi.OrbitalIcon {
+                    size: 16
+                    name: integrityColumn.smartSummary.available ? "drive-harddisk-symbolic" : "system-lock-screen-symbolic"
+                    tint: integrityColumn.smartSummary.ok ? (integrityColumn.smartSummary.available ? "#7BC29A" : "#91A4BB") : "#FF8A8A"
+                    anchors.verticalCenter: parent.verticalCenter
+                  }
+
+                  Text {
+                    text: integrityColumn.smartSummary.text
+                    color: integrityColumn.smartSummary.ok ? (integrityColumn.smartSummary.available ? "#7BC29A" : "#91A4BB") : "#FF8A8A"
+                    font.family: tokens.fontFamily
+                    font.pixelSize: 11
+                    font.bold: !integrityColumn.smartSummary.ok
+                    wrapMode: Text.WordWrap
+                    width: parent.width - 24
+                    anchors.verticalCenter: parent.verticalCenter
+                  }
                 }
 
-                Text {
-                  text: parent.parent.parent.smartSummary.text
-                  color: parent.parent.parent.smartSummary.ok ? (parent.parent.parent.smartSummary.available ? "#7BC29A" : "#91A4BB") : "#FF8A8A"
-                  font.family: tokens.fontFamily
-                  font.pixelSize: 11
-                  font.bold: !parent.parent.parent.smartSummary.ok
-                  elide: Text.ElideRight
-                  width: parent.width - 32
-                  anchors.verticalCenter: parent.verticalCenter
+                Repeater {
+                  model: integrityColumn.smartHasDevices ? integrityColumn.smartSummary.devices : []
+
+                  Row {
+                    required property var modelData
+                    width: smartCardColumn.width
+                    spacing: Style.space(8)
+
+                    readonly property color diskColor: modelData.failing
+                      ? "#FF8A8A"
+                      : (modelData.warning ? "#D9B66A" : "#7BC29A")
+
+                    OrbitalUi.OrbitalIcon {
+                      size: 16
+                      name: modelData.ok ? "drive-harddisk-symbolic" : "dialog-warning-symbolic"
+                      tint: parent.diskColor
+                      anchors.top: parent.top
+                      anchors.topMargin: 1
+                    }
+
+                    Text {
+                      text: modelData.line
+                      color: parent.diskColor
+                      font.family: tokens.fontFamily
+                      font.pixelSize: 11
+                      font.bold: !modelData.ok
+                      wrapMode: Text.WordWrap
+                      width: parent.width - 24
+                    }
+                  }
                 }
               }
             }

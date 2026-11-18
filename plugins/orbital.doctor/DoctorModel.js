@@ -443,17 +443,51 @@ function systemdStatusSummary(failedUnits, locale) {
   };
 }
 
+function formatSmartTemperature(dev) {
+  var raw = dev.temperature !== undefined && dev.temperature !== null && dev.temperature !== ""
+    ? dev.temperature
+    : dev.temperature_celsius;
+  if (raw === undefined || raw === null || raw === "") {
+    return "";
+  }
+  var text = String(raw).trim();
+  if (text.indexOf("°") !== -1) {
+    return text;
+  }
+  return text + "°C";
+}
+
+function formatSmartAlerts(alerts) {
+  if (!Array.isArray(alerts) || alerts.length === 0) {
+    return "";
+  }
+  var items = [];
+  for (var i = 0; i < alerts.length; i++) {
+    var alert = alerts[i];
+    if (!alert || !alert.attribute) continue;
+    var item = alert.attribute + "=" + alert.raw_value;
+    if (typeof alert.delta === "number" && alert.delta > 0) {
+      item += " (+" + alert.delta + ")";
+    }
+    items.push(item);
+  }
+  return items.join(", ");
+}
+
 /**
  * Generates summary description for SMART storage health.
  * @param {object|null} smart - SMART metadata
  * @param {string} [locale] - Optional locale override
- * @returns {{ available: boolean, ok: boolean, text: string }}
+ * @returns {{ available: boolean, ok: boolean, critical?: boolean, warning?: boolean, text: string, devices?: Array }}
  */
 function smartStatusSummary(smart, locale) {
   if (!smart || smart.available !== true) {
     return {
       available: false,
       ok: true,
+      critical: false,
+      warning: false,
+      devices: [],
       text: tr("SMART: Requires root (permission pending)", null, locale)
     };
   }
@@ -462,10 +496,15 @@ function smartStatusSummary(smart, locale) {
     return {
       available: true,
       ok: true,
+      critical: false,
+      warning: false,
+      devices: [],
       text: tr("SMART: No devices detected", null, locale)
     };
   }
   var failingDevices = [];
+  var warningDevices = [];
+  var deviceRows = [];
   var parts = [];
   var defaultDiskName = tr("disk", null, locale);
   for (var i = 0; i < devices.length; i++) {
@@ -473,22 +512,59 @@ function smartStatusSummary(smart, locale) {
     if (!dev) continue;
     var name = dev.device || (dev.path ? dev.path.replace("/dev/", "") : defaultDiskName);
     var health = dev.health || (dev.failing ? "FAILING" : "OK");
-    var temp = (dev.temperature || dev.temperature_celsius) ? (dev.temperature || dev.temperature_celsius) + "°C" : "";
-    if (dev.failing === true || String(health).toUpperCase() === "FAILING") {
+    var temp = formatSmartTemperature(dev);
+    var isFailing = dev.failing === true || String(health).toUpperCase() === "FAILING";
+    var alerts = Array.isArray(dev.alerts) ? dev.alerts : [];
+    var alertText = formatSmartAlerts(alerts);
+    var hasWarning = dev.warning === true || alerts.length > 0;
+    if (isFailing) {
       failingDevices.push(name);
+    } else if (hasWarning) {
+      warningDevices.push(name);
     }
-    parts.push("/dev/" + name + " (" + health + (temp ? ", " + temp : "") + ")");
+    var baseLabel = "/dev/" + name + " (" + health + (temp ? ", " + temp : "") + ")";
+    var rowLine = baseLabel + (alertText ? " • " + alertText : "");
+    parts.push(rowLine);
+    deviceRows.push({
+      device: name,
+      path: "/dev/" + name,
+      health: health,
+      temperature: temp,
+      failing: isFailing,
+      warning: hasWarning,
+      cached: dev.cached === true,
+      ok: !isFailing && !hasWarning,
+      alerts: alerts,
+      alertText: alertText,
+      line: rowLine
+    });
   }
   if (failingDevices.length > 0) {
     return {
       available: true,
       ok: false,
+      critical: true,
+      warning: false,
+      devices: deviceRows,
       text: tr("WARNING: Imminent physical failure on %s!", [failingDevices.join(", ")], locale)
+    };
+  }
+  if (warningDevices.length > 0) {
+    return {
+      available: true,
+      ok: false,
+      critical: false,
+      warning: true,
+      devices: deviceRows,
+      text: tr("SMART Alert: %s", [parts.join(" • ")], locale)
     };
   }
   return {
     available: true,
     ok: true,
+    critical: false,
+    warning: false,
+    devices: deviceRows,
     text: tr("Physical Disks: %s", [parts.join(" • ")], locale)
   };
 }
